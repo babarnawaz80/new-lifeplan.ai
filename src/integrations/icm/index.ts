@@ -1,5 +1,10 @@
 // iCM integration adapter — mock implementation.
 // All UI must go through these functions so real APIs can swap in later.
+//
+// LifePlan is standalone: this adapter contains NO calls into the legacy
+// plan modules (PCP, BSP, NCP, Staff Action Plan, etc.). The only real
+// integration wire is CareTracker, which LifePlan writes through the same
+// existing entry point the legacy modules use, in the same payload shape.
 
 import {
   individuals,
@@ -10,6 +15,7 @@ import {
   trainings,
   agentTemplates,
   guidelinesEngines,
+  careTrackerServices,
   ORG_ID,
 } from "@/data/mock";
 import type {
@@ -20,6 +26,7 @@ import type {
   Training,
   AgentTemplate,
   GuidelinesEngine,
+  CareTrackerService,
 } from "@/data/mock";
 import {
   PROFILE_FIELD_NAMES,
