@@ -14,6 +14,7 @@ import { Route as IndividualsIndexRouteImport } from './routes/individuals.index
 import { Route as AgentsIndexRouteImport } from './routes/agents.index'
 import { Route as IndividualsIdRouteImport } from './routes/individuals.$id'
 import { Route as AgentsNewRouteImport } from './routes/agents.new'
+import { Route as AgentsIdEditRouteImport } from './routes/agents.$id.edit'
 import { Route as IndividualsIdPlanPlanIdRouteImport } from './routes/individuals.$id.plan.$planId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -41,6 +42,11 @@ const AgentsNewRoute = AgentsNewRouteImport.update({
   path: '/agents/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsIdEditRoute = AgentsIdEditRouteImport.update({
+  id: '/agents/$id/edit',
+  path: '/agents/$id/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndividualsIdPlanPlanIdRoute = IndividualsIdPlanPlanIdRouteImport.update({
   id: '/plan/$planId',
   path: '/plan/$planId',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
   '/agents/': typeof AgentsIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
+  '/agents/$id/edit': typeof AgentsIdEditRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
   '/agents': typeof AgentsIndexRoute
   '/individuals': typeof IndividualsIndexRoute
+  '/agents/$id/edit': typeof AgentsIdEditRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
 }
 export interface FileRoutesById {
@@ -70,6 +78,7 @@ export interface FileRoutesById {
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
   '/agents/': typeof AgentsIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
+  '/agents/$id/edit': typeof AgentsIdEditRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
 }
 export interface FileRouteTypes {
@@ -80,6 +89,7 @@ export interface FileRouteTypes {
     | '/individuals/$id'
     | '/agents/'
     | '/individuals/'
+    | '/agents/$id/edit'
     | '/individuals/$id/plan/$planId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -88,6 +98,7 @@ export interface FileRouteTypes {
     | '/individuals/$id'
     | '/agents'
     | '/individuals'
+    | '/agents/$id/edit'
     | '/individuals/$id/plan/$planId'
   id:
     | '__root__'
@@ -96,6 +107,7 @@ export interface FileRouteTypes {
     | '/individuals/$id'
     | '/agents/'
     | '/individuals/'
+    | '/agents/$id/edit'
     | '/individuals/$id/plan/$planId'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +117,7 @@ export interface RootRouteChildren {
   IndividualsIdRoute: typeof IndividualsIdRouteWithChildren
   AgentsIndexRoute: typeof AgentsIndexRoute
   IndividualsIndexRoute: typeof IndividualsIndexRoute
+  AgentsIdEditRoute: typeof AgentsIdEditRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -144,6 +157,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents/$id/edit': {
+      id: '/agents/$id/edit'
+      path: '/agents/$id/edit'
+      fullPath: '/agents/$id/edit'
+      preLoaderRoute: typeof AgentsIdEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/individuals/$id/plan/$planId': {
       id: '/individuals/$id/plan/$planId'
       path: '/plan/$planId'
@@ -172,7 +192,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndividualsIdRoute: IndividualsIdRouteWithChildren,
   AgentsIndexRoute: AgentsIndexRoute,
   IndividualsIndexRoute: IndividualsIndexRoute,
+  AgentsIdEditRoute: AgentsIdEditRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
