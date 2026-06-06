@@ -509,6 +509,8 @@ export const individualAgents: IndividualAgent[] = [
 ];
 
 export const plans: Plan[] = [];
+export const taskAssignments: TaskAssignment[] = [];
+export const trainings: Training[] = [];
 
 export const categoryColor: Record<Agent["category"], string> = {
   behavioral: "var(--indigo)",
