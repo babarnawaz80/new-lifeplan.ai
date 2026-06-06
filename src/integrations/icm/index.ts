@@ -275,7 +275,127 @@ export function getProfileData(
   }
   return out;
 }
-export function pushToCareTracker(planId: string, payload: unknown) {
-  console.log("[icm] pushToCareTracker", planId, payload);
+// ---- CareTracker (the only real integration wire) ----
+//
+// Coexistence plan types: types LifePlan can author that ALSO exist in a
+// legacy module. Used to surface a cutover warning before implement, since
+// v1 has no read API into the legacy modules to auto-detect.
+const COEXISTENCE_PLAN_TYPES = new Set<string>([
+  "person_centered",
+  "nursing_care",
+  "staff_action_plan",
+  "behavior_support",
+]);
+
+export function mayHaveLegacyPlan(planType: string): boolean {
+  return COEXISTENCE_PLAN_TYPES.has(planType);
+}
+
+// Returns the active LifePlan or legacy CareTracker source for this
+// (individual, plan type), if any. A given individual + plan type may have
+// at most ONE active source at a time. `exceptPlanId` lets the current plan
+// ignore itself when re-implementing.
+export function getActiveCareTrackerSource(args: {
+  individualId: string;
+  planType: string;
+  exceptPlanId?: string;
+}): CareTrackerService | undefined {
+  return careTrackerServices.find(
+    (s) =>
+      s.individual_id === args.individualId &&
+      s.plan_type === args.planType &&
+      !s.end_date &&
+      s.plan_id !== args.exceptPlanId,
+  );
+}
+
+export function listCareTrackerServices(individualId: string): CareTrackerService[] {
+  return careTrackerServices.filter((s) => s.individual_id === individualId);
+}
+
+// End all open services for a given individual + plan type. Mirrors how the
+// legacy module's discontinue ends services through iCM today.
+export function discontinueCareTrackerSource(args: {
+  individualId: string;
+  planType: string;
+  endDate: string;
+  exceptPlanId?: string;
+}) {
+  for (const s of careTrackerServices) {
+    if (
+      s.individual_id === args.individualId &&
+      s.plan_type === args.planType &&
+      !s.end_date &&
+      s.plan_id !== args.exceptPlanId
+    ) {
+      s.end_date = args.endDate;
+    }
+  }
+}
+
+// LifePlan emits its CareTracker payload in the legacy shape through the
+// same existing entry point. Each service is tagged with source='lifeplan'
+// and dated with the plan's implementation date. Enforces: one active
+// source per (individual, plan type) by closing any prior active source.
+export function pushToCareTracker(
+  planId: string,
+  payload: unknown,
+  opts?: { effectiveDate?: string },
+): CareTrackerService[] {
+  const plan = plans.find((p) => p.id === planId);
+  if (!plan) {
+    console.warn("[icm] pushToCareTracker called for unknown plan", planId);
+    return [];
+  }
+  const agent = agents.find((a) => a.id === plan.agent_id);
+  const planType = agent?.plan_type ?? "unknown";
+  const effective_date =
+    opts?.effectiveDate ??
+    plan.implementation_date ??
+    new Date().toISOString();
+
+  // Enforce single active source per (individual, plan type).
+  discontinueCareTrackerSource({
+    individualId: plan.individual_id,
+    planType,
+    endDate: effective_date,
+    exceptPlanId: planId,
+  });
+
+  // Accept the legacy-shaped payload: { goals: [...], plan_summary: "..." }.
+  type LegacyGoal = {
+    id?: string;
+    title?: string;
+    description?: string;
+    responsible?: string;
+    services?: string[];
+    target_date?: string;
+  };
+  const goals: LegacyGoal[] =
+    (payload as { goals?: LegacyGoal[] } | null)?.goals ?? [];
+
+  const created: CareTrackerService[] = [];
+  goals.forEach((g, i) => {
+    const svc: CareTrackerService = {
+      id: `cts_${planId}_${i}_${Date.now()}`,
+      individual_id: plan.individual_id,
+      plan_id: planId,
+      plan_type: planType,
+      source: "lifeplan",
+      title: g.title ?? `Goal ${i + 1}`,
+      description: g.description,
+      responsible: g.responsible,
+      effective_date,
+      raw: g,
+    };
+    careTrackerServices.push(svc);
+    created.push(svc);
+  });
+
+  console.log(
+    "[icm] pushToCareTracker",
+    { planId, planType, individualId: plan.individual_id, count: created.length },
+  );
+  return created;
 }
 
