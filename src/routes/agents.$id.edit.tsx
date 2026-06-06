@@ -234,16 +234,29 @@ function AgentEditor() {
 
             <div className="flex-1 p-5 overflow-y-auto">
               {tab === "guidelines" && (
-                <GuidelinesTab
-                  all={guidelines}
-                  selectedIds={guidelineIds}
-                  onToggle={(id) =>
-                    setGuidelineIds((prev) =>
-                      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-                    )
-                  }
-                />
+                <div className="space-y-4">
+                  <div className="rounded-xl bg-muted/40 border border-line p-3 text-[12px] text-ink2 flex items-start gap-2">
+                    <Shield className="h-4 w-4 text-teal shrink-0 mt-0.5" />
+                    <span>
+                      Guidelines are managed in the{" "}
+                      <Link to="/guidelines" className="text-navy font-semibold underline">
+                        State Guidelines library
+                      </Link>{" "}
+                      and cannot be edited here. You can link a different published guideline below.
+                    </span>
+                  </div>
+                  <GuidelinesTab
+                    all={guidelines}
+                    selectedIds={guidelineIds}
+                    onToggle={(id) =>
+                      setGuidelineIds((prev) =>
+                        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+                      )
+                    }
+                  />
+                </div>
               )}
+
               {tab === "workflow" && <WorkflowTab phases={phases} onChange={setPhases} />}
               {tab === "data" && (
                 <ToggleGridTab
