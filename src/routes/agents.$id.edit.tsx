@@ -9,8 +9,9 @@ import { WorkflowTab } from "@/components/agents/tabs/WorkflowTab";
 import { ToggleGridTab } from "@/components/agents/tabs/ToggleGridTab";
 import { getAgent, listGuidelines, updateAgent } from "@/integrations/icm";
 import { accentColor } from "@/data/mock";
-import { buildWorkflow } from "@/lib/build-workflow.functions";
+import { buildAgent } from "@/lib/build-agent.functions";
 import { toast } from "sonner";
+import { Shield } from "lucide-react";
 import type { WorkflowPhase, ToggleField } from "@/data/lifeplan-types";
 
 export const Route = createFileRoute("/agents/$id/edit")({
