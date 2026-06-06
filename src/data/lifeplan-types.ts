@@ -1,5 +1,10 @@
 // Shared agent/workflow types and constants.
 
+export type NotifyTrigger = {
+  type: "before_due" | "on_due" | "overdue";
+  days: number;
+};
+
 export type WorkflowTask = {
   id: string;
   title: string;
@@ -11,6 +16,9 @@ export type WorkflowTask = {
   icm_links: string[];
   sort_order: number;
   ai_instructions?: string;
+  notify_roles?: boolean;
+  notify_service_contacts?: boolean;
+  triggers?: NotifyTrigger[];
 };
 
 export type WorkflowPhase = {
