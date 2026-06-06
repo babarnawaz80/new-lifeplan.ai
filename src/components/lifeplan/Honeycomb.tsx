@@ -1,30 +1,86 @@
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Agent, Individual } from "@/data/mock";
 import { categoryColor } from "@/data/mock";
 
-// Geometry — flat-top hexagons.
-// Center hex at (340, 235), R = 68, ring distance ~124 (with slight gap), viewBox 680x470.
-const R = 68;
-const VBW = 680;
-const VBH = 470;
-const CENTER = { x: 340, y: 235 };
+// ---------------------------------------------------------------------------
+// Honeycomb hex-grid (flat-top, axial coordinates).
+// Rings grow outward; ring r holds 6r tiles. Capacity through ring r is
+// 1 + 3r(r+1). So 7 tiles through ring 1, 19 through ring 2, 37 through ring 3.
+// ---------------------------------------------------------------------------
 
-// Ring positions per spec
-const RING_POSITIONS = [
-  { x: 464, y: 235 }, // right
-  { x: 402, y: 128 }, // top-right
-  { x: 278, y: 128 }, // top-left
-  { x: 216, y: 235 }, // left
-  { x: 278, y: 342 }, // bottom-left
-  { x: 402, y: 342 }, // bottom-right
+// Tunable constants (named so they are easy to change).
+const MAX_TILE = 68;       // tile radius at small ring counts
+const MIN_TILE = 38;       // floor — never shrink below this
+const RING_GAP = 4;        // visual gap between tiles
+const PAGINATION_THRESHOLD = 18; // when plan tiles exceed this, paginate
+const PAGE_SIZE = 18;      // tiles per page after paginating (ring 2 capacity)
+const VIEWBOX_PADDING = 24;
+
+// Axial directions for a flat-top hex grid.
+// In axial (q,r) -> pixel: x = size * 3/2 * q ; y = size * sqrt(3) * (r + q/2)
+const AXIAL_DIRECTIONS: Array<[number, number]> = [
+  [1, 0],   // E
+  [1, -1],  // NE
+  [0, -1],  // NW
+  [-1, 0],  // W
+  [-1, 1],  // SW
+  [0, 1],   // SE
 ];
 
-const MAX_RING = 6; // change to 12 later for ring-out
+function axialToPixel(q: number, r: number, size: number) {
+  const x = size * (3 / 2) * q;
+  const y = size * Math.sqrt(3) * (r + q / 2);
+  return { x, y };
+}
 
-function hexPath(cx: number, cy: number, r = R) {
-  // flat-top: (cx+r,cy) (cx+r/2,cy+r*sin60) (cx-r/2,cy+r*sin60) (cx-r,cy) (cx-r/2,cy-r*sin60) (cx+r/2,cy-r*sin60)
-  const h = Math.round(r * Math.sin(Math.PI / 3) * 100) / 100; // ~58.88; spec uses 59
+// Generate axial coords for ring k (k>=1). Walks the perimeter clockwise.
+function ringCoords(k: number): Array<[number, number]> {
+  if (k === 0) return [[0, 0]];
+  const result: Array<[number, number]> = [];
+  // Start at k steps in direction 4 (SW) — matches common implementations.
+  let [q, r] = [AXIAL_DIRECTIONS[4][0] * k, AXIAL_DIRECTIONS[4][1] * k];
+  for (let side = 0; side < 6; side++) {
+    for (let step = 0; step < k; step++) {
+      result.push([q, r]);
+      q += AXIAL_DIRECTIONS[side][0];
+      r += AXIAL_DIRECTIONS[side][1];
+    }
+  }
+  return result;
+}
+
+// All ring coords up to and including ring `rings` (excluding center).
+function ringsUpTo(rings: number): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (let k = 1; k <= rings; k++) out.push(...ringCoords(k));
+  return out;
+}
+
+// Capacity (incl. center) through ring r.
+function capacityThrough(r: number) {
+  return 1 + 3 * r * (r + 1);
+}
+
+// Smallest ring r such that capacityThrough(r) >= total cells.
+function ringsNeeded(totalCells: number) {
+  if (totalCells <= 1) return 0;
+  let r = 1;
+  while (capacityThrough(r) < totalCells) r++;
+  return r;
+}
+
+// Tile size scales down with rings, but never below MIN_TILE.
+function tileSizeFor(rings: number) {
+  if (rings <= 1) return MAX_TILE;
+  // Step down ~12px per extra ring after the first.
+  const stepped = MAX_TILE - (rings - 1) * 12;
+  return Math.max(MIN_TILE, stepped);
+}
+
+function hexPoints(cx: number, cy: number, r: number) {
+  const h = r * Math.sin(Math.PI / 3);
   return [
     [cx + r, cy],
     [cx + r / 2, cy + h],
@@ -33,13 +89,13 @@ function hexPath(cx: number, cy: number, r = R) {
     [cx - r / 2, cy - h],
     [cx + r / 2, cy - h],
   ]
-    .map((p) => p.join(","))
+    .map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`)
     .join(" ");
 }
 
 type Cell =
-  | { kind: "agent"; agent: Agent; status: "current" | "draft"; pos: { x: number; y: number } }
-  | { kind: "add"; pos: { x: number; y: number } };
+  | { kind: "agent"; agent: Agent; status: "current" | "draft"; cx: number; cy: number }
+  | { kind: "add"; cx: number; cy: number };
 
 interface HoneycombProps {
   individual: Individual;
@@ -49,17 +105,54 @@ interface HoneycombProps {
 }
 
 export function Honeycomb({ individual, agents, onSelectAgent, onAddPlan }: HoneycombProps) {
-  const cells: Cell[] = [];
-  for (let i = 0; i < MAX_RING; i++) {
-    const pos = RING_POSITIONS[i];
-    const a = agents[i];
-    if (a) cells.push({ kind: "agent", agent: a.agent, status: a.status, pos });
-    else {
-      // first empty slot = Add cell
-      const hasAdd = cells.some((c) => c.kind === "add");
-      if (!hasAdd) cells.push({ kind: "add", pos });
+  // Pagination: when too many plan tiles, slice into pages of PAGE_SIZE.
+  const paginated = agents.length > PAGINATION_THRESHOLD;
+  const pageCount = paginated ? Math.ceil(agents.length / PAGE_SIZE) : 1;
+  const [page, setPage] = useState(0);
+  const pageAgents = paginated
+    ? agents.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+    : agents;
+
+  const { cells, viewBox } = useMemo(() => {
+    // Total cells needed on this page: center + agent tiles + (1 add slot if room).
+    const tilesOnPage = pageAgents.length;
+    const wantAddCell = !paginated || page === pageCount - 1;
+    const totalCells = 1 + tilesOnPage + (wantAddCell ? 1 : 0);
+
+    const rings = Math.max(1, ringsNeeded(totalCells));
+    const size = tileSizeFor(rings) + RING_GAP / 2;
+    const r = tileSizeFor(rings); // actual draw radius (gap baked in via spacing)
+    const coords = ringsUpTo(rings);
+
+    const out: Cell[] = [];
+    pageAgents.forEach((a, i) => {
+      const [q, rr] = coords[i];
+      const { x, y } = axialToPixel(q, rr, size);
+      out.push({ kind: "agent", agent: a.agent, status: a.status, cx: x, cy: y });
+    });
+    if (wantAddCell) {
+      const [q, rr] = coords[tilesOnPage];
+      const { x, y } = axialToPixel(q, rr, size);
+      out.push({ kind: "add", cx: x, cy: y });
     }
-  }
+
+    // Compute bbox from all drawn cells (incl. center).
+    const allPoints: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }, ...out.map((c) => ({ x: c.cx, y: c.cy }))];
+    const minX = Math.min(...allPoints.map((p) => p.x)) - r - VIEWBOX_PADDING;
+    const maxX = Math.max(...allPoints.map((p) => p.x)) + r + VIEWBOX_PADDING;
+    const minY = Math.min(...allPoints.map((p) => p.y)) - r - VIEWBOX_PADDING;
+    const maxY = Math.max(...allPoints.map((p) => p.y)) + r + VIEWBOX_PADDING;
+    const vb = `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
+
+    return { cells: out, viewBox: vb, drawR: r } as { cells: Cell[]; viewBox: string; drawR: number };
+  }, [pageAgents, paginated, page, pageCount]);
+
+  // Recompute draw radius for rendering (same logic).
+  const rings = useMemo(() => {
+    const total = 1 + pageAgents.length + (!paginated || page === pageCount - 1 ? 1 : 0);
+    return Math.max(1, ringsNeeded(total));
+  }, [pageAgents.length, paginated, page, pageCount]);
+  const drawR = tileSizeFor(rings);
 
   const initials = individual.name
     .split(" ")
@@ -69,8 +162,8 @@ export function Honeycomb({ individual, agents, onSelectAgent, onAddPlan }: Hone
     .toUpperCase();
 
   return (
-    <div className="w-full max-w-[560px] mx-auto">
-      <svg viewBox={`0 0 ${VBW} ${VBH}`} className="w-full h-auto" aria-label="Life plan honeycomb">
+    <div className="w-full max-w-[640px] mx-auto">
+      <svg viewBox={viewBox} className="w-full h-auto" aria-label="Life plan honeycomb">
         {/* Center: individual */}
         <motion.g
           initial={{ opacity: 0, scale: 0.9 }}
@@ -78,38 +171,38 @@ export function Honeycomb({ individual, agents, onSelectAgent, onAddPlan }: Hone
           transition={{ duration: 0.35 }}
         >
           <polygon
-            points={hexPath(CENTER.x, CENTER.y)}
+            points={hexPoints(0, 0, drawR)}
             fill="#eeeffb"
             stroke="var(--indigo)"
             strokeWidth={2}
           />
-          <circle cx={CENTER.x} cy={CENTER.y - 26} r={20} fill="var(--indigo)" />
+          <circle cx={0} cy={-drawR * 0.38} r={drawR * 0.29} fill="var(--indigo)" />
           <text
-            x={CENTER.x}
-            y={CENTER.y - 21}
+            x={0}
+            y={-drawR * 0.31}
             textAnchor="middle"
             fill="#fff"
-            fontSize="14"
+            fontSize={drawR * 0.21}
             fontWeight="700"
           >
             {initials}
           </text>
           <text
-            x={CENTER.x}
-            y={CENTER.y + 10}
+            x={0}
+            y={drawR * 0.15}
             textAnchor="middle"
             fill="var(--ink)"
-            fontSize="15"
+            fontSize={drawR * 0.22}
             fontWeight="700"
           >
             {individual.name}
           </text>
           <text
-            x={CENTER.x}
-            y={CENTER.y + 30}
+            x={0}
+            y={drawR * 0.44}
             textAnchor="middle"
             fill="var(--green)"
-            fontSize="10"
+            fontSize={drawR * 0.15}
             fontWeight="800"
             letterSpacing="1"
           >
@@ -117,49 +210,50 @@ export function Honeycomb({ individual, agents, onSelectAgent, onAddPlan }: Hone
           </text>
         </motion.g>
 
-        {/* Ring */}
+        {/* Outer ring cells */}
         {cells.map((cell, i) => (
           <motion.g
             key={i}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 + i * 0.06, duration: 0.3 }}
+            transition={{ delay: 0.12 + i * 0.04, duration: 0.28 }}
             style={{ cursor: "pointer" }}
             className="hex-cell"
-            onClick={() => (cell.kind === "agent" ? onSelectAgent(cell.agent) : onAddPlan())}
+            onClick={() =>
+              cell.kind === "agent" ? onSelectAgent(cell.agent) : onAddPlan()
+            }
           >
             {cell.kind === "agent" ? (
               <>
                 <polygon
-                  points={hexPath(cell.pos.x, cell.pos.y)}
+                  points={hexPoints(cell.cx, cell.cy, drawR)}
                   fill="#ffffff"
                   stroke="#e2ddd2"
                   strokeWidth={1.5}
                   className="hex-poly"
                 />
-                {/* category dot */}
                 <circle
-                  cx={cell.pos.x}
-                  cy={cell.pos.y - 38}
-                  r={4.5}
+                  cx={cell.cx}
+                  cy={cell.cy - drawR * 0.56}
+                  r={drawR * 0.07}
                   fill={categoryColor[cell.agent.category]}
                 />
                 <text
-                  x={cell.pos.x}
-                  y={cell.pos.y + 2}
+                  x={cell.cx}
+                  y={cell.cy + drawR * 0.03}
                   textAnchor="middle"
                   fill="var(--ink)"
-                  fontSize="13"
+                  fontSize={drawR * 0.2}
                   fontWeight="700"
                 >
                   {cell.agent.short}
                 </text>
                 <text
-                  x={cell.pos.x}
-                  y={cell.pos.y + 22}
+                  x={cell.cx}
+                  y={cell.cy + drawR * 0.33}
                   textAnchor="middle"
                   fill={cell.status === "current" ? "var(--green)" : "var(--amber)"}
-                  fontSize="10"
+                  fontSize={drawR * 0.15}
                   fontWeight="600"
                 >
                   {cell.status === "current" ? "Current" : "Draft"}
@@ -168,22 +262,22 @@ export function Honeycomb({ individual, agents, onSelectAgent, onAddPlan }: Hone
             ) : (
               <>
                 <polygon
-                  points={hexPath(cell.pos.x, cell.pos.y)}
+                  points={hexPoints(cell.cx, cell.cy, drawR)}
                   fill="#fbfaf6"
                   stroke="var(--ink3)"
                   strokeWidth={1.5}
                   strokeDasharray="5 5"
                   className="hex-poly"
                 />
-                <g transform={`translate(${cell.pos.x - 8}, ${cell.pos.y - 14})`}>
+                <g transform={`translate(${cell.cx - 8}, ${cell.cy - drawR * 0.22})`}>
                   <Plus width={16} height={16} stroke="var(--ink2)" />
                 </g>
                 <text
-                  x={cell.pos.x}
-                  y={cell.pos.y + 14}
+                  x={cell.cx}
+                  y={cell.cy + drawR * 0.21}
                   textAnchor="middle"
                   fill="var(--ink2)"
-                  fontSize="11"
+                  fontSize={drawR * 0.16}
                   fontWeight="600"
                 >
                   Add plan
@@ -193,6 +287,30 @@ export function Honeycomb({ individual, agents, onSelectAgent, onAddPlan }: Hone
           </motion.g>
         ))}
       </svg>
+
+      {paginated && (
+        <div className="mt-4 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[12px] font-semibold text-ink2 hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" /> Prev
+          </button>
+          <span className="text-[12px] font-semibold text-ink2">
+            Page {page + 1} / {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            disabled={page === pageCount - 1}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[12px] font-semibold text-ink2 hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       <style>{`
         .hex-cell { transition: transform .2s ease; transform-origin: center; transform-box: fill-box; }
