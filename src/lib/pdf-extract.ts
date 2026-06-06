@@ -5,7 +5,6 @@ export async function extractPdfText(file: File): Promise<string> {
   const pdfjs = await import("pdfjs-dist");
   // Use a CDN worker — avoids bundler worker config.
   const workerUrl = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-  // @ts-expect-error pdfjs types are loose here
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
   const buf = await file.arrayBuffer();
