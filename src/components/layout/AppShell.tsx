@@ -8,6 +8,7 @@ import {
   UserCog,
   CalendarDays,
   FileText,
+  Workflow,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -15,6 +16,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 const navItems = [
   { label: "Dashboard", icon: Home, to: "/" },
   { label: "Individuals", icon: Users, to: "/individuals" },
+  { label: "Plan agents", icon: Workflow, to: "/agents" },
   { label: "Staff", icon: UserCog, to: "#staff" },
   { label: "Events", icon: CalendarDays, to: "#events" },
   { label: "Logs", icon: FileText, to: "#logs" },
@@ -24,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const isActive = (to: string) =>
-    to !== "#staff" && to !== "#events" && to !== "#logs" && pathname.startsWith(to) && to !== "/";
+    !to.startsWith("#") && to !== "/" && pathname.startsWith(to);
 
   return (
     <div className="min-h-screen bg-background">
@@ -44,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = item.to === "/individuals" ? pathname.startsWith("/individuals") : isActive(item.to);
+              const active = isActive(item.to);
               if (item.to.startsWith("#")) {
                 return (
                   <button
