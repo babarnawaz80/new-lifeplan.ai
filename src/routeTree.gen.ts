@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as IndividualsIndexRouteImport } from './routes/individuals.index'
 import { Route as AgentsIndexRouteImport } from './routes/agents.index'
 import { Route as IndividualsIdRouteImport } from './routes/individuals.$id'
+import { Route as ApiGeneratePlanRouteImport } from './routes/api/generate-plan'
 import { Route as AgentsNewRouteImport } from './routes/agents.new'
 import { Route as AgentsIdEditRouteImport } from './routes/agents.$id.edit'
 import { Route as IndividualsIdPlanPlanIdRouteImport } from './routes/individuals.$id.plan.$planId'
@@ -37,6 +38,11 @@ const IndividualsIdRoute = IndividualsIdRouteImport.update({
   path: '/individuals/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGeneratePlanRoute = ApiGeneratePlanRouteImport.update({
+  id: '/api/generate-plan',
+  path: '/api/generate-plan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentsNewRoute = AgentsNewRouteImport.update({
   id: '/agents/new',
   path: '/agents/new',
@@ -56,6 +62,7 @@ const IndividualsIdPlanPlanIdRoute = IndividualsIdPlanPlanIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agents/new': typeof AgentsNewRoute
+  '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
   '/agents/': typeof AgentsIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agents/new': typeof AgentsNewRoute
+  '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
   '/agents': typeof AgentsIndexRoute
   '/individuals': typeof IndividualsIndexRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/agents/new': typeof AgentsNewRoute
+  '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
   '/agents/': typeof AgentsIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/agents/new'
+    | '/api/generate-plan'
     | '/individuals/$id'
     | '/agents/'
     | '/individuals/'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/agents/new'
+    | '/api/generate-plan'
     | '/individuals/$id'
     | '/agents'
     | '/individuals'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/agents/new'
+    | '/api/generate-plan'
     | '/individuals/$id'
     | '/agents/'
     | '/individuals/'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgentsNewRoute: typeof AgentsNewRoute
+  ApiGeneratePlanRoute: typeof ApiGeneratePlanRoute
   IndividualsIdRoute: typeof IndividualsIdRouteWithChildren
   AgentsIndexRoute: typeof AgentsIndexRoute
   IndividualsIndexRoute: typeof IndividualsIndexRoute
@@ -148,6 +161,13 @@ declare module '@tanstack/react-router' {
       path: '/individuals/$id'
       fullPath: '/individuals/$id'
       preLoaderRoute: typeof IndividualsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/generate-plan': {
+      id: '/api/generate-plan'
+      path: '/api/generate-plan'
+      fullPath: '/api/generate-plan'
+      preLoaderRoute: typeof ApiGeneratePlanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents/new': {
@@ -189,6 +209,7 @@ const IndividualsIdRouteWithChildren = IndividualsIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgentsNewRoute: AgentsNewRoute,
+  ApiGeneratePlanRoute: ApiGeneratePlanRoute,
   IndividualsIdRoute: IndividualsIdRouteWithChildren,
   AgentsIndexRoute: AgentsIndexRoute,
   IndividualsIndexRoute: IndividualsIndexRoute,
