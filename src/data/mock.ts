@@ -58,6 +58,15 @@ export type AgentTemplate = {
   default_output_fields: ToggleField[];
 };
 
+export type ComplianceBrief = {
+  rules: string[];
+  required_timelines: string[];
+  required_phases?: string[];
+  required_tasks?: string[];
+  required_fields?: string[];
+  notes?: string;
+};
+
 export type GuidelinesEngine = {
   id: string;
   name: string;
@@ -66,10 +75,13 @@ export type GuidelinesEngine = {
   version: number;
   status: "draft" | "published";
   source_url: string;
-  compliance_brief: {
-    rules: string[];
-    required_timelines: string[];
-  };
+  source_file_name?: string;
+  services_extracted?: number;
+  summary?: string;
+  created_at: string;
+  updated_at: string;
+  previous_version_id?: string | null;
+  compliance_brief: ComplianceBrief;
 };
 
 export type IndividualAgent = {
