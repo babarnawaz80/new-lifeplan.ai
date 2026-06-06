@@ -149,6 +149,115 @@ export function getGuideline(id: string): GuidelinesEngine | undefined {
 export function getGuidelinesForAgent(agent: Agent): GuidelinesEngine[] {
   return guidelinesEngines.filter((g) => agent.guidelines_engine_ids.includes(g.id));
 }
+export function createGuideline(args: {
+  name: string;
+  state: string;
+  program_type: string;
+  source_file_name?: string;
+  compliance_brief: import("@/data/mock").ComplianceBrief;
+  services_extracted?: number;
+  summary?: string;
+}): GuidelinesEngine {
+  const now = new Date().toISOString();
+  const g: GuidelinesEngine = {
+    id: `gl_${Date.now()}`,
+    name: args.name,
+    state: args.state,
+    program_type: args.program_type,
+    version: 1,
+    status: "published",
+    source_url: "",
+    source_file_name: args.source_file_name,
+    services_extracted: args.services_extracted,
+    summary: args.summary,
+    created_at: now,
+    updated_at: now,
+    previous_version_id: null,
+    compliance_brief: args.compliance_brief,
+  };
+  guidelinesEngines.push(g);
+  return g;
+}
+export function updateGuidelineVersion(
+  prevId: string,
+  args: {
+    source_file_name?: string;
+    compliance_brief: import("@/data/mock").ComplianceBrief;
+    services_extracted?: number;
+    summary?: string;
+  },
+): GuidelinesEngine {
+  const prev = getGuideline(prevId);
+  if (!prev) throw new Error("Guideline not found");
+  const now = new Date().toISOString();
+  const next: GuidelinesEngine = {
+    ...prev,
+    id: `gl_${Date.now()}`,
+    version: prev.version + 1,
+    status: "published",
+    source_file_name: args.source_file_name ?? prev.source_file_name,
+    services_extracted: args.services_extracted,
+    summary: args.summary,
+    created_at: now,
+    updated_at: now,
+    previous_version_id: prev.id,
+    compliance_brief: args.compliance_brief,
+  };
+  guidelinesEngines.push(next);
+  return next;
+}
+export function listGuidelineVersions(id: string): GuidelinesEngine[] {
+  // walk the previous_version_id chain back from id
+  const chain: GuidelinesEngine[] = [];
+  let cur: GuidelinesEngine | undefined = getGuideline(id);
+  while (cur) {
+    chain.push(cur);
+    cur = cur.previous_version_id ? getGuideline(cur.previous_version_id) : undefined;
+  }
+  return chain;
+}
+
+// ---- Agent creation from prompt-generated config ----
+export function createAgentFromConfig(args: {
+  name: string;
+  planType: string;
+  guidelineId?: string;
+  workflow_data: import("@/data/lifeplan-types").WorkflowPhase[];
+  profile_fields: import("@/data/lifeplan-types").ToggleField[];
+  output_fields: import("@/data/lifeplan-types").ToggleField[];
+  instructions: string;
+}): Agent {
+  const now = new Date().toISOString();
+  const short = args.name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 3)
+    .toUpperCase() || "NEW";
+  const agent: Agent = {
+    id: `agent_${Date.now()}`,
+    org_id: ORG_ID,
+    name: args.name,
+    short,
+    plan_type: args.planType,
+    category: "planning",
+    status: "draft",
+    description: "",
+    icon: "ti-sparkles",
+    accent: "navy",
+    instructions: args.instructions,
+    guidelines_engine_ids: args.guidelineId ? [args.guidelineId] : [],
+    workflow_data: args.workflow_data,
+    profile_fields: args.profile_fields,
+    output_fields: args.output_fields,
+    created_from_template_id: null,
+    created_at: now,
+    updated_at: now,
+  };
+  agents.push(agent);
+  return agent;
+}
+
 
 // ---- Plans ----
 export function createPlan(args: {

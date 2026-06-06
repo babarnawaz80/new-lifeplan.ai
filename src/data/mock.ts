@@ -58,6 +58,15 @@ export type AgentTemplate = {
   default_output_fields: ToggleField[];
 };
 
+export type ComplianceBrief = {
+  rules: string[];
+  required_timelines: string[];
+  required_phases?: string[];
+  required_tasks?: string[];
+  required_fields?: string[];
+  notes?: string;
+};
+
 export type GuidelinesEngine = {
   id: string;
   name: string;
@@ -66,10 +75,13 @@ export type GuidelinesEngine = {
   version: number;
   status: "draft" | "published";
   source_url: string;
-  compliance_brief: {
-    rules: string[];
-    required_timelines: string[];
-  };
+  source_file_name?: string;
+  services_extracted?: number;
+  summary?: string;
+  created_at: string;
+  updated_at: string;
+  previous_version_id?: string | null;
+  compliance_brief: ComplianceBrief;
 };
 
 export type IndividualAgent = {
@@ -182,6 +194,12 @@ export const guidelinesEngines: GuidelinesEngine[] = [
     version: 1,
     status: "published",
     source_url: "",
+    source_file_name: "ny-opwdd-regs.pdf",
+    services_extracted: 12,
+    summary: "Core OPWDD person-centered planning requirements for residential services.",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    previous_version_id: null,
     compliance_brief: {
       rules: [
         "Annual person-centered plan is required for every individual.",
@@ -194,6 +212,13 @@ export const guidelinesEngines: GuidelinesEngine[] = [
         "Finalize within 30 days post-meeting",
         "Effective on implementation date",
       ],
+      required_phases: ["Pre-Planning", "Meeting", "Pre-Implementation", "Implementation"],
+      required_tasks: [
+        "Gather assessments and prior plan",
+        "Hold person-centered planning meeting",
+        "Finalize goals and services",
+      ],
+      required_fields: ["Goals", "Services / Expected Outcomes", "Person Responsible"],
     },
   },
   {
@@ -204,6 +229,12 @@ export const guidelinesEngines: GuidelinesEngine[] = [
     version: 1,
     status: "published",
     source_url: "",
+    source_file_name: "il-isp-regs.pdf",
+    services_extracted: 8,
+    summary: "Illinois Individual Service Plan annual review requirements.",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    previous_version_id: null,
     compliance_brief: {
       rules: [
         "ISP must be reviewed annually and updated whenever a major change occurs.",
@@ -214,6 +245,9 @@ export const guidelinesEngines: GuidelinesEngine[] = [
         "Annual ISP meeting",
         "Implementation within 14 days of meeting",
       ],
+      required_phases: ["Pre-Planning", "ISP Meeting", "Implementation"],
+      required_tasks: ["Review prior ISP", "Hold ISP meeting", "Train staff"],
+      required_fields: ["Goals", "Person Responsible", "Target Date"],
     },
   },
 ];
