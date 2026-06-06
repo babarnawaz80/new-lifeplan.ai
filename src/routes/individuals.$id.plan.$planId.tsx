@@ -274,7 +274,7 @@ function PlanRuntime() {
                 initialMarkdown={planMarkdown}
                 canImplement={canImplement}
                 onPlanContent={handlePlanContent}
-                onImplement={() => setImplementOpen(true)}
+                onImplement={requestImplement}
               />
             ) : planMarkdown ? (
               <div className="space-y-3">
@@ -292,7 +292,7 @@ function PlanRuntime() {
                   onRegenerate={() => setPlanMarkdown("")}
                   onAiRevise={() => {}}
                   onSaveDraft={() => persistContent(planMarkdown, caretrackerData)}
-                  onImplement={() => setImplementOpen(true)}
+                  onImplement={requestImplement}
                 />
               </div>
             ) : (
@@ -303,7 +303,7 @@ function PlanRuntime() {
                 onImplement={(md) => {
                   setPlanMarkdown(md);
                   persistContent(md, caretrackerData);
-                  setImplementOpen(true);
+                  requestImplement();
                 }}
               />
             )}
@@ -311,6 +311,17 @@ function PlanRuntime() {
         </div>
       </div>
 
+      <CutoverWarningDialog
+        open={cutoverOpen}
+        onOpenChange={setCutoverOpen}
+        individualName={individual.name}
+        planTypeLabel={agent.name}
+        onAcknowledge={() => {
+          setCutoverAcked(true);
+          setCutoverOpen(false);
+          setImplementOpen(true);
+        }}
+      />
       <ImplementDialog
         open={implementOpen}
         onOpenChange={setImplementOpen}
