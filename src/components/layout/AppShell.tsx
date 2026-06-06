@@ -26,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const isActive = (to: string) =>
-    to !== "#staff" && to !== "#events" && to !== "#logs" && pathname.startsWith(to) && to !== "/";
+    !to.startsWith("#") && to !== "/" && pathname.startsWith(to);
 
   return (
     <div className="min-h-screen bg-background">
@@ -46,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = item.to === "/individuals" ? pathname.startsWith("/individuals") : isActive(item.to);
+              const active = isActive(item.to);
               if (item.to.startsWith("#")) {
                 return (
                   <button
