@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as IndividualsIndexRouteImport } from './routes/individuals.index'
+import { Route as GuidelinesIndexRouteImport } from './routes/guidelines.index'
 import { Route as AgentsIndexRouteImport } from './routes/agents.index'
 import { Route as IndividualsIdRouteImport } from './routes/individuals.$id'
 import { Route as ApiGeneratePlanRouteImport } from './routes/api/generate-plan'
@@ -26,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const IndividualsIndexRoute = IndividualsIndexRouteImport.update({
   id: '/individuals/',
   path: '/individuals/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuidelinesIndexRoute = GuidelinesIndexRouteImport.update({
+  id: '/guidelines/',
+  path: '/guidelines/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsIndexRoute = AgentsIndexRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
   '/agents/': typeof AgentsIndexRoute
+  '/guidelines/': typeof GuidelinesIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
   '/agents': typeof AgentsIndexRoute
+  '/guidelines': typeof GuidelinesIndexRoute
   '/individuals': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
   '/agents/': typeof AgentsIndexRoute
+  '/guidelines/': typeof GuidelinesIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/api/generate-plan'
     | '/individuals/$id'
     | '/agents/'
+    | '/guidelines/'
     | '/individuals/'
     | '/agents/$id/edit'
     | '/individuals/$id/plan/$planId'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/api/generate-plan'
     | '/individuals/$id'
     | '/agents'
+    | '/guidelines'
     | '/individuals'
     | '/agents/$id/edit'
     | '/individuals/$id/plan/$planId'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/api/generate-plan'
     | '/individuals/$id'
     | '/agents/'
+    | '/guidelines/'
     | '/individuals/'
     | '/agents/$id/edit'
     | '/individuals/$id/plan/$planId'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   ApiGeneratePlanRoute: typeof ApiGeneratePlanRoute
   IndividualsIdRoute: typeof IndividualsIdRouteWithChildren
   AgentsIndexRoute: typeof AgentsIndexRoute
+  GuidelinesIndexRoute: typeof GuidelinesIndexRoute
   IndividualsIndexRoute: typeof IndividualsIndexRoute
   AgentsIdEditRoute: typeof AgentsIdEditRoute
 }
@@ -147,6 +160,13 @@ declare module '@tanstack/react-router' {
       path: '/individuals'
       fullPath: '/individuals/'
       preLoaderRoute: typeof IndividualsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guidelines/': {
+      id: '/guidelines/'
+      path: '/guidelines'
+      fullPath: '/guidelines/'
+      preLoaderRoute: typeof GuidelinesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents/': {
@@ -212,9 +232,20 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGeneratePlanRoute: ApiGeneratePlanRoute,
   IndividualsIdRoute: IndividualsIdRouteWithChildren,
   AgentsIndexRoute: AgentsIndexRoute,
+  GuidelinesIndexRoute: GuidelinesIndexRoute,
   IndividualsIndexRoute: IndividualsIndexRoute,
   AgentsIdEditRoute: AgentsIdEditRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
