@@ -49,7 +49,7 @@ function AgentEditor() {
   if (!agent) throw notFound();
 
   const guidelines = listGuidelines();
-  const callBuildWorkflow = useServerFn(buildWorkflow);
+  const callBuildAgent = useServerFn(buildAgent);
 
   // Local editable state
   const [name, setName] = useState(agent.name);
@@ -64,7 +64,6 @@ function AgentEditor() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   useEffect(() => {
-    // Greeting once on mount
     if (phases.length > 0) {
       const totalTasks = phases.reduce((n, p) => n + p.tasks.length, 0);
       setMessages([
@@ -72,10 +71,8 @@ function AgentEditor() {
           id: "m_init",
           role: "ai",
           text:
-            (guidelineIds.length > 0
-              ? `I read the linked guidelines and `
-              : `I `) +
-            `drafted a ${phases.length}-phase workflow with ${totalTasks} tasks. The right panel shows it. Want to change anything — add a phase, reassign a role, mark a task required?`,
+            (guidelineIds.length > 0 ? `I read the linked guideline and ` : `I `) +
+            `drafted this agent with ${phases.length} phases and ${totalTasks} tasks. Ask me to change anything — workflow, data sources, output fields, or instructions.`,
         },
       ]);
     } else {
@@ -83,7 +80,7 @@ function AgentEditor() {
         {
           id: "m_init",
           role: "ai",
-          text: "This agent is blank. Link a guideline on the Guidelines tab, then click \"Generate from guidelines\" or describe the workflow you want.",
+          text: "This agent is blank. Describe what you want and I'll build it.",
         },
       ]);
     }
@@ -96,6 +93,9 @@ function AgentEditor() {
     return {
       rules: linked.flatMap((g) => g.compliance_brief.rules),
       required_timelines: linked.flatMap((g) => g.compliance_brief.required_timelines),
+      required_phases: linked.flatMap((g) => g.compliance_brief.required_phases ?? []),
+      required_tasks: linked.flatMap((g) => g.compliance_brief.required_tasks ?? []),
+      required_fields: linked.flatMap((g) => g.compliance_brief.required_fields ?? []),
     };
   }, [guidelines, guidelineIds]);
 
@@ -104,19 +104,30 @@ function AgentEditor() {
   const runAi = async (opts: { message?: string; generate?: boolean }) => {
     setBusy(true);
     try {
-      const result = await callBuildWorkflow({
+      const result = await callBuildAgent({
         data: {
-          planType: agent.plan_type,
           agentName: name,
-          currentPhases: opts.generate ? undefined : phases,
+          planType: agent.plan_type,
+          prompt: opts.generate ? "Generate from the linked guideline." : "",
           message: opts.message,
           complianceBrief,
+          currentConfig: opts.generate
+            ? undefined
+            : {
+                workflow_data: phases,
+                profile_fields: profileFields,
+                output_fields: outputFields,
+                instructions,
+              },
         },
       });
-      setPhases(result.phases);
+      setPhases(result.workflow_data);
+      setProfileFields(result.profile_fields);
+      setOutputFields(result.output_fields);
+      if (result.instructions) setInstructions(result.instructions);
       setMessages((prev) => [
         ...prev,
-        { id: `m_${Date.now()}`, role: "ai", text: result.summary || "Workflow updated." },
+        { id: `m_${Date.now()}`, role: "ai", text: result.summary || "Agent updated." },
       ]);
       setTab("workflow");
     } catch (err) {
@@ -127,6 +138,7 @@ function AgentEditor() {
       setBusy(false);
     }
   };
+
 
   const onSend = (text: string) => {
     setMessages((prev) => [...prev, { id: `u_${Date.now()}`, role: "user", text }]);
