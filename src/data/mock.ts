@@ -116,6 +116,24 @@ export type Training = {
   created_at: string;
 };
 
+// CareTracker is the only real integration wire. LifePlan emits services in
+// the same shape the legacy modules already use, through one entry point.
+// Each service is tagged with `source` and dated so the timeline is
+// continuous across the legacy-to-LifePlan handoff.
+export type CareTrackerService = {
+  id: string;
+  individual_id: string;
+  plan_id: string;
+  plan_type: string;
+  source: "lifeplan" | "legacy";
+  title: string;
+  description?: string;
+  responsible?: string;
+  effective_date: string; // ISO
+  end_date?: string;      // ISO when discontinued
+  raw?: unknown;
+};
+
 export const ORG_ID = "org_mock_1";
 
 export const individuals: Individual[] = [
@@ -511,6 +529,7 @@ export const individualAgents: IndividualAgent[] = [
 export const plans: Plan[] = [];
 export const taskAssignments: TaskAssignment[] = [];
 export const trainings: Training[] = [];
+export const careTrackerServices: CareTrackerService[] = [];
 
 export const categoryColor: Record<Agent["category"], string> = {
   behavioral: "var(--indigo)",
