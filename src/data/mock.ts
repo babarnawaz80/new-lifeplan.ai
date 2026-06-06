@@ -91,8 +91,29 @@ export type Plan = {
   status: "draft" | "in_progress" | "implementing" | "implemented";
   plan_content: Record<string, unknown>;
   auto_renew: boolean;
+  annual_plan_date: string; // ISO date that anchors workflow due dates
+  implementation_date?: string;
   created_at: string;
   updated_at: string;
+};
+
+export type TaskAssignment = {
+  id: string;
+  plan_id: string;
+  task_id: string;
+  role: string | null; // null = single assignment (anyone rule)
+  status: "pending" | "complete";
+  completed_at?: string;
+  completed_by?: string;
+};
+
+export type Training = {
+  id: string;
+  plan_id: string;
+  individual_id: string;
+  status: "pending" | "ready" | "failed";
+  video_status: "pending" | "ready" | "failed";
+  created_at: string;
 };
 
 export const ORG_ID = "org_mock_1";
