@@ -15,12 +15,14 @@ import {
   updatePlan,
   pushToCareTracker,
   createPendingTraining,
+  mayHaveLegacyPlan,
 } from "@/integrations/icm";
 import { ChecklistPanel } from "@/components/plan-runtime/ChecklistPanel";
 import { AiChatPane } from "@/components/plan-runtime/AiChatPane";
 import { ManualEditor } from "@/components/plan-runtime/ManualEditor";
 import { ImplementDialog } from "@/components/plan-runtime/ImplementDialog";
 import { TrainingDialog } from "@/components/plan-runtime/TrainingDialog";
+import { CutoverWarningDialog } from "@/components/plan-runtime/CutoverWarningDialog";
 import { ActionRow } from "@/components/plan-runtime/ActionRow";
 import { PlanPreview } from "@/components/plan-runtime/PlanPreview";
 import { enrichImplementationTasks } from "@/lib/enrich-tasks.functions";
@@ -91,7 +93,19 @@ function PlanRuntime() {
     (plan.plan_content as { taskInstructions?: Record<string, string> }).taskInstructions || {},
   );
   const [implementOpen, setImplementOpen] = useState(false);
+  const [cutoverOpen, setCutoverOpen] = useState(false);
+  const [cutoverAcked, setCutoverAcked] = useState(false);
   const [trainingOpen, setTrainingOpen] = useState(false);
+
+  // Gate the implement flow with a cutover warning for plan types that may
+  // already exist in the legacy module. No auto-detect in v1.
+  const requestImplement = () => {
+    if (mayHaveLegacyPlan(agent.plan_type) && !cutoverAcked) {
+      setCutoverOpen(true);
+      return;
+    }
+    setImplementOpen(true);
+  };
 
   // ---- Profile data (per enabled profile fields) ----
   const enabledProfileFieldNames = agent.profile_fields
