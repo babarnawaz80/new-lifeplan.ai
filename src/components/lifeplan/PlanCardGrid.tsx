@@ -10,8 +10,6 @@ import type { Agent, Individual } from "@/data/mock";
 
 type StatusKey = "current" | "draft";
 
-type StatusKey = "current" | "draft";
-
 // Each plan type maps to a two-stop gradient for its top "cap" + a tint.
 type PlanColor = { from: string; to: string; tint: string };
 const PLAN_COLORS: Record<string, PlanColor> = {
