@@ -1,35 +1,48 @@
-import { Plus, MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowRight, Plus, HeartHandshake, Brain, HeartPulse, Pill, ShieldAlert,
+  ClipboardList, FileText, type LucideIcon,
+} from "lucide-react";
 import type { Agent, Individual } from "@/data/mock";
 
 // ---------------------------------------------------------------------------
-// PlanCardGrid — Honeycomb layout. The individual sits in the center hex,
-// plan agents fill the surrounding ring(s) of touching hexagons, and a
-// dashed "Add plan" hex occupies the next open slot. New plans grow the
-// honeycomb outward ring-by-ring (6, 12, 18 ...).
+// PlanCardGrid — Orbit layout. The individual sits as a circular avatar at
+// the center; plan cards orbit around them on a dashed ring with subtle
+// connector lines. The ring expands automatically as plans are added so
+// cards never overlap. Falls back to a stacked grid on narrow screens.
 // ---------------------------------------------------------------------------
 
 type StatusKey = "current" | "draft";
 
-// Each plan type maps to a two-stop gradient for its top "cap" + a tint.
-type PlanColor = { from: string; to: string; tint: string };
-const PLAN_COLORS: Record<string, PlanColor> = {
-  person_centered:  { from: "#6366f1", to: "#a78bfa", tint: "#EEF0FF" }, // indigo→violet
-  behavior_support: { from: "#8b5cf6", to: "#ec4899", tint: "#F5EEFF" }, // violet→pink
-  nursing_care:     { from: "#10b981", to: "#34d399", tint: "#E8FAF1" }, // emerald
-  medication:       { from: "#0ea5e9", to: "#22d3ee", tint: "#E6F6FD" }, // sky→cyan
-  high_risk:        { from: "#ef4444", to: "#f97316", tint: "#FFEDE6" }, // red→orange
-  staff_action_plan:{ from: "#f59e0b", to: "#f97316", tint: "#FFF3E0" }, // amber→orange
+type PlanMeta = {
+  Icon: LucideIcon;
+  /** Gradient (from → to) used for the colored header band. */
+  from: string;
+  to: string;
+  /** Accent color used for "Open plan" text + arrow. */
+  accent: string;
 };
-const DEFAULT_COLOR: PlanColor = { from: "#475569", to: "#94a3b8", tint: "#F1F5F9" };
 
-function planColor(agent: Agent): PlanColor {
-  return PLAN_COLORS[agent.plan_type] ?? DEFAULT_COLOR;
+const PLAN_META: Record<string, PlanMeta> = {
+  person_centered:  { Icon: HeartHandshake, from: "#4f46e5", to: "#6366f1", accent: "#4f46e5" },
+  behavior_support: { Icon: Brain,          from: "#7c3aed", to: "#a855f7", accent: "#7c3aed" },
+  nursing_care:     { Icon: HeartPulse,     from: "#059669", to: "#10b981", accent: "#059669" },
+  medication:       { Icon: Pill,           from: "#0284c7", to: "#0ea5e9", accent: "#0284c7" },
+  high_risk:        { Icon: ShieldAlert,    from: "#dc2626", to: "#ef4444", accent: "#dc2626" },
+  staff_action_plan:{ Icon: ClipboardList,  from: "#334155", to: "#475569", accent: "#334155" },
+};
+const DEFAULT_META: PlanMeta = {
+  Icon: FileText, from: "#475569", to: "#64748b", accent: "#475569",
+};
+
+function planMeta(agent: Agent): PlanMeta {
+  return PLAN_META[agent.plan_type] ?? DEFAULT_META;
 }
 
-function dotColor(agent: Agent, status: StatusKey) {
-  if (status === "draft") return "#b45309";
-  return planColor(agent).from;
-}
+const STATUS_PILL: Record<StatusKey, { text: string; dot: string; label: string }> = {
+  current: { text: "text-emerald-700", dot: "bg-emerald-500", label: "Current" },
+  draft:   { text: "text-amber-700",   dot: "bg-amber-500",   label: "Draft" },
+};
 
 function initialsOf(name: string) {
   return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
@@ -42,243 +55,215 @@ interface PlanCardGridProps {
   onAddPlan: () => void;
 }
 
-// Pointy-top hex math. R = corner radius. W = sqrt(3)*R, H = 2R.
-// Six axial neighbor directions (angle, distance W from center).
-const NEIGHBOR_ANGLES = [0, 60, 120, 180, 240, 300].map((d) => (d * Math.PI) / 180);
-
-function buildHoneycombPositions(n: number, W: number) {
-  // Returns n positions (x, y offsets from center) for ring 0,1,2...
-  // Skips the first slot (center) — caller uses center separately.
-  const dirs = NEIGHBOR_ANGLES.map((a) => ({ dx: Math.cos(a) * W, dy: Math.sin(a) * W }));
-  const out: { x: number; y: number }[] = [];
-  let r = 1;
-  while (out.length < n) {
-    // Start at r steps in direction index 4 (upper-left).
-    let x = dirs[4].dx * r;
-    let y = dirs[4].dy * r;
-    for (let side = 0; side < 6; side++) {
-      const step = dirs[side];
-      for (let i = 0; i < r; i++) {
-        out.push({ x, y });
-        x += step.dx;
-        y += step.dy;
-        if (out.length >= n) return out;
-      }
-    }
-    r++;
-  }
-  return out;
-}
-
 export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: PlanCardGridProps) {
-  const W = 168; // hex width (flat-side to flat-side)
-  const H = (W * 2) / Math.sqrt(3); // hex height (point-to-point)
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const el = wrapRef.current;
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
-  // One slot per plan + one "add" slot.
-  const slotCount = agents.length + 1;
-  const offsets = buildHoneycombPositions(slotCount, W);
-
-  // Compute container bounds from all hex centers (including the center).
-  const allCenters = [{ x: 0, y: 0 }, ...offsets];
-  const halfW = W / 2;
-  const halfH = H / 2;
-  const minX = Math.min(...allCenters.map((c) => c.x)) - halfW;
-  const maxX = Math.max(...allCenters.map((c) => c.x)) + halfW;
-  const minY = Math.min(...allCenters.map((c) => c.y)) - halfH;
-  const maxY = Math.max(...allCenters.map((c) => c.y)) + halfH;
-  const padding = 16;
-  const width = Math.ceil(maxX - minX) + padding * 2;
-  const height = Math.ceil(maxY - minY) + padding * 2;
-  const cx = -minX + padding;
-  const cy = -minY + padding;
-
-  const hexPoints = pointyHexPath(W, H);
+  // Card footprint
+  const cardW = 230;
+  const cardH = 268;
+  // +1 slot for the add-card so it always lives in the orbit
+  const slots = agents.length + 1;
+  const angleStep = (2 * Math.PI) / Math.max(slots, 2);
+  // Generous chord so neighbours don't overlap at any angle
+  const minChord = Math.max(cardW, cardH * 0.7) + 40;
+  const radius = Math.max(
+    240,
+    slots <= 1 ? 240 : minChord / (2 * Math.sin(angleStep / 2)),
+  );
+  const neededWidth = radius * 2 + cardW + 64;
+  const useOrbit = width >= neededWidth;
 
   return (
-    <div className="w-full">
-      <div className="flex justify-center">
-        <div className="relative" style={{ width, height }}>
-          <svg
-            width={width}
-            height={height}
-            viewBox={`0 0 ${width} ${height}`}
-            className="absolute inset-0"
-          >
-            <defs>
-              {agents.map(({ agent }) => {
-                const c = planColor(agent);
-                return (
-                  <linearGradient
-                    key={`g-${agent.id}`}
-                    id={`hex-cap-${agent.id}`}
-                    x1="0%" y1="0%" x2="100%" y2="0%"
-                  >
-                    <stop offset="0%" stopColor={c.from} />
-                    <stop offset="100%" stopColor={c.to} />
-                  </linearGradient>
-                );
-              })}
-            </defs>
+    <div ref={wrapRef} className="relative w-full">
+      {useOrbit ? (
+        <OrbitLayout
+          width={width}
+          radius={radius}
+          cardW={cardW}
+          cardH={cardH}
+          angleStep={angleStep}
+          individual={individual}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onAddPlan={onAddPlan}
+        />
+      ) : (
+        <StackedLayout
+          individual={individual}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onAddPlan={onAddPlan}
+        />
+      )}
+    </div>
+  );
+}
 
-            {/* Center hex (individual) */}
-            <g transform={`translate(${cx} ${cy})`}>
-              <polygon
-                points={hexPoints}
-                fill="#EEEAFB"
-                stroke="#4f46e5"
-                strokeWidth={2}
-              />
-            </g>
+// ----- Orbit layout ---------------------------------------------------------
 
-            {/* Plan + add hex outlines */}
-            {offsets.map((o, i) => {
-              const isAdd = i === agents.length;
-              if (isAdd) {
-                return (
-                  <g key={i} transform={`translate(${cx + o.x} ${cy + o.y})`}>
-                    <polygon
-                      points={hexPoints}
-                      fill="#FBF8F0"
-                      stroke="#9CA3AF"
-                      strokeWidth={1.25}
-                      strokeDasharray="6 5"
-                    />
-                  </g>
-                );
-              }
-              const { agent } = agents[i];
-              const c = planColor(agent);
-              // Top-cap path: upper-left vertex → top vertex → upper-right vertex.
-              const capPath = `M ${-W / 2} ${-H / 4} L 0 ${-H / 2} L ${W / 2} ${-H / 4}`;
-              return (
-                <g key={i} transform={`translate(${cx + o.x} ${cy + o.y})`}>
-                  <polygon
-                    points={hexPoints}
-                    fill={c.tint}
-                    stroke="#D6D3CC"
-                    strokeWidth={1}
-                  />
-                  <path
-                    d={capPath}
-                    fill="none"
-                    stroke={`url(#hex-cap-${agent.id})`}
-                    strokeWidth={5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </g>
-              );
-            })}
-          </svg>
+function OrbitLayout({
+  width, radius, cardW, cardH, angleStep, individual, agents, onSelectAgent, onAddPlan,
+}: {
+  width: number;
+  radius: number;
+  cardW: number;
+  cardH: number;
+  angleStep: number;
+  individual: Individual;
+  agents: { agent: Agent; status: StatusKey }[];
+  onSelectAgent: (agent: Agent) => void;
+  onAddPlan: () => void;
+}) {
+  const height = Math.round(radius * 2 + cardH + 96);
+  const cx = width / 2;
+  const cy = height / 2;
 
-          {/* Center HTML overlay */}
-          <CenterContent
-            individual={individual}
-            style={{
-              position: "absolute",
-              left: cx,
-              top: cy,
-              width: W,
-              height: H,
-              transform: "translate(-50%, -50%)",
-            }}
+  type Slot =
+    | { kind: "plan"; agent: Agent; status: StatusKey }
+    | { kind: "add" };
+  const slotList: Slot[] = [
+    ...agents.map<Slot>(({ agent, status }) => ({ kind: "plan", agent, status })),
+    { kind: "add" },
+  ];
+
+  const positions = slotList.map((_, i) => {
+    const a = -Math.PI / 2 + i * angleStep;
+    return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
+  });
+
+  return (
+    <div className="relative mx-auto" style={{ width: "100%", height }}>
+      {/* Connector lines */}
+      <svg
+        className="absolute inset-0 pointer-events-none"
+        width={width}
+        height={height}
+        aria-hidden
+      >
+        {positions.map((p, i) => (
+          <line
+            key={i}
+            x1={cx}
+            y1={cy}
+            x2={p.x}
+            y2={p.y}
+            stroke="#cbd5e1"
+            strokeWidth={1}
+            strokeDasharray="4 6"
           />
+        ))}
+      </svg>
 
-          {/* Plan + add HTML overlays */}
-          {offsets.map((o, i) => {
-            const isAdd = i === agents.length;
-            const style: React.CSSProperties = {
-              position: "absolute",
-              left: cx + o.x,
-              top: cy + o.y,
-              width: W,
-              height: H,
-              transform: "translate(-50%, -50%)",
-            };
-            if (isAdd) {
-              return <AddHex key="add" onClick={onAddPlan} style={style} />;
-            }
-            const { agent, status } = agents[i];
-            return (
-              <PlanHex
-                key={agent.id}
-                agent={agent}
-                status={status}
-                onClick={() => onSelectAgent(agent)}
-                style={style}
-              />
-            );
-          })}
-        </div>
-      </div>
+      {/* Center avatar */}
+      <CenterAvatar
+        individual={individual}
+        style={{
+          position: "absolute",
+          left: cx,
+          top: cy,
+          transform: "translate(-50%, -50%)",
+        }}
+      />
 
-      {/* Legend */}
-      <div className="mt-6 flex flex-wrap justify-center items-center gap-6 text-[13px] text-ink2">
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          Current plan
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-600" />
-          Draft in progress
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full border border-ink3" />
-          Add a new plan
-        </span>
+      {/* Orbiting slots */}
+      {slotList.map((slot, i) => {
+        const { x, y } = positions[i];
+        const style: React.CSSProperties = {
+          position: "absolute",
+          left: x,
+          top: y,
+          width: cardW,
+          transform: "translate(-50%, -50%)",
+        };
+        if (slot.kind === "add") {
+          return <AddPlanCard key="add" onClick={onAddPlan} style={style} height={cardH} />;
+        }
+        return (
+          <PlanCard
+            key={slot.agent.id}
+            agent={slot.agent}
+            status={slot.status}
+            onClick={() => onSelectAgent(slot.agent)}
+            style={style}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ----- Stacked fallback -----------------------------------------------------
+
+function StackedLayout({
+  individual, agents, onSelectAgent, onAddPlan,
+}: {
+  individual: Individual;
+  agents: { agent: Agent; status: StatusKey }[];
+  onSelectAgent: (agent: Agent) => void;
+  onAddPlan: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-8">
+      <CenterAvatar individual={individual} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+        {agents.map(({ agent, status }) => (
+          <PlanCard
+            key={agent.id}
+            agent={agent}
+            status={status}
+            onClick={() => onSelectAgent(agent)}
+          />
+        ))}
+        <AddPlanCard onClick={onAddPlan} height={268} />
       </div>
     </div>
   );
 }
 
-// ----- Hex geometry ---------------------------------------------------------
+// ----- Center avatar --------------------------------------------------------
 
-function pointyHexPath(w: number, h: number) {
-  // Pointy-top hexagon points, centered around (0,0).
-  const hw = w / 2;
-  const hh = h / 2;
-  const q = h / 4; // quarter height
-  return [
-    [0, -hh],
-    [hw, -q],
-    [hw, q],
-    [0, hh],
-    [-hw, q],
-    [-hw, -q],
-  ]
-    .map((p) => p.join(","))
-    .join(" ");
-}
-
-// ----- Center content -------------------------------------------------------
-
-function CenterContent({
+function CenterAvatar({
   individual, style,
 }: {
   individual: Individual;
   style?: React.CSSProperties;
 }) {
   return (
-    <div
-      style={style}
-      className="pointer-events-none flex flex-col items-center justify-center text-center px-4"
-    >
-      <div className="h-12 w-12 rounded-full bg-indigo-600 text-white flex items-center justify-center text-lg font-bold shadow-[0_4px_12px_-4px_rgba(79,70,229,0.5)]">
-        {initialsOf(individual.name)}
+    <div style={style} className="z-10 flex flex-col items-center">
+      <div className="relative">
+        {/* Soft halo */}
+        <div
+          aria-hidden
+          className="absolute -inset-6 rounded-full pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(124,58,237,0.18) 0%, rgba(124,58,237,0) 70%)",
+          }}
+        />
+        <div className="relative rounded-full bg-white p-1.5 shadow-[0_10px_30px_-10px_rgba(79,70,229,0.45)]">
+          <div className="h-28 w-28 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-4xl font-extrabold tracking-tight">
+            {initialsOf(individual.name)}
+          </div>
+        </div>
       </div>
-      <div className="mt-2 text-[15px] font-extrabold text-ink leading-tight">
+      <div className="mt-3 text-[16px] font-extrabold text-ink leading-tight">
         {individual.name}
-      </div>
-      <div className="mt-1 text-[10px] font-bold tracking-[0.14em] uppercase text-emerald-700">
-        Active
       </div>
     </div>
   );
 }
 
-// ----- Plan hex -------------------------------------------------------------
+// ----- Plan card ------------------------------------------------------------
 
-function PlanHex({
+function PlanCard({
   agent, status, onClick, style,
 }: {
   agent: Agent;
@@ -286,52 +271,78 @@ function PlanHex({
   onClick: () => void;
   style?: React.CSSProperties;
 }) {
-  const color = dotColor(agent, status);
-  const statusLabel = status === "draft" ? "Draft" : "Current";
-  const statusClass = status === "draft" ? "text-amber-700" : "text-emerald-700";
+  const { Icon, from, to, accent } = planMeta(agent);
+  const pill = STATUS_PILL[status];
   return (
     <button
       type="button"
       onClick={onClick}
       style={style}
-      className="group flex flex-col items-center justify-center px-4 transition-transform duration-150 hover:scale-[1.03] focus:outline-none focus-visible:scale-[1.03]"
+      className="group relative flex flex-col items-stretch text-left rounded-2xl bg-white border border-line shadow-soft overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-16px_rgba(15,23,42,0.25)] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-navy"
       aria-label={`Open ${agent.name}`}
     >
-      <span
-        className="absolute top-[22%] left-1/2 -translate-x-[60%] h-2.5 w-2.5 rounded-full"
-        style={{ background: color }}
-      />
-      <div className="text-[17px] font-extrabold text-ink leading-tight text-center">
-        {agent.short}
+      {/* Colored header */}
+      <div
+        className="relative px-5 pt-5 pb-6"
+        style={{ background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)` }}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/18 border border-white/30">
+            <Icon className="h-[22px] w-[22px] text-white" strokeWidth={1.8} />
+          </span>
+          <span className="inline-flex items-center gap-1.5 bg-white/95 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+            <span className={`${pill.dot} h-1.5 w-1.5 rounded-full`} />
+            <span className={pill.text}>{pill.label}</span>
+          </span>
+        </div>
       </div>
-      <div className={`mt-1.5 text-[12px] font-semibold ${statusClass}`}>
-        {statusLabel}
+
+      {/* Body */}
+      <div className="flex-1 px-5 py-4">
+        <div className="text-[24px] leading-none font-extrabold tracking-tight text-ink">
+          {agent.short}
+        </div>
+        <div className="mt-2 text-[14px] font-semibold text-ink2 line-clamp-2">
+          {agent.name}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div
+        className="flex items-center justify-between px-5 py-3 border-t border-line text-[13px] font-semibold"
+        style={{ color: accent }}
+      >
+        <span>Open plan</span>
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
       </div>
     </button>
   );
 }
 
-// ----- Add hex --------------------------------------------------------------
+// ----- Add card -------------------------------------------------------------
 
-function AddHex({
-  onClick, style,
+function AddPlanCard({
+  onClick, style, height,
 }: {
   onClick: () => void;
   style?: React.CSSProperties;
+  height?: number;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      style={style}
-      className="group flex flex-col items-center justify-center gap-1 text-ink2 transition-transform duration-150 hover:scale-[1.03] hover:text-ink focus:outline-none focus-visible:scale-[1.03]"
+      style={{ ...style, minHeight: height }}
+      className="group flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-line bg-card/40 px-5 py-8 transition-all duration-200 hover:border-navy hover:bg-navy/[0.03] hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-navy"
       aria-label="Add a new plan"
     >
-      <Plus className="h-5 w-5" strokeWidth={2} />
-      <span className="text-[13px] font-semibold">Add plan</span>
+      <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-navy/5 border border-navy/15 text-navy transition-transform group-hover:scale-110 group-hover:rotate-90">
+        <Plus className="h-5 w-5" strokeWidth={2} />
+      </span>
+      <span className="text-[14px] font-semibold text-ink">Add a plan</span>
+      <span className="text-[12px] text-ink3 text-center max-w-[180px]">
+        Attach an existing agent or build a new one.
+      </span>
     </button>
   );
 }
-
-// Re-export MapPin so unused imports stay clean across editors.
-void MapPin;
