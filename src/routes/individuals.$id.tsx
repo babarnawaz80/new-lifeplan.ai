@@ -358,13 +358,6 @@ function IndividualEChart() {
         </div>
       </main>
 
-      <ManualOrAIDialog
-        open={!!selectedAgent}
-        onOpenChange={(o) => !o && setSelectedAgent(null)}
-        agent={selectedAgent}
-        individual={individual}
-        onChoose={handleChoose}
-      />
       <AddPlanPicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}
@@ -373,6 +366,13 @@ function IndividualEChart() {
           attachAgentToIndividual(individual.id, a.id);
           setPickerOpen(false);
           bump();
+        }}
+        onCreateNew={() => {
+          setPickerOpen(false);
+          navigate({
+            to: "/agents/new",
+            search: { attachTo: individual.id },
+          });
         }}
       />
     </AppShell>
