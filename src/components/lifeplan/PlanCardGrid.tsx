@@ -1,22 +1,20 @@
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight, Plus, HeartHandshake, Brain, HeartPulse, Pill, ShieldAlert,
-  ClipboardList, FileText, type LucideIcon,
+  ClipboardList, FileText, MapPin, type LucideIcon,
 } from "lucide-react";
 import type { Agent, Individual } from "@/data/mock";
 
 // ---------------------------------------------------------------------------
-// PlanCardGrid — replaces the hex Honeycomb with a clean 3-column card grid.
-// Each plan agent renders as a vertical card: bold colored icon block on top,
-// short acronym + title + description in the middle, and a CTA bar at the
-// bottom (matching the provided inspiration). An "Add plan" card sits at the
-// end of the grid.
+// PlanCardGrid — "constellation" layout: the individual sits in the center
+// and every attached plan orbits around them. The ring grows automatically
+// as more plans are added so cards never overlap. On small screens it
+// gracefully degrades to a stacked center + grid below.
 // ---------------------------------------------------------------------------
 
 type PlanMeta = {
   Icon: LucideIcon;
-  /** Tailwind background class for the icon block. */
   iconBg: string;
-  /** Solid hex used for hover / cta accents. */
   accent: string;
 };
 
@@ -47,83 +45,326 @@ interface PlanCardGridProps {
   onAddPlan: () => void;
 }
 
-export function PlanCardGrid({ agents, onSelectAgent, onAddPlan }: PlanCardGridProps) {
+function initialsOf(name: string) {
+  return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
+}
+
+export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: PlanCardGridProps) {
+  // +1 slot for the Add card so it always lives in the orbit.
+  const slots = agents.length + 1;
+
+  // Track container width for responsive layout (orbit vs stacked).
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const el = wrapRef.current;
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const useOrbit = width >= 760;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-      {agents.map(({ agent, status }) => (
-        <PlanCard key={agent.id} agent={agent} status={status} onClick={() => onSelectAgent(agent)} />
-      ))}
-      <AddPlanCard onClick={onAddPlan} />
+    <div ref={wrapRef} className="relative">
+      {useOrbit ? (
+        <OrbitLayout
+          width={width}
+          individual={individual}
+          agents={agents}
+          slots={slots}
+          onSelectAgent={onSelectAgent}
+          onAddPlan={onAddPlan}
+        />
+      ) : (
+        <StackedLayout
+          individual={individual}
+          agents={agents}
+          onSelectAgent={onSelectAgent}
+          onAddPlan={onAddPlan}
+        />
+      )}
     </div>
   );
 }
 
+// ----- Orbit (desktop) ------------------------------------------------------
+
+function OrbitLayout({
+  width, individual, agents, slots, onSelectAgent, onAddPlan,
+}: {
+  width: number;
+  individual: Individual;
+  agents: { agent: Agent; status: StatusKey }[];
+  slots: number;
+  onSelectAgent: (agent: Agent) => void;
+  onAddPlan: () => void;
+}) {
+  // Card footprint used to size the orbit so nothing overlaps.
+  const cardW = 230;
+  const cardH = 168;
+
+  // Required radius so cards spaced evenly around the ring don't collide.
+  // Chord between neighbors >= ~ sqrt(cardW^2 + cardH^2) * 0.78
+  const minChord = Math.hypot(cardW, cardH) * 0.78;
+  const angleStep = (2 * Math.PI) / slots;
+  const radiusForSpacing = slots <= 1 ? 220 : minChord / (2 * Math.sin(angleStep / 2));
+  const radius = Math.max(230, Math.min(radiusForSpacing, (width - cardW) / 2 - 24));
+
+  // Container height = vertical diameter + card height + breathing room.
+  const height = Math.round(radius * 2 + cardH + 80);
+  const cx = width / 2;
+  const cy = height / 2;
+
+  // Build the slot list (cards + the add slot last).
+  type Slot =
+    | { kind: "plan"; agent: Agent; status: StatusKey }
+    | { kind: "add" };
+  const slotList: Slot[] = [
+    ...agents.map<Slot>(({ agent, status }) => ({ kind: "plan", agent, status })),
+    { kind: "add" },
+  ];
+
+  // Compute positions starting at the top (-90deg) and going clockwise.
+  const positions = slotList.map((_, i) => {
+    const a = -Math.PI / 2 + i * angleStep;
+    return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
+  });
+
+  return (
+    <div
+      className="relative mx-auto"
+      style={{ width: "100%", height }}
+    >
+      {/* Connector lines from center to each card */}
+      <svg
+        className="absolute inset-0 pointer-events-none"
+        width={width}
+        height={height}
+        aria-hidden
+      >
+        <defs>
+          <radialGradient id="orbit-fade" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#0f172a" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#0f172a" stopOpacity="0.04" />
+          </radialGradient>
+        </defs>
+        {/* Subtle orbit ring */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={radius}
+          fill="none"
+          stroke="url(#orbit-fade)"
+          strokeWidth={1}
+          strokeDasharray="3 6"
+        />
+        {positions.map((p, i) => (
+          <line
+            key={i}
+            x1={cx}
+            y1={cy}
+            x2={p.x}
+            y2={p.y}
+            stroke="#0f172a"
+            strokeOpacity={0.08}
+            strokeWidth={1}
+          />
+        ))}
+      </svg>
+
+      {/* Center: individual */}
+      <CenterAvatar
+        individual={individual}
+        planCount={agents.length}
+        style={{
+          position: "absolute",
+          left: cx,
+          top: cy,
+          transform: "translate(-50%, -50%)",
+        }}
+      />
+
+      {/* Orbiting slots */}
+      {slotList.map((slot, i) => {
+        const { x, y } = positions[i];
+        const style: React.CSSProperties = {
+          position: "absolute",
+          left: x,
+          top: y,
+          width: cardW,
+          transform: "translate(-50%, -50%)",
+        };
+        if (slot.kind === "add") {
+          return <AddPlanCard key="add" onClick={onAddPlan} style={style} />;
+        }
+        return (
+          <PlanCard
+            key={slot.agent.id}
+            agent={slot.agent}
+            status={slot.status}
+            onClick={() => onSelectAgent(slot.agent)}
+            style={style}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ----- Stacked (mobile) -----------------------------------------------------
+
+function StackedLayout({
+  individual, agents, onSelectAgent, onAddPlan,
+}: {
+  individual: Individual;
+  agents: { agent: Agent; status: StatusKey }[];
+  onSelectAgent: (agent: Agent) => void;
+  onAddPlan: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-6">
+      <CenterAvatar individual={individual} planCount={agents.length} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+        {agents.map(({ agent, status }) => (
+          <PlanCard
+            key={agent.id}
+            agent={agent}
+            status={status}
+            onClick={() => onSelectAgent(agent)}
+          />
+        ))}
+        <AddPlanCard onClick={onAddPlan} />
+      </div>
+    </div>
+  );
+}
+
+// ----- Center avatar --------------------------------------------------------
+
+function CenterAvatar({
+  individual, planCount, style,
+}: {
+  individual: Individual;
+  planCount: number;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div style={style} className="z-10">
+      <div className="relative flex flex-col items-center">
+        {/* Soft halo */}
+        <div
+          aria-hidden
+          className="absolute inset-0 -m-8 rounded-full pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(circle, rgba(79,70,229,0.10) 0%, rgba(79,70,229,0) 70%)",
+          }}
+        />
+        <div className="relative rounded-full bg-white border border-line shadow-[0_8px_30px_-12px_rgba(15,23,42,0.25)] p-2">
+          <div className="h-28 w-28 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-3xl font-bold tracking-tight">
+            {initialsOf(individual.name)}
+          </div>
+        </div>
+        <div className="mt-3 text-center max-w-[200px]">
+          <div className="text-[15px] font-extrabold text-ink leading-tight">
+            {individual.name}
+          </div>
+          <div className="mt-0.5 text-[12px] text-ink2 inline-flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            <span className="truncate">{individual.location}</span>
+          </div>
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-navy/5 border border-navy/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-navy">
+            <span className="h-1.5 w-1.5 rounded-full bg-navy" />
+            {planCount} {planCount === 1 ? "plan" : "plans"}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ----- Plan card ------------------------------------------------------------
+
 function PlanCard({
-  agent, status, onClick,
-}: { agent: Agent; status: StatusKey; onClick: () => void }) {
+  agent, status, onClick, style,
+}: {
+  agent: Agent;
+  status: StatusKey;
+  onClick: () => void;
+  style?: React.CSSProperties;
+}) {
   const { Icon, iconBg, accent } = planMeta(agent);
   const pill = STATUS_PILL[status];
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex flex-col items-stretch text-left rounded-2xl bg-card border border-line shadow-soft overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(15,23,42,0.18)] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-navy"
+      style={style}
+      className="group flex flex-col items-stretch text-left rounded-2xl bg-card border border-line shadow-soft overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_36px_-14px_rgba(15,23,42,0.22)] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-navy"
       aria-label={`Open ${agent.name} log`}
     >
-      {/* Icon block */}
-      <div className={`${iconBg} relative px-6 pt-6 pb-5`}>
-        <div className="absolute inset-0 opacity-[0.18] pointer-events-none"
-          style={{ background:
-            "radial-gradient(circle at 15% 20%, rgba(255,255,255,0.5) 0%, transparent 35%), radial-gradient(circle at 90% 90%, rgba(0,0,0,0.18) 0%, transparent 45%)" }}
+      <div className={`${iconBg} relative px-4 pt-4 pb-3`}>
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.18] pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(circle at 15% 20%, rgba(255,255,255,0.5) 0%, transparent 35%), radial-gradient(circle at 90% 90%, rgba(0,0,0,0.18) 0%, transparent 45%)",
+          }}
         />
-        <div className="relative flex items-start justify-between">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm border border-white/25">
-            <Icon className="h-6 w-6 text-white" strokeWidth={1.8} />
+        <div className="relative flex items-start justify-between gap-2">
+          <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm border border-white/25">
+            <Icon className="h-5 w-5 text-white" strokeWidth={1.8} />
           </div>
-          <span className={`${pill.bg} ${pill.text} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider`}>
+          <span className={`${pill.bg} ${pill.text} inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider`}>
             <span className={`${pill.dot} h-1.5 w-1.5 rounded-full`} />
             {pill.label}
           </span>
         </div>
       </div>
 
-      {/* Body */}
-      <div className="flex-1 px-6 py-5">
-        <div className="text-[28px] leading-none font-extrabold tracking-tight text-ink">
+      <div className="flex-1 px-4 py-3">
+        <div className="text-[20px] leading-none font-extrabold tracking-tight text-ink">
           {agent.short}
         </div>
-        <div className="mt-2 text-[14px] font-semibold text-ink">{agent.name}</div>
-        <p className="mt-1.5 text-[13px] text-ink2 line-clamp-2">
-          {agent.description || "Plan agent for this individual."}
-        </p>
+        <div className="mt-1.5 text-[13px] font-semibold text-ink line-clamp-1">
+          {agent.name}
+        </div>
       </div>
 
-      {/* CTA bar */}
       <div
-        className="flex items-center justify-between px-6 py-3 border-t border-line text-[13px] font-semibold transition-colors"
+        className="flex items-center justify-between px-4 py-2 border-t border-line text-[12px] font-semibold transition-colors"
         style={{ color: accent }}
       >
         <span>Open plan</span>
-        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
       </div>
     </button>
   );
 }
 
-function AddPlanCard({ onClick }: { onClick: () => void }) {
+function AddPlanCard({
+  onClick, style,
+}: {
+  onClick: () => void;
+  style?: React.CSSProperties;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-line bg-card/40 min-h-[260px] px-6 py-8 transition-all duration-200 hover:border-navy hover:bg-navy/[0.03] hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-navy"
+      style={style}
+      className="group flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-card/60 px-4 py-6 min-h-[168px] transition-all duration-200 hover:border-navy hover:bg-navy/[0.03] hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-navy"
       aria-label="Add a new plan"
     >
-      <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-navy/5 border border-navy/15 text-navy transition-transform group-hover:scale-110 group-hover:rotate-90">
-        <Plus className="h-6 w-6" strokeWidth={2} />
+      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-navy/5 border border-navy/15 text-navy transition-transform group-hover:scale-110 group-hover:rotate-90">
+        <Plus className="h-5 w-5" strokeWidth={2} />
       </span>
-      <span className="text-[14px] font-semibold text-ink">Add a new plan</span>
-      <span className="text-[12px] text-ink3 text-center max-w-[220px]">
-        Attach an existing plan agent or build a new one for this individual.
+      <span className="text-[13px] font-semibold text-ink">Add a plan</span>
+      <span className="text-[11px] text-ink3 text-center max-w-[180px]">
+        Attach an existing agent or build a new one.
       </span>
     </button>
   );
