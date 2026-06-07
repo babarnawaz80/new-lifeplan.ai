@@ -61,6 +61,8 @@ const InputSchema = z.object({
       notes: z.string().default(""),
     })
     .optional(),
+  guidelineText: z.string().optional(),
+  sampleText: z.string().optional(),
   currentConfig: z
     .object({
       workflow_data: z.array(PhaseSchema),
@@ -71,6 +73,7 @@ const InputSchema = z.object({
     .optional(),
   message: z.string().optional(),
 });
+
 
 export const buildAgent = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
@@ -116,6 +119,18 @@ export const buildAgent = createServerFn({ method: "POST" })
     if (data.complianceBrief) {
       userParts.push(`Compliance brief:\n${JSON.stringify(data.complianceBrief, null, 2)}`);
     }
+    if (data.guidelineText) {
+      const trimmed = data.guidelineText.slice(0, 16000);
+      userParts.push(
+        `State guideline text (compliance — required items derived from here must be marked locked):\n${trimmed}`,
+      );
+    }
+    if (data.sampleText) {
+      const trimmed = data.sampleText.slice(0, 16000);
+      userParts.push(
+        `Sample plan text (STRUCTURAL reference only — mirror its sections, fields, format, and tone; do NOT copy any personal data; do NOT mark these items as locked):\n${trimmed}`,
+      );
+    }
     if (data.prompt) {
       userParts.push(`Admin description:\n${data.prompt}`);
     }
@@ -125,6 +140,7 @@ export const buildAgent = createServerFn({ method: "POST" })
     if (data.message) {
       userParts.push(`Admin request: ${data.message}`);
     }
+
 
     let resultConfig: z.infer<typeof ConfigSchema> | null = null;
 
