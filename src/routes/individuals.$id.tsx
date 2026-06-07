@@ -13,7 +13,7 @@ import { PlanCardGrid } from "@/components/lifeplan/PlanCardGrid";
 import { AddPlanPicker } from "@/components/lifeplan/AddPlanPicker";
 import {
   getIndividual, getAgentsForIndividual, listAgents,
-  attachAgentToIndividual,
+  attachAgentToIndividual, listPlansForIndividualAndAgent,
 } from "@/integrations/icm";
 import { individualAgents, type Agent } from "@/data/mock";
 
