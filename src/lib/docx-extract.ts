@@ -2,7 +2,8 @@
 // Returns concatenated plain text.
 
 export async function extractDocxText(file: File): Promise<string> {
-  const mammoth = await import("mammoth/mammoth.browser");
+  // @ts-expect-error - mammoth.browser has no types
+  const mammoth = await import("mammoth/mammoth.browser.js");
   const buf = await file.arrayBuffer();
   const result = await mammoth.extractRawText({ arrayBuffer: buf });
   return (result?.value ?? "").trim();
