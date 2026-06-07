@@ -9,7 +9,7 @@ import {
   FolderOpen, Sparkles, Shield,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { Honeycomb } from "@/components/lifeplan/Honeycomb";
+import { PlanCardGrid } from "@/components/lifeplan/PlanCardGrid";
 import { AddPlanPicker } from "@/components/lifeplan/AddPlanPicker";
 import {
   getIndividual, getAgentsForIndividual, listAgents,
@@ -346,24 +346,14 @@ function IndividualEChart() {
                 {open && (
                   <div className="bg-card p-[18px]">
                     {isLifePlan ? (
-                      <div>
-                        <Honeycomb
-                          individual={individual}
-                          agents={attachedAgents}
-                          onSelectAgent={openAgentLog}
-                          onAddPlan={() => setPickerOpen(true)}
-                        />
-                        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-semibold uppercase tracking-wider text-ink2">
-                          <LegendDot color="#2E9E5B" label="Current" />
-                          <LegendDot color="#D9920A" label="Draft" />
-                          <LegendDot color="#DC4C3E" label="Needs attention" />
-                          <span className="inline-flex items-center gap-2 normal-case tracking-normal text-ink3">
-                            <span className="inline-block h-2.5 w-2.5 rounded-full border border-dashed border-[#C9BFA4]" />
-                            Add a new plan
-                          </span>
-                        </div>
-                      </div>
+                      <PlanCardGrid
+                        individual={individual}
+                        agents={attachedAgents}
+                        onSelectAgent={openAgentLog}
+                        onAddPlan={() => setPickerOpen(true)}
+                      />
                     ) : (
+
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                         {cat.items.map((item, idx) => (
                           <ActionItemCard key={idx} item={item} sectionColor={cat.color} />
@@ -399,16 +389,8 @@ function IndividualEChart() {
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: color }} />
-      {label}
-    </span>
-  );
-}
-
 function ActionItemCard({
+
   item,
   sectionColor,
 }: {
