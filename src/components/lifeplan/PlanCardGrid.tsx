@@ -104,6 +104,22 @@ export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: P
             viewBox={`0 0 ${width} ${height}`}
             className="absolute inset-0"
           >
+            <defs>
+              {agents.map(({ agent }) => {
+                const c = planColor(agent);
+                return (
+                  <linearGradient
+                    key={`g-${agent.id}`}
+                    id={`hex-cap-${agent.id}`}
+                    x1="0%" y1="0%" x2="100%" y2="0%"
+                  >
+                    <stop offset="0%" stopColor={c.from} />
+                    <stop offset="100%" stopColor={c.to} />
+                  </linearGradient>
+                );
+              })}
+            </defs>
+
             {/* Center hex (individual) */}
             <g transform={`translate(${cx} ${cy})`}>
               <polygon
@@ -117,14 +133,38 @@ export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: P
             {/* Plan + add hex outlines */}
             {offsets.map((o, i) => {
               const isAdd = i === agents.length;
+              if (isAdd) {
+                return (
+                  <g key={i} transform={`translate(${cx + o.x} ${cy + o.y})`}>
+                    <polygon
+                      points={hexPoints}
+                      fill="#FBF8F0"
+                      stroke="#9CA3AF"
+                      strokeWidth={1.25}
+                      strokeDasharray="6 5"
+                    />
+                  </g>
+                );
+              }
+              const { agent } = agents[i];
+              const c = planColor(agent);
+              // Top-cap path: upper-left vertex → top vertex → upper-right vertex.
+              const capPath = `M ${-W / 2} ${-H / 4} L 0 ${-H / 2} L ${W / 2} ${-H / 4}`;
               return (
                 <g key={i} transform={`translate(${cx + o.x} ${cy + o.y})`}>
                   <polygon
                     points={hexPoints}
-                    fill={isAdd ? "#FBF8F0" : "#FFFFFF"}
-                    stroke={isAdd ? "#9CA3AF" : "#D6D3CC"}
-                    strokeWidth={1.25}
-                    strokeDasharray={isAdd ? "6 5" : undefined}
+                    fill={c.tint}
+                    stroke="#D6D3CC"
+                    strokeWidth={1}
+                  />
+                  <path
+                    d={capPath}
+                    fill="none"
+                    stroke={`url(#hex-cap-${agent.id})`}
+                    strokeWidth={5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
                 </g>
               );
