@@ -10,18 +10,27 @@ import type { Agent, Individual } from "@/data/mock";
 
 type StatusKey = "current" | "draft";
 
-const PLAN_DOT: Record<string, string> = {
-  person_centered: "#1e3a8a",  // navy
-  behavior_support: "#7c3aed", // violet
-  nursing_care: "#0f766e",     // teal
-  medication: "#0d9488",       // teal
-  high_risk: "#b91c1c",        // red
-  staff_action_plan: "#334155",
+type StatusKey = "current" | "draft";
+
+// Each plan type maps to a two-stop gradient for its top "cap" + a tint.
+type PlanColor = { from: string; to: string; tint: string };
+const PLAN_COLORS: Record<string, PlanColor> = {
+  person_centered:  { from: "#6366f1", to: "#a78bfa", tint: "#EEF0FF" }, // indigo→violet
+  behavior_support: { from: "#8b5cf6", to: "#ec4899", tint: "#F5EEFF" }, // violet→pink
+  nursing_care:     { from: "#10b981", to: "#34d399", tint: "#E8FAF1" }, // emerald
+  medication:       { from: "#0ea5e9", to: "#22d3ee", tint: "#E6F6FD" }, // sky→cyan
+  high_risk:        { from: "#ef4444", to: "#f97316", tint: "#FFEDE6" }, // red→orange
+  staff_action_plan:{ from: "#f59e0b", to: "#f97316", tint: "#FFF3E0" }, // amber→orange
 };
+const DEFAULT_COLOR: PlanColor = { from: "#475569", to: "#94a3b8", tint: "#F1F5F9" };
+
+function planColor(agent: Agent): PlanColor {
+  return PLAN_COLORS[agent.plan_type] ?? DEFAULT_COLOR;
+}
 
 function dotColor(agent: Agent, status: StatusKey) {
-  if (status === "draft") return "#b45309"; // amber for drafts
-  return PLAN_DOT[agent.plan_type] ?? "#475569";
+  if (status === "draft") return "#b45309";
+  return planColor(agent).from;
 }
 
 function initialsOf(name: string) {
