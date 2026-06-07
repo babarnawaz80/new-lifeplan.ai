@@ -61,6 +61,8 @@ const InputSchema = z.object({
       notes: z.string().default(""),
     })
     .optional(),
+  guidelineText: z.string().optional(),
+  sampleText: z.string().optional(),
   currentConfig: z
     .object({
       workflow_data: z.array(PhaseSchema),
@@ -71,6 +73,7 @@ const InputSchema = z.object({
     .optional(),
   message: z.string().optional(),
 });
+
 
 export const buildAgent = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
