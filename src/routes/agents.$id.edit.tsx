@@ -244,12 +244,23 @@ function AgentEditor() {
               onRegenerate={() => runAi({ regenerate: true })}
             />
 
-            <BuilderCanvas
-              phases={phases}
-              selection={selection}
-              onChange={setPhases}
-              onSelect={setSelection}
-            />
+            <BuilderModeTabs mode={mode} onChange={setMode} />
+
+            {mode === "workflow" ? (
+              <BuilderCanvas
+                phases={phases}
+                selection={selection}
+                onChange={setPhases}
+                onSelect={setSelection}
+              />
+            ) : (
+              <SchemaCanvas
+                schema={schema}
+                selection={schemaSelection}
+                onChange={setSchema}
+                onSelect={setSchemaSelection}
+              />
+            )}
 
             <SecondaryTabs
               profileFields={profileFields}
@@ -273,14 +284,25 @@ function AgentEditor() {
 
           {/* Right config panel */}
           <div className="lg:sticky lg:top-6 lg:self-start lg:h-[calc(100vh-7rem)] rounded-2xl overflow-hidden border border-line bg-card shadow-soft">
-            <ConfigPanel
-              phases={phases}
-              selection={selection}
-              profileFields={profileFields}
-              onChange={setPhases}
-              onClose={() => setSelection({ kind: null, phaseId: null, taskId: null })}
-            />
+            {mode === "workflow" ? (
+              <ConfigPanel
+                phases={phases}
+                selection={selection}
+                profileFields={profileFields}
+                onChange={setPhases}
+                onClose={() => setSelection({ kind: null, phaseId: null, taskId: null })}
+              />
+            ) : (
+              <FieldConfigPanel
+                schema={schema}
+                selection={schemaSelection}
+                optionSets={optionSets}
+                onChange={setSchema}
+                onClose={() => setSchemaSelection({ kind: null })}
+              />
+            )}
           </div>
+
         </div>
       </div>
     </AppShell>
