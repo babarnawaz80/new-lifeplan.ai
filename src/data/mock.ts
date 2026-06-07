@@ -555,6 +555,7 @@ function cloneTemplateAsAgent(t: AgentTemplate, id: string): Agent {
     workflow_data: JSON.parse(JSON.stringify(t.default_workflow)),
     profile_fields: JSON.parse(JSON.stringify(t.default_profile_fields)),
     output_fields: JSON.parse(JSON.stringify(t.default_output_fields)),
+    plan_schema: JSON.parse(JSON.stringify(t.default_plan_schema)),
     created_from_template_id: t.id,
     created_at: now,
     updated_at: now,
@@ -571,6 +572,19 @@ export const agents: Agent[] = [
 // Give a couple of agents linked guidelines and instructions to seed editor demos.
 agents[0].guidelines_engine_ids = ["ny_opwdd"];
 agents[1].guidelines_engine_ids = ["ny_opwdd"];
+
+// Apply guideline-required locks to seeded agents.
+{
+  const reqByGuideline: Record<string, string[]> = {};
+  for (const g of guidelinesEngines) {
+    reqByGuideline[g.id] = g.compliance_brief.required_fields ?? [];
+  }
+  for (const a of agents) {
+    const labels = a.guidelines_engine_ids.flatMap((gid) => reqByGuideline[gid] ?? []);
+    if (labels.length > 0) a.plan_schema = applyLocks(a.plan_schema, labels);
+  }
+}
+
 
 export const individualAgents: IndividualAgent[] = [
   { id: "ia_1", individual_id: "esha", agent_id: "pcp", status: "current", added_at: "" },
