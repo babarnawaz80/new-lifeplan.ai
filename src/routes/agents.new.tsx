@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { ChevronRight, Loader2, Sparkles, Upload, X, FileText } from "lucide-react";
 import { z } from "zod";
 import { AppShell } from "@/components/layout/AppShell";
 import { buildAgent } from "@/lib/build-agent.functions";
+import { extractSampleText } from "@/lib/docx-extract";
 import {
   listGuidelines,
   getGuideline,
@@ -42,7 +43,42 @@ function NewAgentPage() {
   const [planType, setPlanType] = useState(PLAN_TYPES[0].v);
   const [guidelineId, setGuidelineId] = useState<string>("none");
   const [prompt, setPrompt] = useState("");
+  const [sampleFile, setSampleFile] = useState<File | null>(null);
+  const [sampleText, setSampleText] = useState<string>("");
+  const [extracting, setExtracting] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  const onPickSample = async (file: File | null) => {
+    if (!file) {
+      setSampleFile(null);
+      setSampleText("");
+      return;
+    }
+    const name = file.name.toLowerCase();
+    if (!name.endsWith(".pdf") && !name.endsWith(".docx")) {
+      toast.error("Upload a PDF or DOCX.");
+      return;
+    }
+    setExtracting(true);
+    setSampleFile(file);
+    try {
+      const text = await extractSampleText(file);
+      if (!text.trim()) {
+        toast.error("Could not extract text from that file.");
+        setSampleFile(null);
+        setSampleText("");
+      } else {
+        setSampleText(text);
+        toast.success(`Loaded ${file.name}`);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to read file.");
+      setSampleFile(null);
+      setSampleText("");
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const generate = async () => {
     if (!name.trim() || !prompt.trim()) {
@@ -58,6 +94,8 @@ function NewAgentPage() {
           planType,
           prompt,
           complianceBrief: linked ? linked.compliance_brief : undefined,
+          guidelineText: linked?.compliance_brief?.notes || undefined,
+          sampleText: sampleText || undefined,
         },
       });
       const agent = createAgentFromConfig({
@@ -99,9 +137,14 @@ function NewAgentPage() {
         </nav>
 
         <h1 className="text-[28px] font-extrabold text-ink mb-1">New plan agent</h1>
-        <p className="text-[14px] text-ink2 mb-6">
-          Describe the plan in plain language. AI builds the draft. You review and save.
-          {attachTo ? " It will be attached to this individual when saved." : ""}
+        <p className="text-[14px] text-ink2">
+          Describe how this plan type should work and the AI builds the agent as a draft.
+          You review and save. The saved agent is shared across your organization
+          {attachTo ? " and attached to this individual to start." : "."}
+        </p>
+        <p className="text-[12px] text-ink3 mt-1 mb-6">
+          This sets up the plan type once. You will generate each individual's actual plan
+          later in a couple of clicks.
         </p>
 
         <div className="rounded-2xl bg-card border border-line p-6 shadow-soft space-y-5">
@@ -143,20 +186,59 @@ function NewAgentPage() {
             </Field>
           </div>
 
-          <Field label="Describe this plan">
+          <Field label="Describe this plan agent">
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              rows={8}
-              placeholder="Describe this plan. What is it, what are the phases and their timing, who is responsible for each step, what should trigger alerts and to whom, and what fields should be captured."
+              rows={9}
+              placeholder="Write this like a prompt. The more detail you give, the better the agent. Include what this plan is and its purpose, the phases and their timing, who is responsible for each step, what should trigger alerts and to whom, and what sections and fields the plan should capture. The AI turns this into a complete agent draft (workflow, fields, alerts) that you review and edit before saving."
               className="w-full p-3 rounded-[9px] border border-line bg-card text-[13px] text-ink focus:outline-none focus:border-navy"
             />
           </Field>
 
-          <div className="flex justify-end pt-2">
+          <Field label="Upload a sample plan (optional)">
+            <p className="text-[12px] text-ink3 mb-2">
+              Have an example of this plan? Upload it and the AI will match its structure,
+              sections, and format. Use a blank or de-identified sample, not a real
+              individual's completed plan.
+            </p>
+            {sampleFile ? (
+              <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-[9px] border border-line bg-bg2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="h-4 w-4 text-ink2 shrink-0" />
+                  <span className="text-[13px] text-ink truncate">{sampleFile.name}</span>
+                  {extracting && <Loader2 className="h-3.5 w-3.5 animate-spin text-ink3" />}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onPickSample(null)}
+                  className="p-1 rounded hover:bg-line text-ink2"
+                  aria-label="Remove sample"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 px-3 py-3 rounded-[9px] border border-dashed border-line text-[13px] text-ink2 hover:border-navy hover:text-ink cursor-pointer">
+                <Upload className="h-4 w-4" />
+                <span>Choose a PDF or DOCX</span>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={(e) => onPickSample(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            )}
+          </Field>
+
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <p className="text-[12px] text-ink3">
+              The AI builds a draft. Nothing is final until you review and save.
+            </p>
             <button
               onClick={generate}
-              disabled={busy}
+              disabled={busy || extracting}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[9px] bg-navy text-white text-[13px] font-semibold hover:opacity-95 disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
