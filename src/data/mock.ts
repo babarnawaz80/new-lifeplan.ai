@@ -3,12 +3,19 @@
 import type {
   WorkflowPhase,
   ToggleField,
+  PlanSchema,
+  OptionSet,
 } from "./lifeplan-types";
 import {
   PROFILE_FIELD_NAMES,
   OUTPUT_FIELD_NAMES,
+  AVAILABLE_ROLES,
+  AVAILABLE_LINKS,
   toToggleFields,
+  defaultSchemaFromOutputFields,
+  applyLocks,
 } from "./lifeplan-types";
+
 
 export type Individual = {
   id: string;
@@ -38,6 +45,7 @@ export type Agent = {
   workflow_data: WorkflowPhase[];
   profile_fields: ToggleField[];
   output_fields: ToggleField[];
+  plan_schema: PlanSchema;
   created_from_template_id: string | null;
   created_at: string;
   updated_at: string;
@@ -56,7 +64,9 @@ export type AgentTemplate = {
   default_workflow: WorkflowPhase[];
   default_profile_fields: ToggleField[];
   default_output_fields: ToggleField[];
+  default_plan_schema: PlanSchema;
 };
+
 
 export type ComplianceBrief = {
   rules: string[];
