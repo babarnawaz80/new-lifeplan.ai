@@ -262,27 +262,16 @@ export function Honeycomb({ individual, agents, onSelectAgent, onAddPlan }: Hone
 
           {/* Soft tile shadow */}
           <filter id="hc-tile-shadow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#1B2A4A" floodOpacity="0.06" />
-            <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#1B2A4A" floodOpacity="0.08" />
+            <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#1B2A4A" floodOpacity="0.05" />
+            <feDropShadow dx="0" dy="6" stdDeviation="12" floodColor="#1B2A4A" floodOpacity="0.07" />
           </filter>
 
           {/* Nucleus shadow (deeper) */}
           <filter id="hc-nucleus-shadow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#1B2A4A" floodOpacity="0.10" />
-            <feDropShadow dx="0" dy="16" stdDeviation="22" floodColor="#3B2FB0" floodOpacity="0.18" />
+            <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#1B2A4A" floodOpacity="0.08" />
+            <feDropShadow dx="0" dy="14" stdDeviation="20" floodColor="#3B2FB0" floodOpacity="0.16" />
           </filter>
         </defs>
-
-        {/* Atmospheric background layers */}
-        <rect
-          x="-10000"
-          y="-10000"
-          width="20000"
-          height="20000"
-          fill="url(#hc-hex-bg)"
-          opacity="0.08"
-        />
-        <circle cx={0} cy={0} r={drawR * 5.2} fill="url(#hc-spotlight)" />
 
         {/* Plan tiles (rendered first so nucleus sits above them) */}
         {cells.map((cell, i) => (
@@ -298,21 +287,7 @@ export function Honeycomb({ individual, agents, onSelectAgent, onAddPlan }: Hone
           />
         ))}
 
-        {/* Nucleus aura (behind nucleus tile but above tiles is fine — soft) */}
-        {!reduced && (
-          <motion.circle
-            cx={0}
-            cy={0}
-            r={drawR * 1.18}
-            fill="none"
-            stroke="#5B4FE0"
-            strokeWidth={drawR * 0.06}
-            initial={{ opacity: 0.0, scale: 0.95 }}
-            animate={{ opacity: [0.0, 0.28, 0.0], scale: [0.95, 1.18, 1.32] }}
-            transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-            style={{ transformOrigin: "0 0", transformBox: "fill-box" }}
-          />
-        )}
+
 
         {/* Nucleus tile */}
         <motion.g
