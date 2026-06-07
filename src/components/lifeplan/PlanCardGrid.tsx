@@ -64,16 +64,30 @@ export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: P
     return () => ro.disconnect();
   }, []);
 
-  const useOrbit = width >= 760;
+  // Card footprint used to size the orbit so nothing overlaps.
+  const cardW = 220;
+  const cardH = 160;
+  // Generous chord = diagonal of card + breathing room (works for any angle).
+  const minChord = Math.hypot(cardW, cardH) + 28;
+  const angleStep = (2 * Math.PI) / Math.max(slots, 2);
+  const radius = Math.max(
+    240,
+    slots <= 1 ? 240 : minChord / (2 * Math.sin(angleStep / 2)),
+  );
+  const neededWidth = radius * 2 + cardW + 48;
+  const useOrbit = width >= neededWidth;
 
   return (
     <div ref={wrapRef} className="relative">
       {useOrbit ? (
         <OrbitLayout
           width={width}
+          radius={radius}
+          cardW={cardW}
+          cardH={cardH}
+          angleStep={angleStep}
           individual={individual}
           agents={agents}
-          slots={slots}
           onSelectAgent={onSelectAgent}
           onAddPlan={onAddPlan}
         />
@@ -92,25 +106,18 @@ export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: P
 // ----- Orbit (desktop) ------------------------------------------------------
 
 function OrbitLayout({
-  width, individual, agents, slots, onSelectAgent, onAddPlan,
+  width, radius, cardW, cardH, angleStep, individual, agents, onSelectAgent, onAddPlan,
 }: {
   width: number;
+  radius: number;
+  cardW: number;
+  cardH: number;
+  angleStep: number;
   individual: Individual;
   agents: { agent: Agent; status: StatusKey }[];
-  slots: number;
   onSelectAgent: (agent: Agent) => void;
   onAddPlan: () => void;
 }) {
-  // Card footprint used to size the orbit so nothing overlaps.
-  const cardW = 230;
-  const cardH = 168;
-
-  // Required radius so cards spaced evenly around the ring don't collide.
-  // Chord between neighbors >= ~ sqrt(cardW^2 + cardH^2) * 0.78
-  const minChord = Math.hypot(cardW, cardH) * 0.78;
-  const angleStep = (2 * Math.PI) / slots;
-  const radiusForSpacing = slots <= 1 ? 220 : minChord / (2 * Math.sin(angleStep / 2));
-  const radius = Math.max(230, Math.min(radiusForSpacing, (width - cardW) / 2 - 24));
 
   // Container height = vertical diameter + card height + breathing room.
   const height = Math.round(radius * 2 + cardH + 80);
