@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, Save, Loader2, Shield } from "lucide-react";
+import { ChevronRight, Save, Loader2, Shield, AlertTriangle } from "lucide-react";
+import { z } from "zod";
 import { AppShell } from "@/components/layout/AppShell";
 import { BuilderCanvas } from "@/components/agents/builder/BuilderCanvas";
 import { ConfigPanel } from "@/components/agents/builder/ConfigPanel";
@@ -13,15 +14,21 @@ import { buildAgent } from "@/lib/build-agent.functions";
 import { toast } from "sonner";
 import type { WorkflowPhase, ToggleField } from "@/data/lifeplan-types";
 
+const editSearchSchema = z.object({
+  fresh: z.number().optional(),
+  attachTo: z.string().optional(),
+});
+
 export const Route = createFileRoute("/agents/$id/edit")({
   head: () => ({ meta: [{ title: "Edit agent — LifePlan" }] }),
+  validateSearch: editSearchSchema,
   component: AgentEditor,
   notFoundComponent: () => (
     <AppShell>
       <div className="max-w-3xl mx-auto p-12 text-center">
         <h1 className="text-2xl font-extrabold text-ink">Agent not found</h1>
-        <Link to="/agents" className="text-navy underline mt-3 inline-block">
-          Back to agents
+        <Link to="/individuals" className="text-navy underline mt-3 inline-block">
+          Back to individuals
         </Link>
       </div>
     </AppShell>
