@@ -529,3 +529,79 @@ export function pushToCareTracker(
   return created;
 }
 
+
+// ===== Libraries (Prompt 8) =====
+import {
+  rolesLibrary,
+  icmLinksLibrary,
+  optionSetsLibrary,
+} from "@/data/mock";
+
+export function listRoles(): string[] {
+  return [...rolesLibrary];
+}
+export function addRole(role: string) {
+  const v = role.trim();
+  if (!v || rolesLibrary.includes(v)) return;
+  rolesLibrary.push(v);
+}
+export function removeRole(role: string) {
+  const i = rolesLibrary.indexOf(role);
+  if (i >= 0) rolesLibrary.splice(i, 1);
+}
+
+export function listIcmLinks(): string[] {
+  return [...icmLinksLibrary];
+}
+export function addIcmLink(link: string) {
+  const v = link.trim();
+  if (!v || icmLinksLibrary.includes(v)) return;
+  icmLinksLibrary.push(v);
+}
+export function removeIcmLink(link: string) {
+  const i = icmLinksLibrary.indexOf(link);
+  if (i >= 0) icmLinksLibrary.splice(i, 1);
+}
+
+export function listOptionSets(): OptionSet[] {
+  return optionSetsLibrary;
+}
+export function getOptionSet(id: string): OptionSet | undefined {
+  return optionSetsLibrary.find((o) => o.id === id);
+}
+export function upsertOptionSet(input: { id?: string; name: string; options: { value: string; label: string }[] }): OptionSet {
+  const existing = input.id ? optionSetsLibrary.find((o) => o.id === input.id) : undefined;
+  if (existing) {
+    existing.name = input.name;
+    existing.options = input.options;
+    return existing;
+  }
+  const created: OptionSet = {
+    id: input.id || `os_${uid()}`,
+    org_id: ORG_ID,
+    name: input.name,
+    options: input.options,
+  };
+  optionSetsLibrary.push(created);
+  return created;
+}
+export function deleteOptionSet(id: string) {
+  const i = optionSetsLibrary.findIndex((o) => o.id === id);
+  if (i >= 0) optionSetsLibrary.splice(i, 1);
+}
+
+// ===== Schema =====
+export function updateAgentSchema(agentId: string, schema: PlanSchema): Agent | undefined {
+  const a = agents.find((x) => x.id === agentId);
+  if (!a) return undefined;
+  a.plan_schema = schema;
+  a.updated_at = new Date().toISOString();
+  return a;
+}
+
+function applyLocksFromGuidelineId(schema: PlanSchema, guidelineId?: string): PlanSchema {
+  if (!guidelineId) return schema;
+  const g = getGuideline(guidelineId);
+  const labels = g?.compliance_brief.required_fields ?? [];
+  return labels.length ? applyLocks(schema, labels) : schema;
+}
