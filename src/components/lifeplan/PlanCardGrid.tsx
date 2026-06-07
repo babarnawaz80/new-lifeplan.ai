@@ -4,6 +4,7 @@ import {
   ClipboardList, FileText, type LucideIcon,
 } from "lucide-react";
 import type { Agent, Individual } from "@/data/mock";
+import eshaAvatar from "@/assets/esha-avatar.jpg";
 
 // ---------------------------------------------------------------------------
 // PlanCardGrid — Orbit layout. The individual sits as a circular avatar at
