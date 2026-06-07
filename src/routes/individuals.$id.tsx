@@ -331,7 +331,7 @@ function IndividualEChart() {
                         <Honeycomb
                           individual={individual}
                           agents={attachedAgents}
-                          onSelectAgent={(a) => setSelectedAgent(a)}
+                          onSelectAgent={openAgentLog}
                           onAddPlan={() => setPickerOpen(true)}
                         />
                         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12px] text-ink2">
