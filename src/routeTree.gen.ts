@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as IndividualsIndexRouteImport } from './routes/individuals.index'
 import { Route as GuidelinesIndexRouteImport } from './routes/guidelines.index'
-import { Route as AgentsIndexRouteImport } from './routes/agents.index'
 import { Route as IndividualsIdRouteImport } from './routes/individuals.$id'
 import { Route as GuidelinesNewRouteImport } from './routes/guidelines.new'
 import { Route as GuidelinesIdRouteImport } from './routes/guidelines.$id'
@@ -34,11 +33,6 @@ const IndividualsIndexRoute = IndividualsIndexRouteImport.update({
 const GuidelinesIndexRoute = GuidelinesIndexRouteImport.update({
   id: '/guidelines/',
   path: '/guidelines/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgentsIndexRoute = AgentsIndexRouteImport.update({
-  id: '/agents/',
-  path: '/agents/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndividualsIdRoute = IndividualsIdRouteImport.update({
@@ -84,7 +78,6 @@ export interface FileRoutesByFullPath {
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
-  '/agents/': typeof AgentsIndexRoute
   '/guidelines/': typeof GuidelinesIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
@@ -97,7 +90,6 @@ export interface FileRoutesByTo {
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
-  '/agents': typeof AgentsIndexRoute
   '/guidelines': typeof GuidelinesIndexRoute
   '/individuals': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
@@ -111,7 +103,6 @@ export interface FileRoutesById {
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
-  '/agents/': typeof AgentsIndexRoute
   '/guidelines/': typeof GuidelinesIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
@@ -126,7 +117,6 @@ export interface FileRouteTypes {
     | '/guidelines/$id'
     | '/guidelines/new'
     | '/individuals/$id'
-    | '/agents/'
     | '/guidelines/'
     | '/individuals/'
     | '/agents/$id/edit'
@@ -139,7 +129,6 @@ export interface FileRouteTypes {
     | '/guidelines/$id'
     | '/guidelines/new'
     | '/individuals/$id'
-    | '/agents'
     | '/guidelines'
     | '/individuals'
     | '/agents/$id/edit'
@@ -152,7 +141,6 @@ export interface FileRouteTypes {
     | '/guidelines/$id'
     | '/guidelines/new'
     | '/individuals/$id'
-    | '/agents/'
     | '/guidelines/'
     | '/individuals/'
     | '/agents/$id/edit'
@@ -166,7 +154,6 @@ export interface RootRouteChildren {
   GuidelinesIdRoute: typeof GuidelinesIdRoute
   GuidelinesNewRoute: typeof GuidelinesNewRoute
   IndividualsIdRoute: typeof IndividualsIdRouteWithChildren
-  AgentsIndexRoute: typeof AgentsIndexRoute
   GuidelinesIndexRoute: typeof GuidelinesIndexRoute
   IndividualsIndexRoute: typeof IndividualsIndexRoute
   AgentsIdEditRoute: typeof AgentsIdEditRoute
@@ -193,13 +180,6 @@ declare module '@tanstack/react-router' {
       path: '/guidelines'
       fullPath: '/guidelines/'
       preLoaderRoute: typeof GuidelinesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agents/': {
-      id: '/agents/'
-      path: '/agents'
-      fullPath: '/agents/'
-      preLoaderRoute: typeof AgentsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/individuals/$id': {
@@ -273,7 +253,6 @@ const rootRouteChildren: RootRouteChildren = {
   GuidelinesIdRoute: GuidelinesIdRoute,
   GuidelinesNewRoute: GuidelinesNewRoute,
   IndividualsIdRoute: IndividualsIdRouteWithChildren,
-  AgentsIndexRoute: AgentsIndexRoute,
   GuidelinesIndexRoute: GuidelinesIndexRoute,
   IndividualsIndexRoute: IndividualsIndexRoute,
   AgentsIdEditRoute: AgentsIdEditRoute,
@@ -281,3 +260,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
