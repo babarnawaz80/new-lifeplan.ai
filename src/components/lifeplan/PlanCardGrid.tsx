@@ -64,11 +64,11 @@ export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: P
     return () => ro.disconnect();
   }, []);
 
-  // Card footprint used to size the orbit so nothing overlaps.
-  const cardW = 220;
-  const cardH = 160;
-  // Generous chord = diagonal of card + breathing room (works for any angle).
-  const minChord = Math.hypot(cardW, cardH) + 28;
+  // Hex tile footprint (pointy-top). Height = width * 2/sqrt(3).
+  const cardW = 184;
+  const cardH = Math.round(cardW * 2 / Math.sqrt(3)); // ≈ 213
+  // Min chord between neighbor centers so hexes don't touch.
+  const minChord = cardW + 28;
   const angleStep = (2 * Math.PI) / Math.max(slots, 2);
   const radius = Math.max(
     240,
