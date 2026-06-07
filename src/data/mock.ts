@@ -453,6 +453,10 @@ const HRP_OUTPUT = new Set([
   "Status",
 ]);
 
+function templateSchema(output: ToggleField[]): PlanSchema {
+  return defaultSchemaFromOutputFields(output);
+}
+
 export const agentTemplates: AgentTemplate[] = [
   {
     id: "tpl_pcp",
@@ -467,6 +471,7 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: PCP_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, PCP_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, PCP_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, PCP_OUTPUT)),
   },
   {
     id: "tpl_bsp",
@@ -481,6 +486,7 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: BSP_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, BSP_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, BSP_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, BSP_OUTPUT)),
   },
   {
     id: "tpl_ncp",
@@ -495,6 +501,7 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: NCP_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, NCP_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, NCP_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, NCP_OUTPUT)),
   },
   {
     id: "tpl_med",
@@ -509,6 +516,7 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: MED_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, MED_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, MED_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, MED_OUTPUT)),
   },
   {
     id: "tpl_hrp",
@@ -523,8 +531,10 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: HRP_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, HRP_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, HRP_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, HRP_OUTPUT)),
   },
 ];
+
 
 // ---------- Org agents (cloned from templates so the hexagon is populated) ----------
 function cloneTemplateAsAgent(t: AgentTemplate, id: string): Agent {
