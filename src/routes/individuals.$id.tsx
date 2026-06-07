@@ -10,11 +10,10 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Honeycomb } from "@/components/lifeplan/Honeycomb";
-import { ManualOrAIDialog } from "@/components/lifeplan/ManualOrAIDialog";
 import { AddPlanPicker } from "@/components/lifeplan/AddPlanPicker";
 import {
   getIndividual, getAgentsForIndividual, listAgents,
-  attachAgentToIndividual, createPlan,
+  attachAgentToIndividual,
 } from "@/integrations/icm";
 import { individualAgents, type Agent } from "@/data/mock";
 
