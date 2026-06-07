@@ -353,11 +353,12 @@ function IndividualEChart() {
                           onSelectAgent={openAgentLog}
                           onAddPlan={() => setPickerOpen(true)}
                         />
-                        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12px] text-ink2">
-                          <LegendDot color="var(--green)" label="Current plan" />
-                          <LegendDot color="var(--amber)" label="Draft in progress" />
-                          <span className="inline-flex items-center gap-2">
-                            <span className="inline-block h-2.5 w-2.5 rounded-full border border-dashed border-ink3" />
+                        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-semibold uppercase tracking-wider text-ink2">
+                          <LegendDot color="#2E9E5B" label="Current" />
+                          <LegendDot color="#D9920A" label="Draft" />
+                          <LegendDot color="#DC4C3E" label="Needs attention" />
+                          <span className="inline-flex items-center gap-2 normal-case tracking-normal text-ink3">
+                            <span className="inline-block h-2.5 w-2.5 rounded-full border border-dashed border-[#C9BFA4]" />
                             Add a new plan
                           </span>
                         </div>
