@@ -32,7 +32,12 @@ import {
   PROFILE_FIELD_NAMES,
   OUTPUT_FIELD_NAMES,
   toToggleFields,
+  defaultSchemaFromOutputFields,
+  applyLocks,
+  uid,
 } from "@/data/lifeplan-types";
+import type { PlanSchema, OptionSet } from "@/data/lifeplan-types";
+
 
 export function getCurrentSession() {
   return { userId: "user_mock_1", userName: "Babar Nawaz", orgId: ORG_ID };
@@ -105,6 +110,8 @@ export function createAgentFromTemplate(templateId: string): Agent {
     workflow_data: JSON.parse(JSON.stringify(t.default_workflow)),
     profile_fields: JSON.parse(JSON.stringify(t.default_profile_fields)),
     output_fields: JSON.parse(JSON.stringify(t.default_output_fields)),
+    plan_schema: JSON.parse(JSON.stringify(t.default_plan_schema)),
+
     created_from_template_id: t.id,
     created_at: now,
     updated_at: now,
@@ -131,7 +138,9 @@ export function createBlankAgent(): Agent {
     workflow_data: [],
     profile_fields: toToggleFields(PROFILE_FIELD_NAMES),
     output_fields: toToggleFields(OUTPUT_FIELD_NAMES),
+    plan_schema: { sections: [] },
     created_from_template_id: null,
+
     created_at: now,
     updated_at: now,
   };
@@ -250,7 +259,12 @@ export function createAgentFromConfig(args: {
     workflow_data: args.workflow_data,
     profile_fields: args.profile_fields,
     output_fields: args.output_fields,
+    plan_schema: applyLocksFromGuidelineId(
+      defaultSchemaFromOutputFields(args.output_fields),
+      args.guidelineId,
+    ),
     created_from_template_id: null,
+
     created_at: now,
     updated_at: now,
   };
