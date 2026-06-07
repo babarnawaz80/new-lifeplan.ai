@@ -9,6 +9,7 @@ import {
   CalendarDays,
   FileText,
   Shield,
+  Library,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,10 +18,12 @@ const navItems = [
   { label: "Dashboard", icon: Home, to: "/" },
   { label: "Individuals", icon: Users, to: "/individuals" },
   { label: "Guidelines", icon: Shield, to: "/guidelines" },
+  { label: "Libraries", icon: Library, to: "/settings/libraries" },
   { label: "Staff", icon: UserCog, to: "#staff" },
   { label: "Events", icon: CalendarDays, to: "#events" },
   { label: "Logs", icon: FileText, to: "#logs" },
 ];
+
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
