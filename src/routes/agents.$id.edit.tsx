@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, Save, Loader2, Shield } from "lucide-react";
+import { ChevronRight, Save, Loader2, Shield, AlertTriangle } from "lucide-react";
+import { z } from "zod";
 import { AppShell } from "@/components/layout/AppShell";
 import { BuilderCanvas } from "@/components/agents/builder/BuilderCanvas";
 import { ConfigPanel } from "@/components/agents/builder/ConfigPanel";
@@ -13,15 +14,21 @@ import { buildAgent } from "@/lib/build-agent.functions";
 import { toast } from "sonner";
 import type { WorkflowPhase, ToggleField } from "@/data/lifeplan-types";
 
+const editSearchSchema = z.object({
+  fresh: z.number().optional(),
+  attachTo: z.string().optional(),
+});
+
 export const Route = createFileRoute("/agents/$id/edit")({
   head: () => ({ meta: [{ title: "Edit agent — LifePlan" }] }),
+  validateSearch: editSearchSchema,
   component: AgentEditor,
   notFoundComponent: () => (
     <AppShell>
       <div className="max-w-3xl mx-auto p-12 text-center">
         <h1 className="text-2xl font-extrabold text-ink">Agent not found</h1>
-        <Link to="/agents" className="text-navy underline mt-3 inline-block">
-          Back to agents
+        <Link to="/individuals" className="text-navy underline mt-3 inline-block">
+          Back to individuals
         </Link>
       </div>
     </AppShell>
@@ -46,6 +53,7 @@ type Selection = { kind: "phase" | "task" | null; phaseId: string | null; taskId
 
 function AgentEditor() {
   const { id } = Route.useParams();
+  const { fresh, attachTo } = Route.useSearch();
   const navigate = useNavigate();
   const agent = getAgent(id);
   if (!agent) throw notFound();
@@ -121,19 +129,48 @@ function AgentEditor() {
       status: "active",
     });
     toast.success("Agent saved");
-    navigate({ to: "/agents" });
+    if (attachTo) {
+      navigate({
+        to: "/individuals/$id/log/$agentId",
+        params: { id: attachTo, agentId: agent.id },
+      });
+    } else {
+      navigate({ to: "/individuals" });
+    }
   };
 
   const totalTasks = phases.reduce((n, p) => n + p.tasks.length, 0);
+  const showSharedBanner = !fresh;
+  const planTypeLabel = agent.plan_type.replace(/_/g, " ");
 
   return (
     <AppShell>
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 pt-6">
         <nav className="flex items-center gap-1.5 text-[12px] text-ink3 mb-4">
-          <Link to="/agents" className="hover:text-ink">Plan agents</Link>
+          {attachTo ? (
+            <Link
+              to="/individuals/$id/log/$agentId"
+              params={{ id: attachTo, agentId: agent.id }}
+              className="hover:text-ink"
+            >
+              Back to plan log
+            </Link>
+          ) : (
+            <Link to="/individuals" className="hover:text-ink">Individuals</Link>
+          )}
           <ChevronRight className="h-3 w-3" />
           <span className="text-ink font-semibold truncate">{name}</span>
         </nav>
+
+        {showSharedBanner && (
+          <div className="mb-4 rounded-[12px] border border-amber/40 bg-amber/10 px-4 py-3 flex items-start gap-3">
+            <AlertTriangle className="h-4 w-4 text-amber shrink-0 mt-0.5" />
+            <p className="text-[13px] text-ink">
+              <span className="font-bold">This is the shared {planTypeLabel} agent.</span>{" "}
+              Changes apply to every individual who uses it.
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-5">
           <div

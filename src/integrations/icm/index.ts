@@ -290,6 +290,11 @@ export function createPlan(args: {
 export function getPlan(id: string) {
   return plans.find((p) => p.id === id);
 }
+export function listPlansForIndividualAndAgent(individualId: string, agentId: string): Plan[] {
+  return plans
+    .filter((p) => p.individual_id === individualId && p.agent_id === agentId)
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+}
 export function updatePlan(id: string, patch: Partial<Plan>): Plan | undefined {
   const p = plans.find((x) => x.id === id);
   if (!p) return undefined;

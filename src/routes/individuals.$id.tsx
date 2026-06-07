@@ -6,15 +6,14 @@ import {
   ClipboardList, FileCheck, Users, Brain, Phone, BarChart3, Settings, PenTool,
   CalendarDays, Building2, MessageSquare, Zap, Clipboard, FileSpreadsheet, Heart,
   CircleDot, LayoutList, UserCheck, BookOpen, ShieldPlus, ClipboardCheck,
-  FolderOpen, Sparkles,
+  FolderOpen, Sparkles, Shield,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Honeycomb } from "@/components/lifeplan/Honeycomb";
-import { ManualOrAIDialog } from "@/components/lifeplan/ManualOrAIDialog";
 import { AddPlanPicker } from "@/components/lifeplan/AddPlanPicker";
 import {
   getIndividual, getAgentsForIndividual, listAgents,
-  attachAgentToIndividual, createPlan,
+  attachAgentToIndividual,
 } from "@/integrations/icm";
 import { individualAgents, type Agent } from "@/data/mock";
 
@@ -190,19 +189,11 @@ function IndividualEChart() {
     const attachedIds = new Set(attachedAgents.map((a) => a.agent.id));
     return listAgents().filter((a) => !attachedIds.has(a.id));
   }, [attachedAgents]);
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const handleChoose = (mode: "ai" | "manual") => {
-    if (!selectedAgent) return;
-    const plan = createPlan({
-      individualId: individual.id,
-      agentId: selectedAgent.id,
-      creationMode: mode,
-    });
-    setSelectedAgent(null);
+  const openAgentLog = (a: Agent) => {
     navigate({
-      to: "/individuals/$id/plan/$planId",
-      params: { id: individual.id, planId: plan.id },
+      to: "/individuals/$id/log/$agentId",
+      params: { id: individual.id, agentId: a.id },
     });
   };
 
@@ -322,9 +313,28 @@ function IndividualEChart() {
                       </h2>
                     </div>
                     {isLifePlan && (
-                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-white/95 bg-white/15 border border-white/25 px-2 py-1 rounded-full">
-                        <Sparkles className="h-3 w-3" /> AI ready
-                      </span>
+                      <>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate({ to: "/guidelines" });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              navigate({ to: "/guidelines" });
+                            }
+                          }}
+                          className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-white/95 bg-white/15 border border-white/25 px-2 py-1 rounded-full hover:bg-white/25 cursor-pointer"
+                        >
+                          <Shield className="h-3 w-3" /> Guidelines
+                        </span>
+                        <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-white/95 bg-white/15 border border-white/25 px-2 py-1 rounded-full">
+                          <Sparkles className="h-3 w-3" /> AI ready
+                        </span>
+                      </>
                     )}
                     <ChevronDown
                       className={`h-4 w-4 text-white/90 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
@@ -340,7 +350,7 @@ function IndividualEChart() {
                         <Honeycomb
                           individual={individual}
                           agents={attachedAgents}
-                          onSelectAgent={(a) => setSelectedAgent(a)}
+                          onSelectAgent={openAgentLog}
                           onAddPlan={() => setPickerOpen(true)}
                         />
                         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12px] text-ink2">
@@ -367,13 +377,6 @@ function IndividualEChart() {
         </div>
       </main>
 
-      <ManualOrAIDialog
-        open={!!selectedAgent}
-        onOpenChange={(o) => !o && setSelectedAgent(null)}
-        agent={selectedAgent}
-        individual={individual}
-        onChoose={handleChoose}
-      />
       <AddPlanPicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}
@@ -382,6 +385,13 @@ function IndividualEChart() {
           attachAgentToIndividual(individual.id, a.id);
           setPickerOpen(false);
           bump();
+        }}
+        onCreateNew={() => {
+          setPickerOpen(false);
+          navigate({
+            to: "/agents/new",
+            search: { attachTo: individual.id },
+          });
         }}
       />
     </AppShell>

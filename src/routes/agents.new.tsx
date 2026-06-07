@@ -2,12 +2,14 @@ import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { z } from "zod";
 import { AppShell } from "@/components/layout/AppShell";
 import { buildAgent } from "@/lib/build-agent.functions";
 import {
   listGuidelines,
   getGuideline,
   createAgentFromConfig,
+  attachAgentToIndividual,
 } from "@/integrations/icm";
 import { toast } from "sonner";
 
@@ -20,13 +22,19 @@ const PLAN_TYPES = [
   { v: "staff_action_plan", label: "Staff Action Plan" },
 ];
 
+const searchSchema = z.object({
+  attachTo: z.string().optional(),
+});
+
 export const Route = createFileRoute("/agents/new")({
   head: () => ({ meta: [{ title: "New plan agent — LifePlan" }] }),
+  validateSearch: searchSchema,
   component: NewAgentPage,
 });
 
 function NewAgentPage() {
   const navigate = useNavigate();
+  const { attachTo } = Route.useSearch();
   const callBuild = useServerFn(buildAgent);
   const guidelines = listGuidelines().filter((g) => g.status === "published");
 
@@ -61,8 +69,13 @@ function NewAgentPage() {
         output_fields: result.output_fields,
         instructions: result.instructions,
       });
+      if (attachTo) attachAgentToIndividual(attachTo, agent.id);
       toast.success("Draft agent created");
-      navigate({ to: "/agents/$id/edit", params: { id: agent.id } });
+      navigate({
+        to: "/agents/$id/edit",
+        params: { id: agent.id },
+        search: { fresh: 1, attachTo },
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Generation failed.");
     } finally {
@@ -70,18 +83,25 @@ function NewAgentPage() {
     }
   };
 
+  const backTo = attachTo
+    ? { to: "/individuals/$id" as const, params: { id: attachTo } }
+    : { to: "/individuals" as const };
+
   return (
     <AppShell>
       <div className="max-w-3xl mx-auto px-6 py-8">
         <nav className="flex items-center gap-1.5 text-[12px] text-ink3 mb-5">
-          <Link to="/agents" className="hover:text-ink">Plan agents</Link>
+          <Link {...backTo} className="hover:text-ink">
+            {attachTo ? "Back to individual" : "Individuals"}
+          </Link>
           <ChevronRight className="h-3 w-3" />
-          <span className="text-ink font-semibold">New</span>
+          <span className="text-ink font-semibold">New agent</span>
         </nav>
 
         <h1 className="text-[28px] font-extrabold text-ink mb-1">New plan agent</h1>
         <p className="text-[14px] text-ink2 mb-6">
           Describe the plan in plain language. AI builds the draft. You review and save.
+          {attachTo ? " It will be attached to this individual when saved." : ""}
         </p>
 
         <div className="rounded-2xl bg-card border border-line p-6 shadow-soft space-y-5">

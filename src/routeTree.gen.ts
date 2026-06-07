@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as IndividualsIndexRouteImport } from './routes/individuals.index'
 import { Route as GuidelinesIndexRouteImport } from './routes/guidelines.index'
-import { Route as AgentsIndexRouteImport } from './routes/agents.index'
 import { Route as IndividualsIdRouteImport } from './routes/individuals.$id'
 import { Route as GuidelinesNewRouteImport } from './routes/guidelines.new'
 import { Route as GuidelinesIdRouteImport } from './routes/guidelines.$id'
@@ -20,6 +19,7 @@ import { Route as ApiGeneratePlanRouteImport } from './routes/api/generate-plan'
 import { Route as AgentsNewRouteImport } from './routes/agents.new'
 import { Route as AgentsIdEditRouteImport } from './routes/agents.$id.edit'
 import { Route as IndividualsIdPlanPlanIdRouteImport } from './routes/individuals.$id.plan.$planId'
+import { Route as IndividualsIdLogAgentIdRouteImport } from './routes/individuals.$id.log.$agentId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,11 +34,6 @@ const IndividualsIndexRoute = IndividualsIndexRouteImport.update({
 const GuidelinesIndexRoute = GuidelinesIndexRouteImport.update({
   id: '/guidelines/',
   path: '/guidelines/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgentsIndexRoute = AgentsIndexRouteImport.update({
-  id: '/agents/',
-  path: '/agents/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndividualsIdRoute = IndividualsIdRouteImport.update({
@@ -76,6 +71,11 @@ const IndividualsIdPlanPlanIdRoute = IndividualsIdPlanPlanIdRouteImport.update({
   path: '/plan/$planId',
   getParentRoute: () => IndividualsIdRoute,
 } as any)
+const IndividualsIdLogAgentIdRoute = IndividualsIdLogAgentIdRouteImport.update({
+  id: '/log/$agentId',
+  path: '/log/$agentId',
+  getParentRoute: () => IndividualsIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -84,10 +84,10 @@ export interface FileRoutesByFullPath {
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
-  '/agents/': typeof AgentsIndexRoute
   '/guidelines/': typeof GuidelinesIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
+  '/individuals/$id/log/$agentId': typeof IndividualsIdLogAgentIdRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
 }
 export interface FileRoutesByTo {
@@ -97,10 +97,10 @@ export interface FileRoutesByTo {
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
-  '/agents': typeof AgentsIndexRoute
   '/guidelines': typeof GuidelinesIndexRoute
   '/individuals': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
+  '/individuals/$id/log/$agentId': typeof IndividualsIdLogAgentIdRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
 }
 export interface FileRoutesById {
@@ -111,10 +111,10 @@ export interface FileRoutesById {
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
   '/individuals/$id': typeof IndividualsIdRouteWithChildren
-  '/agents/': typeof AgentsIndexRoute
   '/guidelines/': typeof GuidelinesIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
+  '/individuals/$id/log/$agentId': typeof IndividualsIdLogAgentIdRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
 }
 export interface FileRouteTypes {
@@ -126,10 +126,10 @@ export interface FileRouteTypes {
     | '/guidelines/$id'
     | '/guidelines/new'
     | '/individuals/$id'
-    | '/agents/'
     | '/guidelines/'
     | '/individuals/'
     | '/agents/$id/edit'
+    | '/individuals/$id/log/$agentId'
     | '/individuals/$id/plan/$planId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -139,10 +139,10 @@ export interface FileRouteTypes {
     | '/guidelines/$id'
     | '/guidelines/new'
     | '/individuals/$id'
-    | '/agents'
     | '/guidelines'
     | '/individuals'
     | '/agents/$id/edit'
+    | '/individuals/$id/log/$agentId'
     | '/individuals/$id/plan/$planId'
   id:
     | '__root__'
@@ -152,10 +152,10 @@ export interface FileRouteTypes {
     | '/guidelines/$id'
     | '/guidelines/new'
     | '/individuals/$id'
-    | '/agents/'
     | '/guidelines/'
     | '/individuals/'
     | '/agents/$id/edit'
+    | '/individuals/$id/log/$agentId'
     | '/individuals/$id/plan/$planId'
   fileRoutesById: FileRoutesById
 }
@@ -166,7 +166,6 @@ export interface RootRouteChildren {
   GuidelinesIdRoute: typeof GuidelinesIdRoute
   GuidelinesNewRoute: typeof GuidelinesNewRoute
   IndividualsIdRoute: typeof IndividualsIdRouteWithChildren
-  AgentsIndexRoute: typeof AgentsIndexRoute
   GuidelinesIndexRoute: typeof GuidelinesIndexRoute
   IndividualsIndexRoute: typeof IndividualsIndexRoute
   AgentsIdEditRoute: typeof AgentsIdEditRoute
@@ -193,13 +192,6 @@ declare module '@tanstack/react-router' {
       path: '/guidelines'
       fullPath: '/guidelines/'
       preLoaderRoute: typeof GuidelinesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agents/': {
-      id: '/agents/'
-      path: '/agents'
-      fullPath: '/agents/'
-      preLoaderRoute: typeof AgentsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/individuals/$id': {
@@ -251,14 +243,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndividualsIdPlanPlanIdRouteImport
       parentRoute: typeof IndividualsIdRoute
     }
+    '/individuals/$id/log/$agentId': {
+      id: '/individuals/$id/log/$agentId'
+      path: '/log/$agentId'
+      fullPath: '/individuals/$id/log/$agentId'
+      preLoaderRoute: typeof IndividualsIdLogAgentIdRouteImport
+      parentRoute: typeof IndividualsIdRoute
+    }
   }
 }
 
 interface IndividualsIdRouteChildren {
+  IndividualsIdLogAgentIdRoute: typeof IndividualsIdLogAgentIdRoute
   IndividualsIdPlanPlanIdRoute: typeof IndividualsIdPlanPlanIdRoute
 }
 
 const IndividualsIdRouteChildren: IndividualsIdRouteChildren = {
+  IndividualsIdLogAgentIdRoute: IndividualsIdLogAgentIdRoute,
   IndividualsIdPlanPlanIdRoute: IndividualsIdPlanPlanIdRoute,
 }
 
@@ -273,7 +274,6 @@ const rootRouteChildren: RootRouteChildren = {
   GuidelinesIdRoute: GuidelinesIdRoute,
   GuidelinesNewRoute: GuidelinesNewRoute,
   IndividualsIdRoute: IndividualsIdRouteWithChildren,
-  AgentsIndexRoute: AgentsIndexRoute,
   GuidelinesIndexRoute: GuidelinesIndexRoute,
   IndividualsIndexRoute: IndividualsIndexRoute,
   AgentsIdEditRoute: AgentsIdEditRoute,

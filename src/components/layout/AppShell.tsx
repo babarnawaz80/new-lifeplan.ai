@@ -8,7 +8,6 @@ import {
   UserCog,
   CalendarDays,
   FileText,
-  Workflow,
   Shield,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -17,7 +16,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 const navItems = [
   { label: "Dashboard", icon: Home, to: "/" },
   { label: "Individuals", icon: Users, to: "/individuals" },
-  { label: "Plan agents", icon: Workflow, to: "/agents" },
   { label: "Guidelines", icon: Shield, to: "/guidelines" },
   { label: "Staff", icon: UserCog, to: "#staff" },
   { label: "Events", icon: CalendarDays, to: "#events" },
