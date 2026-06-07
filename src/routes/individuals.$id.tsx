@@ -6,7 +6,7 @@ import {
   ClipboardList, FileCheck, Users, Brain, Phone, BarChart3, Settings, PenTool,
   CalendarDays, Building2, MessageSquare, Zap, Clipboard, FileSpreadsheet, Heart,
   CircleDot, LayoutList, UserCheck, BookOpen, ShieldPlus, ClipboardCheck,
-  FolderOpen, Sparkles,
+  FolderOpen, Sparkles, Shield,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Honeycomb } from "@/components/lifeplan/Honeycomb";
