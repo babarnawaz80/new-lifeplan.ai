@@ -250,13 +250,15 @@ function CenterAvatar({
           }}
         />
         <div className="relative rounded-full bg-white p-1.5 shadow-[0_10px_30px_-10px_rgba(79,70,229,0.45)]">
-          <div className="h-28 w-28 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-4xl font-extrabold tracking-tight">
-            {initialsOf(individual.name)}
-          </div>
+          <img
+            src={eshaAvatar}
+            alt={individual.name}
+            width={512}
+            height={512}
+            loading="lazy"
+            className="h-28 w-28 rounded-full object-cover"
+          />
         </div>
-      </div>
-      <div className="mt-3 text-[16px] font-extrabold text-ink leading-tight">
-        {individual.name}
       </div>
     </div>
   );
