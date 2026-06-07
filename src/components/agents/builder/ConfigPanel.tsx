@@ -1,8 +1,9 @@
 import { useRef } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import type { WorkflowPhase, WorkflowTask, ToggleField, NotifyTrigger } from "@/data/lifeplan-types";
-import { AVAILABLE_ROLES, AVAILABLE_LINKS } from "@/data/lifeplan-types";
+import { listRoles, listIcmLinks } from "@/integrations/icm";
 import { VariablePicker } from "./VariablePicker";
+
 
 interface Props {
   phases: WorkflowPhase[];
@@ -219,7 +220,7 @@ function TaskConfig({
       <div>
         <Label>Assigned roles</Label>
         <MultiToggle
-          options={[...AVAILABLE_ROLES]}
+          options={listRoles()}
           value={task.assigned_roles}
           onChange={(v) => onChange({ assigned_roles: v })}
         />
@@ -228,11 +229,12 @@ function TaskConfig({
       <div>
         <Label>iCM links</Label>
         <MultiToggle
-          options={[...AVAILABLE_LINKS]}
+          options={listIcmLinks()}
           value={task.icm_links}
           onChange={(v) => onChange({ icm_links: v })}
         />
       </div>
+
 
       <div className="rounded-xl bg-muted/40 border border-line p-3 space-y-2">
         <Label>Notifications</Label>

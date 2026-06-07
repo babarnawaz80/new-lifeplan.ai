@@ -8,11 +8,15 @@ import { BuilderCanvas } from "@/components/agents/builder/BuilderCanvas";
 import { ConfigPanel } from "@/components/agents/builder/ConfigPanel";
 import { AiAssist } from "@/components/agents/builder/AiAssist";
 import { SecondaryTabs } from "@/components/agents/builder/SecondaryTabs";
-import { getAgent, listGuidelines, updateAgent } from "@/integrations/icm";
+import { BuilderModeTabs, type BuilderMode } from "@/components/agents/builder/schema/BuilderModeTabs";
+import { SchemaCanvas, type SchemaSelection } from "@/components/agents/builder/schema/SchemaCanvas";
+import { FieldConfigPanel } from "@/components/agents/builder/schema/FieldConfigPanel";
+import { getAgent, listGuidelines, listOptionSets, updateAgent, updateAgentSchema } from "@/integrations/icm";
 import { accentColor } from "@/data/mock";
 import { buildAgent } from "@/lib/build-agent.functions";
 import { toast } from "sonner";
-import type { WorkflowPhase, ToggleField } from "@/data/lifeplan-types";
+import type { WorkflowPhase, ToggleField, PlanSchema } from "@/data/lifeplan-types";
+
 
 const editSearchSchema = z.object({
   fresh: z.number().optional(),
@@ -67,6 +71,10 @@ function AgentEditor() {
   const [profileFields, setProfileFields] = useState<ToggleField[]>(agent.profile_fields);
   const [outputFields, setOutputFields] = useState<ToggleField[]>(agent.output_fields);
   const [instructions, setInstructions] = useState(agent.instructions);
+  const [schema, setSchema] = useState<PlanSchema>(agent.plan_schema);
+  const [mode, setMode] = useState<BuilderMode>("workflow");
+  const [schemaSelection, setSchemaSelection] = useState<SchemaSelection>({ kind: null });
+  const optionSets = listOptionSets();
   const [selection, setSelection] = useState<Selection>(() => {
     const first = agent.workflow_data[0];
     if (first) return { kind: "phase", phaseId: first.id, taskId: null };
@@ -74,6 +82,7 @@ function AgentEditor() {
   });
   const [busy, setBusy] = useState(false);
   const [lastSummary, setLastSummary] = useState<string>();
+
 
   const complianceBrief = useMemo(() => {
     if (!linkedGuideline) return undefined;
@@ -128,6 +137,7 @@ function AgentEditor() {
       instructions,
       status: "active",
     });
+    updateAgentSchema(agent.id, schema);
     toast.success("Agent saved");
     if (attachTo) {
       navigate({
@@ -138,6 +148,7 @@ function AgentEditor() {
       navigate({ to: "/individuals" });
     }
   };
+
 
   const totalTasks = phases.reduce((n, p) => n + p.tasks.length, 0);
   const showSharedBanner = !fresh;
@@ -233,12 +244,23 @@ function AgentEditor() {
               onRegenerate={() => runAi({ regenerate: true })}
             />
 
-            <BuilderCanvas
-              phases={phases}
-              selection={selection}
-              onChange={setPhases}
-              onSelect={setSelection}
-            />
+            <BuilderModeTabs mode={mode} onChange={setMode} />
+
+            {mode === "workflow" ? (
+              <BuilderCanvas
+                phases={phases}
+                selection={selection}
+                onChange={setPhases}
+                onSelect={setSelection}
+              />
+            ) : (
+              <SchemaCanvas
+                schema={schema}
+                selection={schemaSelection}
+                onChange={setSchema}
+                onSelect={setSchemaSelection}
+              />
+            )}
 
             <SecondaryTabs
               profileFields={profileFields}
@@ -262,14 +284,25 @@ function AgentEditor() {
 
           {/* Right config panel */}
           <div className="lg:sticky lg:top-6 lg:self-start lg:h-[calc(100vh-7rem)] rounded-2xl overflow-hidden border border-line bg-card shadow-soft">
-            <ConfigPanel
-              phases={phases}
-              selection={selection}
-              profileFields={profileFields}
-              onChange={setPhases}
-              onClose={() => setSelection({ kind: null, phaseId: null, taskId: null })}
-            />
+            {mode === "workflow" ? (
+              <ConfigPanel
+                phases={phases}
+                selection={selection}
+                profileFields={profileFields}
+                onChange={setPhases}
+                onClose={() => setSelection({ kind: null, phaseId: null, taskId: null })}
+              />
+            ) : (
+              <FieldConfigPanel
+                schema={schema}
+                selection={schemaSelection}
+                optionSets={optionSets}
+                onChange={setSchema}
+                onClose={() => setSchemaSelection({ kind: null })}
+              />
+            )}
           </div>
+
         </div>
       </div>
     </AppShell>

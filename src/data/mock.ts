@@ -3,12 +3,19 @@
 import type {
   WorkflowPhase,
   ToggleField,
+  PlanSchema,
+  OptionSet,
 } from "./lifeplan-types";
 import {
   PROFILE_FIELD_NAMES,
   OUTPUT_FIELD_NAMES,
+  AVAILABLE_ROLES,
+  AVAILABLE_LINKS,
   toToggleFields,
+  defaultSchemaFromOutputFields,
+  applyLocks,
 } from "./lifeplan-types";
+
 
 export type Individual = {
   id: string;
@@ -38,6 +45,7 @@ export type Agent = {
   workflow_data: WorkflowPhase[];
   profile_fields: ToggleField[];
   output_fields: ToggleField[];
+  plan_schema: PlanSchema;
   created_from_template_id: string | null;
   created_at: string;
   updated_at: string;
@@ -56,7 +64,9 @@ export type AgentTemplate = {
   default_workflow: WorkflowPhase[];
   default_profile_fields: ToggleField[];
   default_output_fields: ToggleField[];
+  default_plan_schema: PlanSchema;
 };
+
 
 export type ComplianceBrief = {
   rules: string[];
@@ -102,12 +112,15 @@ export type Plan = {
   plan_mode: "annual" | "on_the_fly";
   status: "draft" | "in_progress" | "implementing" | "implemented";
   plan_content: Record<string, unknown>;
+  field_values: Record<string, unknown>;
+  field_overrides?: import("./lifeplan-types").PlanField[];
   auto_renew: boolean;
-  annual_plan_date: string; // ISO date that anchors workflow due dates
+  annual_plan_date: string;
   implementation_date?: string;
   created_at: string;
   updated_at: string;
 };
+
 
 export type TaskAssignment = {
   id: string;
@@ -443,6 +456,10 @@ const HRP_OUTPUT = new Set([
   "Status",
 ]);
 
+function templateSchema(output: ToggleField[]): PlanSchema {
+  return defaultSchemaFromOutputFields(output);
+}
+
 export const agentTemplates: AgentTemplate[] = [
   {
     id: "tpl_pcp",
@@ -457,6 +474,7 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: PCP_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, PCP_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, PCP_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, PCP_OUTPUT)),
   },
   {
     id: "tpl_bsp",
@@ -471,6 +489,7 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: BSP_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, BSP_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, BSP_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, BSP_OUTPUT)),
   },
   {
     id: "tpl_ncp",
@@ -485,6 +504,7 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: NCP_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, NCP_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, NCP_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, NCP_OUTPUT)),
   },
   {
     id: "tpl_med",
@@ -499,6 +519,7 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: MED_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, MED_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, MED_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, MED_OUTPUT)),
   },
   {
     id: "tpl_hrp",
@@ -513,8 +534,10 @@ export const agentTemplates: AgentTemplate[] = [
     default_workflow: HRP_WORKFLOW,
     default_profile_fields: toToggleFields(PROFILE_FIELD_NAMES, HRP_PROFILE),
     default_output_fields: toToggleFields(OUTPUT_FIELD_NAMES, HRP_OUTPUT),
+    default_plan_schema: templateSchema(toToggleFields(OUTPUT_FIELD_NAMES, HRP_OUTPUT)),
   },
 ];
+
 
 // ---------- Org agents (cloned from templates so the hexagon is populated) ----------
 function cloneTemplateAsAgent(t: AgentTemplate, id: string): Agent {
@@ -535,6 +558,7 @@ function cloneTemplateAsAgent(t: AgentTemplate, id: string): Agent {
     workflow_data: JSON.parse(JSON.stringify(t.default_workflow)),
     profile_fields: JSON.parse(JSON.stringify(t.default_profile_fields)),
     output_fields: JSON.parse(JSON.stringify(t.default_output_fields)),
+    plan_schema: JSON.parse(JSON.stringify(t.default_plan_schema)),
     created_from_template_id: t.id,
     created_at: now,
     updated_at: now,
@@ -552,6 +576,19 @@ export const agents: Agent[] = [
 agents[0].guidelines_engine_ids = ["ny_opwdd"];
 agents[1].guidelines_engine_ids = ["ny_opwdd"];
 
+// Apply guideline-required locks to seeded agents.
+{
+  const reqByGuideline: Record<string, string[]> = {};
+  for (const g of guidelinesEngines) {
+    reqByGuideline[g.id] = g.compliance_brief.required_fields ?? [];
+  }
+  for (const a of agents) {
+    const labels = a.guidelines_engine_ids.flatMap((gid) => reqByGuideline[gid] ?? []);
+    if (labels.length > 0) a.plan_schema = applyLocks(a.plan_schema, labels);
+  }
+}
+
+
 export const individualAgents: IndividualAgent[] = [
   { id: "ia_1", individual_id: "esha", agent_id: "pcp", status: "current", added_at: "" },
   { id: "ia_2", individual_id: "esha", agent_id: "bsp", status: "current", added_at: "" },
@@ -564,6 +601,59 @@ export const plans: Plan[] = [];
 export const taskAssignments: TaskAssignment[] = [];
 export const trainings: Training[] = [];
 export const careTrackerServices: CareTrackerService[] = [];
+
+// ===== Org-level editable libraries (Prompt 8) =====
+export const rolesLibrary: string[] = [...AVAILABLE_ROLES];
+export const icmLinksLibrary: string[] = [...AVAILABLE_LINKS];
+
+export const optionSetsLibrary: OptionSet[] = [
+  {
+    id: "os_visit_type",
+    org_id: ORG_ID,
+    name: "Visit Type",
+    options: [
+      { value: "individual", label: "Individual" },
+      { value: "group", label: "Group" },
+      { value: "collateral", label: "Collateral" },
+    ],
+  },
+  {
+    id: "os_visit_frequency",
+    org_id: ORG_ID,
+    name: "Visit Frequency",
+    options: [
+      { value: "2x_week", label: "2x/week" },
+      { value: "4_5x_month", label: "4–5x/month" },
+      { value: "2_3x_month", label: "2–3x/month" },
+      { value: "1x_month", label: "1x/month" },
+    ],
+  },
+  {
+    id: "os_poms",
+    org_id: ORG_ID,
+    name: "POMS Categories",
+    options: [
+      { value: "identity", label: "Identity" },
+      { value: "autonomy", label: "Autonomy" },
+      { value: "affiliation", label: "Affiliation" },
+      { value: "attainment", label: "Attainment" },
+      { value: "safeguards", label: "Safeguards" },
+      { value: "rights", label: "Rights" },
+      { value: "health_wellness", label: "Health & Wellness" },
+    ],
+  },
+  {
+    id: "os_goal_class",
+    org_id: ORG_ID,
+    name: "Goal Class",
+    options: [
+      { value: "goal", label: "Goal" },
+      { value: "support", label: "Support" },
+      { value: "task", label: "Task" },
+    ],
+  },
+];
+
 
 export const categoryColor: Record<Agent["category"], string> = {
   behavioral: "var(--indigo)",
