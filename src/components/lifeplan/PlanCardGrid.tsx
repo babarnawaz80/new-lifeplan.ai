@@ -64,11 +64,11 @@ export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: P
     return () => ro.disconnect();
   }, []);
 
-  // Card footprint used to size the orbit so nothing overlaps.
-  const cardW = 220;
-  const cardH = 160;
-  // Generous chord = diagonal of card + breathing room (works for any angle).
-  const minChord = Math.hypot(cardW, cardH) + 28;
+  // Hex tile footprint (pointy-top). Height = width * 2/sqrt(3).
+  const cardW = 184;
+  const cardH = Math.round(cardW * 2 / Math.sqrt(3)); // ≈ 213
+  // Min chord between neighbor centers so hexes don't touch.
+  const minChord = cardW + 28;
   const angleStep = (2 * Math.PI) / Math.max(slots, 2);
   const radius = Math.max(
     240,
@@ -257,21 +257,38 @@ function CenterAvatar({
   planCount: number;
   style?: React.CSSProperties;
 }) {
+  const W = 168;
+  const H = Math.round(W * 2 / Math.sqrt(3));
+  const points = hexPoints(W, H);
   return (
-    <div style={style} className="z-10">
+    <div style={style} className="z-20">
       <div className="relative flex flex-col items-center">
-        {/* Soft halo */}
         <div
           aria-hidden
-          className="absolute inset-0 -m-8 rounded-full pointer-events-none"
+          className="absolute -inset-10 rounded-full pointer-events-none"
           style={{
             background:
-              "radial-gradient(circle, rgba(79,70,229,0.10) 0%, rgba(79,70,229,0) 70%)",
+              "radial-gradient(circle, rgba(79,70,229,0.16) 0%, rgba(79,70,229,0) 70%)",
           }}
         />
-        <div className="relative rounded-full bg-white border border-line shadow-[0_8px_30px_-12px_rgba(15,23,42,0.25)] p-2">
-          <div className="h-28 w-28 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-3xl font-bold tracking-tight">
-            {initialsOf(individual.name)}
+        <div className="relative" style={{ width: W, height: H }}>
+          <svg width={W} height={H} className="absolute inset-0">
+            <defs>
+              <linearGradient id="center-hex" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#6366f1" />
+                <stop offset="100%" stopColor="#7c3aed" />
+              </linearGradient>
+              <filter id="center-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#1e1b4b" floodOpacity="0.25" />
+              </filter>
+            </defs>
+            <polygon points={points} fill="url(#center-hex)" filter="url(#center-shadow)" />
+            <polygon points={points} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-white text-4xl font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]">
+              {initialsOf(individual.name)}
+            </span>
           </div>
         </div>
         <div className="mt-3 text-center max-w-[200px]">
@@ -292,7 +309,27 @@ function CenterAvatar({
   );
 }
 
-// ----- Plan card ------------------------------------------------------------
+// ----- Hex helpers ----------------------------------------------------------
+
+function hexPoints(w: number, h: number) {
+  // pointy-top hexagon points
+  return [
+    [w / 2, 0],
+    [w, h / 4],
+    [w, (3 * h) / 4],
+    [w / 2, h],
+    [0, (3 * h) / 4],
+    [0, h / 4],
+  ]
+    .map((p) => p.join(","))
+    .join(" ");
+}
+
+function hexToCssClip() {
+  return "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)";
+}
+
+// ----- Plan hex tile --------------------------------------------------------
 
 function PlanCard({
   agent, status, onClick, style,
@@ -302,51 +339,62 @@ function PlanCard({
   onClick: () => void;
   style?: React.CSSProperties;
 }) {
-  const { Icon, iconBg, accent } = planMeta(agent);
+  const { Icon, accent } = planMeta(agent);
   const pill = STATUS_PILL[status];
+  const W = 184;
+  const H = Math.round(W * 2 / Math.sqrt(3));
+  const points = hexPoints(W, H);
+  const gradId = `hex-${agent.id}`;
+  const darker = shade(accent, -22);
+
   return (
     <button
       type="button"
       onClick={onClick}
-      style={style}
-      className="group flex flex-col items-stretch text-left rounded-2xl bg-card border border-line shadow-soft overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_36px_-14px_rgba(15,23,42,0.22)] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-navy"
+      style={{ ...style, width: W, height: H }}
+      className="group relative focus:outline-none"
       aria-label={`Open ${agent.name} log`}
     >
-      <div className={`${iconBg} relative px-4 pt-4 pb-3`}>
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.18] pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(circle at 15% 20%, rgba(255,255,255,0.5) 0%, transparent 35%), radial-gradient(circle at 90% 90%, rgba(0,0,0,0.18) 0%, transparent 45%)",
-          }}
+      <svg width={W} height={H} className="absolute inset-0 transition-transform duration-200 group-hover:-translate-y-1 group-hover:scale-[1.03]">
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={accent} />
+            <stop offset="100%" stopColor={darker} />
+          </linearGradient>
+          <filter id={`${gradId}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#0f172a" floodOpacity="0.18" />
+            <feDropShadow dx="0" dy="12" stdDeviation="18" floodColor="#0f172a" floodOpacity="0.10" />
+          </filter>
+        </defs>
+        <polygon points={points} fill={`url(#${gradId})`} filter={`url(#${gradId}-shadow)`} />
+        {/* gloss */}
+        <polygon points={points} fill="rgba(255,255,255,0.14)" style={{ mixBlendMode: "overlay" }} />
+        <polygon
+          points={points}
+          fill="none"
+          stroke="rgba(255,255,255,0.30)"
+          strokeWidth={1.25}
+          className="transition-[stroke,stroke-width] duration-200 group-hover:stroke-white group-focus-visible:stroke-white"
         />
-        <div className="relative flex items-start justify-between gap-2">
-          <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm border border-white/25">
-            <Icon className="h-5 w-5 text-white" strokeWidth={1.8} />
-          </div>
-          <span className={`${pill.bg} ${pill.text} inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider`}>
-            <span className={`${pill.dot} h-1.5 w-1.5 rounded-full`} />
-            {pill.label}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex-1 px-4 py-3">
-        <div className="text-[20px] leading-none font-extrabold tracking-tight text-ink">
-          {agent.short}
-        </div>
-        <div className="mt-1.5 text-[13px] font-semibold text-ink line-clamp-1">
-          {agent.name}
-        </div>
-      </div>
+      </svg>
 
       <div
-        className="flex items-center justify-between px-4 py-2 border-t border-line text-[12px] font-semibold transition-colors"
-        style={{ color: accent }}
+        className="absolute inset-0 flex flex-col items-center justify-center text-white px-4 pointer-events-none transition-transform duration-200 group-hover:-translate-y-1 group-hover:scale-[1.03]"
+        style={{ clipPath: hexToCssClip() }}
       >
-        <span>Open plan</span>
-        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 border border-white/25 mb-2">
+          <Icon className="h-5 w-5 text-white" strokeWidth={1.8} />
+        </span>
+        <div className="text-[26px] leading-none font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]">
+          {agent.short}
+        </div>
+        <div className="mt-1.5 text-[11px] font-semibold text-center line-clamp-2 max-w-[140px] opacity-95">
+          {agent.name}
+        </div>
+        <span className={`${pill.bg} ${pill.text} mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider`}>
+          <span className={`${pill.dot} h-1.5 w-1.5 rounded-full`} />
+          {pill.label}
+        </span>
       </div>
     </button>
   );
@@ -358,21 +406,55 @@ function AddPlanCard({
   onClick: () => void;
   style?: React.CSSProperties;
 }) {
+  const W = 184;
+  const H = Math.round(W * 2 / Math.sqrt(3));
+  const points = hexPoints(W, H);
   return (
     <button
       type="button"
       onClick={onClick}
-      style={style}
-      className="group flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-card/60 px-4 py-6 min-h-[168px] transition-all duration-200 hover:border-navy hover:bg-navy/[0.03] hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-navy"
+      style={{ ...style, width: W, height: H }}
+      className="group relative focus:outline-none"
       aria-label="Add a new plan"
     >
-      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-navy/5 border border-navy/15 text-navy transition-transform group-hover:scale-110 group-hover:rotate-90">
-        <Plus className="h-5 w-5" strokeWidth={2} />
-      </span>
-      <span className="text-[13px] font-semibold text-ink">Add a plan</span>
-      <span className="text-[11px] text-ink3 text-center max-w-[180px]">
-        Attach an existing agent or build a new one.
-      </span>
+      <svg width={W} height={H} className="absolute inset-0 transition-transform duration-200 group-hover:-translate-y-1 group-hover:scale-[1.03]">
+        <polygon
+          points={points}
+          fill="rgba(15,23,42,0.02)"
+          stroke="rgba(15,23,42,0.25)"
+          strokeWidth={1.5}
+          strokeDasharray="6 5"
+          className="transition-[stroke] duration-200 group-hover:stroke-navy"
+        />
+      </svg>
+      <div
+        className="absolute inset-0 flex flex-col items-center justify-center px-4 pointer-events-none transition-transform duration-200 group-hover:-translate-y-1 group-hover:scale-[1.03]"
+        style={{ clipPath: hexToCssClip() }}
+      >
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-navy/5 border border-navy/15 text-navy transition-transform group-hover:rotate-90">
+          <Plus className="h-5 w-5" strokeWidth={2} />
+        </span>
+        <span className="mt-2 text-[13px] font-semibold text-ink">Add a plan</span>
+        <span className="mt-1 text-[10px] text-ink3 text-center max-w-[140px]">
+          Attach or build a new one
+        </span>
+      </div>
     </button>
   );
 }
+
+// Lighten/darken a hex color by percent (-100..100).
+function shade(hex: string, percent: number) {
+  const h = hex.replace("#", "");
+  const n = parseInt(h, 16);
+  const r = (n >> 16) & 0xff;
+  const g = (n >> 8) & 0xff;
+  const b = n & 0xff;
+  const t = percent < 0 ? 0 : 255;
+  const p = Math.abs(percent) / 100;
+  const mix = (c: number) => Math.round((t - c) * p + c);
+  return `#${[mix(r), mix(g), mix(b)]
+    .map((c) => c.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
