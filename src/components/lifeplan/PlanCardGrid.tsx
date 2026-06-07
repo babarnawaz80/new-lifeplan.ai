@@ -10,18 +10,25 @@ import type { Agent, Individual } from "@/data/mock";
 
 type StatusKey = "current" | "draft";
 
-const PLAN_DOT: Record<string, string> = {
-  person_centered: "#1e3a8a",  // navy
-  behavior_support: "#7c3aed", // violet
-  nursing_care: "#0f766e",     // teal
-  medication: "#0d9488",       // teal
-  high_risk: "#b91c1c",        // red
-  staff_action_plan: "#334155",
+// Each plan type maps to a two-stop gradient for its top "cap" + a tint.
+type PlanColor = { from: string; to: string; tint: string };
+const PLAN_COLORS: Record<string, PlanColor> = {
+  person_centered:  { from: "#6366f1", to: "#a78bfa", tint: "#EEF0FF" }, // indigo→violet
+  behavior_support: { from: "#8b5cf6", to: "#ec4899", tint: "#F5EEFF" }, // violet→pink
+  nursing_care:     { from: "#10b981", to: "#34d399", tint: "#E8FAF1" }, // emerald
+  medication:       { from: "#0ea5e9", to: "#22d3ee", tint: "#E6F6FD" }, // sky→cyan
+  high_risk:        { from: "#ef4444", to: "#f97316", tint: "#FFEDE6" }, // red→orange
+  staff_action_plan:{ from: "#f59e0b", to: "#f97316", tint: "#FFF3E0" }, // amber→orange
 };
+const DEFAULT_COLOR: PlanColor = { from: "#475569", to: "#94a3b8", tint: "#F1F5F9" };
+
+function planColor(agent: Agent): PlanColor {
+  return PLAN_COLORS[agent.plan_type] ?? DEFAULT_COLOR;
+}
 
 function dotColor(agent: Agent, status: StatusKey) {
-  if (status === "draft") return "#b45309"; // amber for drafts
-  return PLAN_DOT[agent.plan_type] ?? "#475569";
+  if (status === "draft") return "#b45309";
+  return planColor(agent).from;
 }
 
 function initialsOf(name: string) {
@@ -97,6 +104,22 @@ export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: P
             viewBox={`0 0 ${width} ${height}`}
             className="absolute inset-0"
           >
+            <defs>
+              {agents.map(({ agent }) => {
+                const c = planColor(agent);
+                return (
+                  <linearGradient
+                    key={`g-${agent.id}`}
+                    id={`hex-cap-${agent.id}`}
+                    x1="0%" y1="0%" x2="100%" y2="0%"
+                  >
+                    <stop offset="0%" stopColor={c.from} />
+                    <stop offset="100%" stopColor={c.to} />
+                  </linearGradient>
+                );
+              })}
+            </defs>
+
             {/* Center hex (individual) */}
             <g transform={`translate(${cx} ${cy})`}>
               <polygon
@@ -110,14 +133,38 @@ export function PlanCardGrid({ individual, agents, onSelectAgent, onAddPlan }: P
             {/* Plan + add hex outlines */}
             {offsets.map((o, i) => {
               const isAdd = i === agents.length;
+              if (isAdd) {
+                return (
+                  <g key={i} transform={`translate(${cx + o.x} ${cy + o.y})`}>
+                    <polygon
+                      points={hexPoints}
+                      fill="#FBF8F0"
+                      stroke="#9CA3AF"
+                      strokeWidth={1.25}
+                      strokeDasharray="6 5"
+                    />
+                  </g>
+                );
+              }
+              const { agent } = agents[i];
+              const c = planColor(agent);
+              // Top-cap path: upper-left vertex → top vertex → upper-right vertex.
+              const capPath = `M ${-W / 2} ${-H / 4} L 0 ${-H / 2} L ${W / 2} ${-H / 4}`;
               return (
                 <g key={i} transform={`translate(${cx + o.x} ${cy + o.y})`}>
                   <polygon
                     points={hexPoints}
-                    fill={isAdd ? "#FBF8F0" : "#FFFFFF"}
-                    stroke={isAdd ? "#9CA3AF" : "#D6D3CC"}
-                    strokeWidth={1.25}
-                    strokeDasharray={isAdd ? "6 5" : undefined}
+                    fill={c.tint}
+                    stroke="#D6D3CC"
+                    strokeWidth={1}
+                  />
+                  <path
+                    d={capPath}
+                    fill="none"
+                    stroke={`url(#hex-cap-${agent.id})`}
+                    strokeWidth={5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
                 </g>
               );
