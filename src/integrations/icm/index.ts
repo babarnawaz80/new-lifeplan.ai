@@ -293,6 +293,8 @@ export function createPlan(args: {
     plan_mode: "annual",
     status: "draft",
     plan_content: {},
+    field_values: {},
+
     auto_renew: false,
     annual_plan_date: annual.toISOString(),
     created_at: now.toISOString(),
