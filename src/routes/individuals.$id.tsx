@@ -191,6 +191,14 @@ function IndividualEChart() {
   }, [attachedAgents]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const openAgentLog = (a: Agent) => {
+    const existing = listPlansForIndividualAndAgent(individual.id, a.id);
+    if (existing.length > 0) {
+      navigate({
+        to: "/individuals/$id/plan/$planId",
+        params: { id: individual.id, planId: existing[0].id },
+      });
+      return;
+    }
     navigate({
       to: "/individuals/$id/log/$agentId",
       params: { id: individual.id, agentId: a.id },
