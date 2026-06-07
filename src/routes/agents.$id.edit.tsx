@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, Save, Loader2 } from "lucide-react";
+import { ChevronRight, Save, Loader2, Shield } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { EditorChat, type ChatMessage } from "@/components/agents/EditorChat";
-import { GuidelinesTab } from "@/components/agents/tabs/GuidelinesTab";
-import { WorkflowTab } from "@/components/agents/tabs/WorkflowTab";
-import { ToggleGridTab } from "@/components/agents/tabs/ToggleGridTab";
+import { BuilderCanvas } from "@/components/agents/builder/BuilderCanvas";
+import { ConfigPanel } from "@/components/agents/builder/ConfigPanel";
+import { AiAssist } from "@/components/agents/builder/AiAssist";
+import { SecondaryTabs } from "@/components/agents/builder/SecondaryTabs";
 import { getAgent, listGuidelines, updateAgent } from "@/integrations/icm";
 import { accentColor } from "@/data/mock";
 import { buildAgent } from "@/lib/build-agent.functions";
 import { toast } from "sonner";
-import { Shield } from "lucide-react";
 import type { WorkflowPhase, ToggleField } from "@/data/lifeplan-types";
 
 export const Route = createFileRoute("/agents/$id/edit")({
@@ -32,7 +31,10 @@ export const Route = createFileRoute("/agents/$id/edit")({
       <div className="max-w-3xl mx-auto p-12 text-center">
         <h1 className="text-xl font-extrabold text-ink">Something went wrong</h1>
         <p className="text-ink2 mt-2">{error.message}</p>
-        <button onClick={reset} className="mt-4 px-4 py-2 rounded-[9px] bg-navy text-white text-sm font-semibold">
+        <button
+          onClick={reset}
+          className="mt-4 px-4 py-2 rounded-[9px] bg-navy text-white text-sm font-semibold"
+        >
           Try again
         </button>
       </div>
@@ -40,7 +42,7 @@ export const Route = createFileRoute("/agents/$id/edit")({
   ),
 });
 
-type TabKey = "guidelines" | "workflow" | "data" | "output";
+type Selection = { kind: "phase" | "task" | null; phaseId: string | null; taskId: string | null };
 
 function AgentEditor() {
   const { id } = Route.useParams();
@@ -49,106 +51,69 @@ function AgentEditor() {
   if (!agent) throw notFound();
 
   const guidelines = listGuidelines();
+  const linkedGuideline = guidelines.find((g) => agent.guidelines_engine_ids.includes(g.id));
   const callBuildAgent = useServerFn(buildAgent);
 
-  // Local editable state
   const [name, setName] = useState(agent.name);
-  const [guidelineIds, setGuidelineIds] = useState<string[]>(agent.guidelines_engine_ids);
   const [phases, setPhases] = useState<WorkflowPhase[]>(agent.workflow_data);
   const [profileFields, setProfileFields] = useState<ToggleField[]>(agent.profile_fields);
   const [outputFields, setOutputFields] = useState<ToggleField[]>(agent.output_fields);
   const [instructions, setInstructions] = useState(agent.instructions);
-
-  const [tab, setTab] = useState<TabKey>("workflow");
+  const [selection, setSelection] = useState<Selection>(() => {
+    const first = agent.workflow_data[0];
+    if (first) return { kind: "phase", phaseId: first.id, taskId: null };
+    return { kind: null, phaseId: null, taskId: null };
+  });
   const [busy, setBusy] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-
-  useEffect(() => {
-    if (phases.length > 0) {
-      const totalTasks = phases.reduce((n, p) => n + p.tasks.length, 0);
-      setMessages([
-        {
-          id: "m_init",
-          role: "ai",
-          text:
-            (guidelineIds.length > 0 ? `I read the linked guideline and ` : `I `) +
-            `drafted this agent with ${phases.length} phases and ${totalTasks} tasks. Ask me to change anything — workflow, data sources, output fields, or instructions.`,
-        },
-      ]);
-    } else {
-      setMessages([
-        {
-          id: "m_init",
-          role: "ai",
-          text: "This agent is blank. Describe what you want and I'll build it.",
-        },
-      ]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [lastSummary, setLastSummary] = useState<string>();
 
   const complianceBrief = useMemo(() => {
-    const linked = guidelines.filter((g) => guidelineIds.includes(g.id));
-    if (linked.length === 0) return undefined;
+    if (!linkedGuideline) return undefined;
+    const b = linkedGuideline.compliance_brief;
     return {
-      rules: linked.flatMap((g) => g.compliance_brief.rules),
-      required_timelines: linked.flatMap((g) => g.compliance_brief.required_timelines),
-      required_phases: linked.flatMap((g) => g.compliance_brief.required_phases ?? []),
-      required_tasks: linked.flatMap((g) => g.compliance_brief.required_tasks ?? []),
-      required_fields: linked.flatMap((g) => g.compliance_brief.required_fields ?? []),
+      rules: b.rules,
+      required_timelines: b.required_timelines,
+      required_phases: b.required_phases ?? [],
+      required_tasks: b.required_tasks ?? [],
+      required_fields: b.required_fields ?? [],
     };
-  }, [guidelines, guidelineIds]);
+  }, [linkedGuideline]);
 
-  const totalTasks = phases.reduce((n, p) => n + p.tasks.length, 0);
-
-  const runAi = async (opts: { message?: string; generate?: boolean }) => {
+  const runAi = async (opts: { message?: string; regenerate?: boolean }) => {
     setBusy(true);
     try {
       const result = await callBuildAgent({
         data: {
           agentName: name,
           planType: agent.plan_type,
-          prompt: opts.generate ? "Generate from the linked guideline." : "",
+          prompt: opts.regenerate ? "Regenerate from the linked guideline and prior config." : "",
           message: opts.message,
           complianceBrief,
-          currentConfig: opts.generate
+          currentConfig: opts.regenerate
             ? undefined
-            : {
-                workflow_data: phases,
-                profile_fields: profileFields,
-                output_fields: outputFields,
-                instructions,
-              },
+            : { workflow_data: phases, profile_fields: profileFields, output_fields: outputFields, instructions },
         },
       });
       setPhases(result.workflow_data);
       setProfileFields(result.profile_fields);
       setOutputFields(result.output_fields);
       if (result.instructions) setInstructions(result.instructions);
-      setMessages((prev) => [
-        ...prev,
-        { id: `m_${Date.now()}`, role: "ai", text: result.summary || "Agent updated." },
-      ]);
-      setTab("workflow");
+      setLastSummary(result.summary);
+      // Reset selection to first phase
+      const first = result.workflow_data[0];
+      setSelection(first ? { kind: "phase", phaseId: first.id, taskId: null } : { kind: null, phaseId: null, taskId: null });
+      toast.success("Agent updated");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong.";
       toast.error(msg);
-      setMessages((prev) => [...prev, { id: `m_${Date.now()}`, role: "ai", text: `I hit an error: ${msg}` }]);
     } finally {
       setBusy(false);
     }
   };
 
-
-  const onSend = (text: string) => {
-    setMessages((prev) => [...prev, { id: `u_${Date.now()}`, role: "user", text }]);
-    void runAi({ message: text });
-  };
-
   const onSave = () => {
     updateAgent(agent.id, {
       name,
-      guidelines_engine_ids: guidelineIds,
       workflow_data: phases,
       profile_fields: profileFields,
       output_fields: outputFields,
@@ -159,16 +124,11 @@ function AgentEditor() {
     navigate({ to: "/agents" });
   };
 
-  const tabs: { id: TabKey; label: string }[] = [
-    { id: "guidelines", label: `Guidelines${guidelineIds.length ? ` · ${guidelineIds.length}` : ""}` },
-    { id: "workflow", label: `Workflow · ${phases.length} / ${totalTasks}` },
-    { id: "data", label: "Data mapping" },
-    { id: "output", label: "Output fields" },
-  ];
+  const totalTasks = phases.reduce((n, p) => n + p.tasks.length, 0);
 
   return (
     <AppShell>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 pt-6">
         <nav className="flex items-center gap-1.5 text-[12px] text-ink3 mb-4">
           <Link to="/agents" className="hover:text-ink">Plan agents</Link>
           <ChevronRight className="h-3 w-3" />
@@ -177,7 +137,7 @@ function AgentEditor() {
 
         <div className="flex items-center gap-3 mb-5">
           <div
-            className="h-11 w-11 rounded-xl flex items-center justify-center text-white text-[13px] font-extrabold"
+            className="h-11 w-11 rounded-xl flex items-center justify-center text-white text-[13px] font-extrabold shrink-0"
             style={{ background: accentColor[agent.accent] }}
           >
             {agent.short.slice(0, 3)}
@@ -188,125 +148,90 @@ function AgentEditor() {
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-transparent text-[22px] font-extrabold text-ink focus:outline-none"
             />
-            <p className="text-[12px] text-ink3 uppercase tracking-wider font-semibold">
-              {agent.plan_type.replace(/_/g, " ")}
-            </p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-[11px] text-ink3 uppercase tracking-wider font-semibold">
+                {agent.plan_type.replace(/_/g, " ")}
+              </span>
+              <span className="text-ink3">·</span>
+              <span className="text-[11px] text-ink3">
+                {phases.length} phases · {totalTasks} tasks
+              </span>
+              {linkedGuideline && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal bg-teal/10 px-2 py-0.5 rounded-md">
+                  <Shield className="h-3 w-3" />
+                  {linkedGuideline.name} (locked)
+                </span>
+              )}
+              <span
+                className={[
+                  "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md",
+                  agent.status === "active"
+                    ? "bg-green/10 text-green"
+                    : "bg-amber/10 text-amber",
+                ].join(" ")}
+              >
+                {agent.status}
+              </span>
+            </div>
           </div>
+          <button
+            onClick={onSave}
+            disabled={busy}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[9px] bg-navy text-white text-[13px] font-semibold hover:opacity-95 disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save agent
+          </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-10">
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-0 rounded-2xl bg-card border border-line shadow-soft overflow-hidden min-h-[640px]">
-          <div className="h-[640px] lg:h-auto">
-            <EditorChat
-              agentName={name}
-              messages={messages}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 pb-10">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5">
+          {/* Main: AI assist + builder canvas + secondary tabs */}
+          <div className="space-y-5 min-w-0">
+            <AiAssist
               busy={busy}
-              canGenerate={guidelineIds.length > 0}
-              onSend={onSend}
-              onGenerateFromGuidelines={() => {
-                setMessages((prev) => [
-                  ...prev,
-                  { id: `u_${Date.now()}`, role: "user", text: "Generate from guidelines." },
-                ]);
-                void runAi({ generate: true });
-              }}
+              lastSummary={lastSummary}
+              onRefine={(m) => runAi({ message: m })}
+              onRegenerate={() => runAi({ regenerate: true })}
+            />
+
+            <BuilderCanvas
+              phases={phases}
+              selection={selection}
+              onChange={setPhases}
+              onSelect={setSelection}
+            />
+
+            <SecondaryTabs
+              profileFields={profileFields}
+              outputFields={outputFields}
+              instructions={instructions}
+              guidelines={guidelines}
+              linkedGuidelineIds={agent.guidelines_engine_ids}
+              onProfileToggle={(id) =>
+                setProfileFields((prev) =>
+                  prev.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f)),
+                )
+              }
+              onOutputToggle={(id) =>
+                setOutputFields((prev) =>
+                  prev.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f)),
+                )
+              }
+              onInstructionsChange={setInstructions}
             />
           </div>
 
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1 px-4 pt-4 border-b border-line bg-card overflow-x-auto">
-              {tabs.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={[
-                    "px-3 py-2.5 text-[12px] font-bold uppercase tracking-wider border-b-2 whitespace-nowrap transition-colors",
-                    tab === t.id
-                      ? "border-navy text-ink"
-                      : "border-transparent text-ink3 hover:text-ink",
-                  ].join(" ")}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex-1 p-5 overflow-y-auto">
-              {tab === "guidelines" && (
-                <div className="space-y-4">
-                  <div className="rounded-xl bg-muted/40 border border-line p-3 text-[12px] text-ink2 flex items-start gap-2">
-                    <Shield className="h-4 w-4 text-teal shrink-0 mt-0.5" />
-                    <span>
-                      Guidelines are managed in the{" "}
-                      <Link to="/guidelines" className="text-navy font-semibold underline">
-                        State Guidelines library
-                      </Link>{" "}
-                      and cannot be edited here. You can link a different published guideline below.
-                    </span>
-                  </div>
-                  <GuidelinesTab
-                    all={guidelines}
-                    selectedIds={guidelineIds}
-                    onToggle={(id) =>
-                      setGuidelineIds((prev) =>
-                        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-                      )
-                    }
-                  />
-                </div>
-              )}
-
-              {tab === "workflow" && <WorkflowTab phases={phases} onChange={setPhases} />}
-              {tab === "data" && (
-                <ToggleGridTab
-                  title="Profile data sources"
-                  description="The chart data sources this agent reads when generating a plan."
-                  fields={profileFields}
-                  onToggle={(id) =>
-                    setProfileFields((prev) =>
-                      prev.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f)),
-                    )
-                  }
-                />
-              )}
-              {tab === "output" && (
-                <ToggleGridTab
-                  title="Output structure"
-                  description="Fields the agent populates on each generated strategy."
-                  fields={outputFields}
-                  onToggle={(id) =>
-                    setOutputFields((prev) =>
-                      prev.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f)),
-                    )
-                  }
-                />
-              )}
-            </div>
-
-            <div className="px-5 py-4 border-t border-line bg-card flex items-center justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <textarea
-                  value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
-                  rows={1}
-                  placeholder="Optional agent instructions (style, tone, conventions)"
-                  className="w-full resize-none rounded-[9px] border border-line bg-card px-3 py-2 text-[12px] text-ink placeholder:text-ink3 focus:outline-none focus:border-navy"
-                />
-              </div>
-              <button
-                onClick={onSave}
-                disabled={busy}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[9px] bg-navy text-white text-[13px] font-semibold hover:opacity-95 disabled:opacity-50"
-              >
-                {busy ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Save agent
-              </button>
-            </div>
+          {/* Right config panel */}
+          <div className="lg:sticky lg:top-6 lg:self-start lg:h-[calc(100vh-7rem)] rounded-2xl overflow-hidden border border-line bg-card shadow-soft">
+            <ConfigPanel
+              phases={phases}
+              selection={selection}
+              profileFields={profileFields}
+              onChange={setPhases}
+              onClose={() => setSelection({ kind: null, phaseId: null, taskId: null })}
+            />
           </div>
         </div>
       </div>
