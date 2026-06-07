@@ -659,23 +659,3 @@ function StatusPill({
   );
 }
 
-// Global tile hover lift + focus ring (kept in one place).
-const _injectedStyles = (
-  <style>{`
-    .hc-tile { transition: transform 220ms cubic-bezier(.34,1.56,.64,1); transform-box: fill-box; transform-origin: center; }
-    .hc-tile:hover { transform: translateY(-4px) scale(1.03); }
-    .hc-tile:hover .hc-stroke { stroke: #1B2A4A; }
-    .hc-tile:hover .hc-accent-stroke { stroke-opacity: 0.55; }
-    .hc-tile:focus { outline: none; }
-    .hc-tile:focus-visible .hc-stroke { stroke: #5B4FE0; stroke-width: 2.4; }
-    @media (prefers-reduced-motion: reduce) {
-      .hc-tile { transition: none; }
-      .hc-tile:hover { transform: none; }
-    }
-  `}</style>
-);
-
-// Attach styles by exporting through a side mount.
-export function HoneycombStyles() {
-  return _injectedStyles;
-}
