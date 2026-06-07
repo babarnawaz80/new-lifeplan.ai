@@ -313,9 +313,28 @@ function IndividualEChart() {
                       </h2>
                     </div>
                     {isLifePlan && (
-                      <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-white/95 bg-white/15 border border-white/25 px-2 py-1 rounded-full">
-                        <Sparkles className="h-3 w-3" /> AI ready
-                      </span>
+                      <>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate({ to: "/guidelines" });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              navigate({ to: "/guidelines" });
+                            }
+                          }}
+                          className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-white/95 bg-white/15 border border-white/25 px-2 py-1 rounded-full hover:bg-white/25 cursor-pointer"
+                        >
+                          <Shield className="h-3 w-3" /> Guidelines
+                        </span>
+                        <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-white/95 bg-white/15 border border-white/25 px-2 py-1 rounded-full">
+                          <Sparkles className="h-3 w-3" /> AI ready
+                        </span>
+                      </>
                     )}
                     <ChevronDown
                       className={`h-4 w-4 text-white/90 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
