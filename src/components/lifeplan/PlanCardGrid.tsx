@@ -368,7 +368,7 @@ function PlanCard({
         </defs>
         <polygon points={points} fill={`url(#${gradId})`} filter={`url(#${gradId}-shadow)`} />
         {/* gloss */}
-        <polygon points={points} fill="url(#hex-gloss)" opacity="0.18" />
+        <polygon points={points} fill="rgba(255,255,255,0.14)" style={{ mixBlendMode: "overlay" }} />
         <polygon
           points={points}
           fill="none"
