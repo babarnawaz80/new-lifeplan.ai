@@ -189,19 +189,11 @@ function IndividualEChart() {
     const attachedIds = new Set(attachedAgents.map((a) => a.agent.id));
     return listAgents().filter((a) => !attachedIds.has(a.id));
   }, [attachedAgents]);
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const handleChoose = (mode: "ai" | "manual") => {
-    if (!selectedAgent) return;
-    const plan = createPlan({
-      individualId: individual.id,
-      agentId: selectedAgent.id,
-      creationMode: mode,
-    });
-    setSelectedAgent(null);
+  const openAgentLog = (a: Agent) => {
     navigate({
-      to: "/individuals/$id/plan/$planId",
-      params: { id: individual.id, planId: plan.id },
+      to: "/individuals/$id/log/$agentId",
+      params: { id: individual.id, agentId: a.id },
     });
   };
 
