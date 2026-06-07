@@ -53,6 +53,7 @@ type Selection = { kind: "phase" | "task" | null; phaseId: string | null; taskId
 
 function AgentEditor() {
   const { id } = Route.useParams();
+  const { fresh, attachTo } = Route.useSearch();
   const navigate = useNavigate();
   const agent = getAgent(id);
   if (!agent) throw notFound();
