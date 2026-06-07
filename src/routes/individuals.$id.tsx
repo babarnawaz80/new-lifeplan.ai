@@ -9,7 +9,7 @@ import {
   FolderOpen, Sparkles, Shield,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { Honeycomb } from "@/components/lifeplan/Honeycomb";
+import { PlanCardGrid } from "@/components/lifeplan/PlanCardGrid";
 import { AddPlanPicker } from "@/components/lifeplan/AddPlanPicker";
 import {
   getIndividual, getAgentsForIndividual, listAgents,
