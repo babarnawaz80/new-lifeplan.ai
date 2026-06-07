@@ -129,19 +129,48 @@ function AgentEditor() {
       status: "active",
     });
     toast.success("Agent saved");
-    navigate({ to: "/agents" });
+    if (attachTo) {
+      navigate({
+        to: "/individuals/$id/log/$agentId",
+        params: { id: attachTo, agentId: agent.id },
+      });
+    } else {
+      navigate({ to: "/individuals" });
+    }
   };
 
   const totalTasks = phases.reduce((n, p) => n + p.tasks.length, 0);
+  const showSharedBanner = !fresh;
+  const planTypeLabel = agent.plan_type.replace(/_/g, " ");
 
   return (
     <AppShell>
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 pt-6">
         <nav className="flex items-center gap-1.5 text-[12px] text-ink3 mb-4">
-          <Link to="/agents" className="hover:text-ink">Plan agents</Link>
+          {attachTo ? (
+            <Link
+              to="/individuals/$id/log/$agentId"
+              params={{ id: attachTo, agentId: agent.id }}
+              className="hover:text-ink"
+            >
+              Back to plan log
+            </Link>
+          ) : (
+            <Link to="/individuals" className="hover:text-ink">Individuals</Link>
+          )}
           <ChevronRight className="h-3 w-3" />
           <span className="text-ink font-semibold truncate">{name}</span>
         </nav>
+
+        {showSharedBanner && (
+          <div className="mb-4 rounded-[12px] border border-amber/40 bg-amber/10 px-4 py-3 flex items-start gap-3">
+            <AlertTriangle className="h-4 w-4 text-amber shrink-0 mt-0.5" />
+            <p className="text-[13px] text-ink">
+              <span className="font-bold">This is the shared {planTypeLabel} agent.</span>{" "}
+              Changes apply to every individual who uses it.
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-5">
           <div
