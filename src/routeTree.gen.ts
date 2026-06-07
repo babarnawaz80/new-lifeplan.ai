@@ -19,6 +19,7 @@ import { Route as ApiGeneratePlanRouteImport } from './routes/api/generate-plan'
 import { Route as AgentsNewRouteImport } from './routes/agents.new'
 import { Route as AgentsIdEditRouteImport } from './routes/agents.$id.edit'
 import { Route as IndividualsIdPlanPlanIdRouteImport } from './routes/individuals.$id.plan.$planId'
+import { Route as IndividualsIdLogAgentIdRouteImport } from './routes/individuals.$id.log.$agentId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -70,6 +71,11 @@ const IndividualsIdPlanPlanIdRoute = IndividualsIdPlanPlanIdRouteImport.update({
   path: '/plan/$planId',
   getParentRoute: () => IndividualsIdRoute,
 } as any)
+const IndividualsIdLogAgentIdRoute = IndividualsIdLogAgentIdRouteImport.update({
+  id: '/log/$agentId',
+  path: '/log/$agentId',
+  getParentRoute: () => IndividualsIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/guidelines/': typeof GuidelinesIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
+  '/individuals/$id/log/$agentId': typeof IndividualsIdLogAgentIdRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
 }
 export interface FileRoutesByTo {
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/guidelines': typeof GuidelinesIndexRoute
   '/individuals': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
+  '/individuals/$id/log/$agentId': typeof IndividualsIdLogAgentIdRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
 }
 export interface FileRoutesById {
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/guidelines/': typeof GuidelinesIndexRoute
   '/individuals/': typeof IndividualsIndexRoute
   '/agents/$id/edit': typeof AgentsIdEditRoute
+  '/individuals/$id/log/$agentId': typeof IndividualsIdLogAgentIdRoute
   '/individuals/$id/plan/$planId': typeof IndividualsIdPlanPlanIdRoute
 }
 export interface FileRouteTypes {
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/guidelines/'
     | '/individuals/'
     | '/agents/$id/edit'
+    | '/individuals/$id/log/$agentId'
     | '/individuals/$id/plan/$planId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/guidelines'
     | '/individuals'
     | '/agents/$id/edit'
+    | '/individuals/$id/log/$agentId'
     | '/individuals/$id/plan/$planId'
   id:
     | '__root__'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/guidelines/'
     | '/individuals/'
     | '/agents/$id/edit'
+    | '/individuals/$id/log/$agentId'
     | '/individuals/$id/plan/$planId'
   fileRoutesById: FileRoutesById
 }
@@ -231,14 +243,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndividualsIdPlanPlanIdRouteImport
       parentRoute: typeof IndividualsIdRoute
     }
+    '/individuals/$id/log/$agentId': {
+      id: '/individuals/$id/log/$agentId'
+      path: '/log/$agentId'
+      fullPath: '/individuals/$id/log/$agentId'
+      preLoaderRoute: typeof IndividualsIdLogAgentIdRouteImport
+      parentRoute: typeof IndividualsIdRoute
+    }
   }
 }
 
 interface IndividualsIdRouteChildren {
+  IndividualsIdLogAgentIdRoute: typeof IndividualsIdLogAgentIdRoute
   IndividualsIdPlanPlanIdRoute: typeof IndividualsIdPlanPlanIdRoute
 }
 
 const IndividualsIdRouteChildren: IndividualsIdRouteChildren = {
+  IndividualsIdLogAgentIdRoute: IndividualsIdLogAgentIdRoute,
   IndividualsIdPlanPlanIdRoute: IndividualsIdPlanPlanIdRoute,
 }
 
@@ -260,3 +281,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
