@@ -19,12 +19,12 @@ const InputSchema = z.object({
 export const enrichImplementationTasks = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY is not configured");
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) throw new Error("GEMINI_API_KEY is not configured");
 
-    const { createLovableAiGatewayProvider } = await import("./ai-gateway.server");
-    const gateway = createLovableAiGatewayProvider(key);
-    const model = gateway("google/gemini-3-flash-preview");
+    const { createGeminiProvider, DEFAULT_GEMINI_MODEL } = await import("./gemini.server");
+    const gemini = createGeminiProvider(key);
+    const model = gemini(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL);
 
     const taskList = data.tasks
       .map((t) => `- [${t.id}] ${t.title} (roles: ${t.assigned_roles.join(", ") || "—"})`)

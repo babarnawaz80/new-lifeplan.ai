@@ -1,6 +1,6 @@
-// Streaming SSE plan generator. Proxies Lovable AI Gateway SSE directly.
+// Streaming SSE plan generator. Streams from Gemini (OpenAI-compatible endpoint).
 import { createFileRoute } from "@tanstack/react-router";
-import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
+import { createGeminiProvider, DEFAULT_GEMINI_MODEL } from "@/lib/gemini.server";
 import { streamText, convertToModelMessages, type UIMessage } from "ai";
 
 type Body = {
@@ -68,11 +68,11 @@ export const Route = createFileRoute("/api/generate-plan")({
         if (!Array.isArray(body.messages)) {
           return new Response("messages required", { status: 400 });
         }
-        const key = process.env.LOVABLE_API_KEY;
-        if (!key) return new Response("LOVABLE_API_KEY missing", { status: 500 });
+        const key = process.env.GEMINI_API_KEY;
+        if (!key) return new Response("GEMINI_API_KEY missing", { status: 500 });
 
-        const gateway = createLovableAiGatewayProvider(key);
-        const model = gateway("google/gemini-3-flash-preview");
+        const gemini = createGeminiProvider(key);
+        const model = gemini(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL);
 
         const result = streamText({
           model,
