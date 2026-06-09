@@ -39,9 +39,10 @@ function buildSystemPrompt(b: Body) {
   const sourceBlock = b.sourceDocument?.text
     ? [
         `## Source plan (from case management) — PRIMARY SOURCE`,
-        `This is ${b.individualName}'s actual ${b.planType} from case management (file: ${b.sourceDocument.name}).`,
+        `This document was uploaded as ${b.individualName}'s ${b.planType} from case management (file: ${b.sourceDocument.name}).`,
         `Extract the goals, outcomes, and strategies from it and translate them into this implementable plan.`,
         `Prefer the document's content over generic suggestions; preserve the individual's own goals, language, and target dates where present.`,
+        `IMPORTANT: if the document appears to be about a DIFFERENT person than ${b.individualName} (different name, age, or details), do NOT silently rewrite it. Begin the plan with a prominent "⚠️ SOURCE DOCUMENT MISMATCH" warning naming the person the document describes, and ask the user to confirm or upload the correct document before relying on its clinical content.`,
         ``,
         `--- BEGIN SOURCE DOCUMENT ---`,
         b.sourceDocument.text.slice(0, 20000),
@@ -50,9 +51,12 @@ function buildSystemPrompt(b: Body) {
       ].join("\n")
     : "";
 
+  const today = new Date().toISOString().slice(0, 10);
+
   return [
     `You are a senior clinician writing a person-centered, strength-based ${b.planType} for an Intellectual and Developmental Disabilities service.`,
-    `Individual: ${b.individualName}. Service type: ${b.serviceType}. Plan agent: ${b.agentName}.`,
+    `Individual: ${b.individualName}. Service type: ${b.serviceType}. Plan agent: ${b.agentName}. Today's date: ${today}.`,
+    `Use ${today} as the plan date and compute all target dates relative to it. Never invent past dates.`,
     b.sourceDocument?.text
       ? `Base this plan on the SOURCE PLAN below (the individual's document from case management), translated into implementable goals. Honor the compliance brief.`
       : `Use the individual's profile data below. Honor the compliance brief. Write in warm, professional clinical language. Avoid deficit-only framing.`,

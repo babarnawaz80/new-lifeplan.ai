@@ -403,42 +403,27 @@ export function createPendingTraining(args: {
   return t;
 }
 
-// ---- Profile data (mock realistic per-field snapshot) ----
-const MOCK_PROFILE: Record<string, string> = {
-  Diagnosis:
-    "Autism Spectrum Disorder (Level 2), Intellectual Disability (mild), Anxiety Disorder NOS.",
-  "Medical History":
-    "History of seizures (last episode 14 months ago, controlled on levetiracetam). Mild asthma, exercise-induced. No surgical history.",
-  Goals:
-    "Increase independence in morning routine; expand community participation; improve emotional regulation during transitions.",
-  Strategies:
-    "Visual schedules, first/then boards, 5-min transition warnings, weighted lap pad for grounding.",
-  Outcomes:
-    "Completes morning routine with 1 prompt 4/7 days; attends a community outing weekly; uses coping strategy independently 60% of triggering events.",
-  Assessments:
-    "Vineland-3 (2025-02), SIS (2024-11), Nursing Assessment (2025-08), Functional Behavior Assessment (2025-05).",
-  "Abilities & Needs":
-    "Strong receptive language, emerging expressive language with AAC support. Needs prompting for personal care and safety in community.",
-  "Previous Plans":
-    "Prior PCP (2024) — partial goal attainment; behavior goal carried forward. Prior BSP focused on elopement.",
-  "Incident Reports":
-    "3 elopement attempts in past 12 months; all during unstructured transitions. No injuries.",
-  Medications:
-    "Levetiracetam 500mg BID; albuterol PRN; sertraline 50mg daily.",
-  eMAR: "Medication adherence 98% over last 90 days; PRN albuterol used 2x last month.",
-  CareTracker: "Active goals: 4 (PCP), 2 (BSP). Average completion last 30d: 78%.",
-  "Labs & Diagnostics": "CBC and CMP within normal limits (2025-07). Valproic acid level therapeutic.",
-  "Vital Signs": "BP avg 118/74; HR avg 76; weight stable 68kg.",
-};
+// ---- Profile data ----
+// Returns only data we actually hold for this individual. Clinical fields
+// (Diagnosis, Medications, eMAR, ...) come from the host app in production;
+// until that adapter is wired, they are honestly absent and the uploaded
+// source document is the plan's primary source. Never fabricate them.
 export function getProfileData(
-  _individualId: string,
-  fields: string[],
+  individualId: string,
+  _fields: string[],
 ): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const f of fields) {
-    if (MOCK_PROFILE[f]) out[f] = MOCK_PROFILE[f];
-  }
-  return out;
+  const ind = individuals.find((i) => i.id === individualId);
+  if (!ind) return {};
+  return {
+    Demographics: [
+      `Name: ${ind.name}`,
+      `Date of birth: ${ind.date_of_birth} (age ${ind.age})`,
+      `Gender: ${ind.gender}`,
+      `Service type: ${ind.service_type}`,
+      `Program: ${ind.program}`,
+      `Location: ${ind.location}`,
+    ].join("; "),
+  };
 }
 // ---- CareTracker (the only real integration wire) ----
 //
