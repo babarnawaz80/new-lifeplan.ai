@@ -28,7 +28,10 @@ async function extractText(file: File): Promise<string> {
 }
 
 export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoose }: Props) {
-  const needsSource = agent?.content_origin === "source_plan";
+  // Every plan originates from a real-world source — a current/previous plan,
+  // or one from the case manager, behavior therapist, or nurse. So the upload
+  // is the first step for ALL plan types, not just source_plan ones.
+  const needsSource = true;
   const docLabel = agent?.source_document_label || "source plan";
 
   const [step, setStep] = useState<"upload" | "choose">("choose");
@@ -66,8 +69,7 @@ export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoo
 
   function pickSource(): PlanStartSource {
     if (uploaded) return { kind: "uploaded", name: uploaded.name, text: uploaded.text };
-    if (needsSource) return { kind: "awaiting" };
-    return { kind: "none" };
+    return { kind: "awaiting" };
   }
 
   return (
@@ -86,13 +88,13 @@ export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoo
         </DialogHeader>
 
         {step === "upload" ? (
-          // ── Step 1 (source_plan agents): upload the individual's source document ──
+          // ── Step 1 (every plan): upload the source document this plan is built from ──
           <div className="px-7 py-5">
             <p className="text-[13px] text-ink2 mb-4 leading-relaxed">
-              This plan originates from case management. Upload {individual.name}'s{" "}
-              <span className="font-semibold text-ink">{docLabel}</span> for this cycle — the AI
-              reads it, extracts the outcomes and strategies, and turns them into the implementable
-              plan. Text is extracted in your browser; the file itself is never uploaded.
+              Every plan starts from a real document — {individual.name}'s current or previous plan,
+              or one from the case manager, behavior therapist, or nurse. Upload it and the AI will
+              read it, fully understand it, and extract the goals, strategies, and outcomes to build
+              the implementable plan. Text is extracted in your browser; the file is never uploaded.
             </p>
 
             <button
