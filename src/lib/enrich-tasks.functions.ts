@@ -22,28 +22,28 @@ export const enrichImplementationTasks = createServerFn({ method: "POST" })
     const key = process.env.GEMINI_API_KEY;
     if (!key) throw new Error("GEMINI_API_KEY is not configured");
 
-    const { createGeminiProvider, DEFAULT_GEMINI_MODEL } = await import("./gemini.server");
-    const gemini = createGeminiProvider(key);
-    const model = gemini(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL);
+    const { withModelFallback } = await import("./gemini.server");
 
     const taskList = data.tasks
       .map((t) => `- [${t.id}] ${t.title} (roles: ${t.assigned_roles.join(", ") || "—"})`)
       .join("\n");
 
     try {
-      const { experimental_output } = await generateText({
-        model,
-        system:
-          "You write 1-2 sentence implementation guidance for clinical workflow tasks. Be concrete, reference the plan when relevant, and address the assigned role(s).",
-        prompt: `Plan for ${data.individualName}:\n\n${data.planContent.slice(0, 6000)}\n\nTasks:\n${taskList}\n\nFor each task id, return one short instruction.`,
-        experimental_output: Output.object({
-          schema: z.object({
-            instructions: z.array(
-              z.object({ task_id: z.string(), instruction: z.string() }),
-            ),
+      const { experimental_output } = await withModelFallback(key, (model) =>
+        generateText({
+          model,
+          system:
+            "You write 1-2 sentence implementation guidance for clinical workflow tasks. Be concrete, reference the plan when relevant, and address the assigned role(s).",
+          prompt: `Plan for ${data.individualName}:\n\n${data.planContent.slice(0, 6000)}\n\nTasks:\n${taskList}\n\nFor each task id, return one short instruction.`,
+          experimental_output: Output.object({
+            schema: z.object({
+              instructions: z.array(
+                z.object({ task_id: z.string(), instruction: z.string() }),
+              ),
+            }),
           }),
         }),
-      });
+      );
 
       const map: Record<string, string> = {};
       for (const row of experimental_output.instructions) {

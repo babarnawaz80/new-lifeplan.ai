@@ -26,9 +26,7 @@ export const extractGuidelines = createServerFn({ method: "POST" })
     const key = process.env.GEMINI_API_KEY;
     if (!key) throw new Error("GEMINI_API_KEY is not configured");
 
-    const { createGeminiProvider, DEFAULT_GEMINI_MODEL } = await import("./gemini.server");
-    const gemini = createGeminiProvider(key);
-    const model = gemini(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL);
+    const { withModelFallback } = await import("./gemini.server");
 
     // Chunk if needed.
     const chunks: string[] = [];
@@ -60,22 +58,24 @@ export const extractGuidelines = createServerFn({ method: "POST" })
     for (let i = 0; i < chunks.length; i++) {
       let captured: z.infer<typeof BriefSchema> | null = null;
       try {
-        await generateText({
-          model,
-          system,
-          prompt: `Document chunk ${i + 1} of ${chunks.length}:\n\n${chunks[i]}`,
-          stopWhen: stepCountIs(5),
-          tools: {
-            submit_brief: tool({
-              description: "Submit the structured compliance brief for this chunk.",
-              inputSchema: BriefSchema,
-              execute: async (input) => {
-                captured = input;
-                return { ok: true };
-              },
-            }),
-          },
-        });
+        await withModelFallback(key, (model) =>
+          generateText({
+            model,
+            system,
+            prompt: `Document chunk ${i + 1} of ${chunks.length}:\n\n${chunks[i]}`,
+            stopWhen: stepCountIs(5),
+            tools: {
+              submit_brief: tool({
+                description: "Submit the structured compliance brief for this chunk.",
+                inputSchema: BriefSchema,
+                execute: async (input) => {
+                  captured = input;
+                  return { ok: true };
+                },
+              }),
+            },
+          }),
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes("429"))

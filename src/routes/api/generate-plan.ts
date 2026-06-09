@@ -100,6 +100,8 @@ export const Route = createFileRoute("/api/generate-plan")({
           model,
           system: buildSystemPrompt(body),
           messages: await convertToModelMessages(body.messages),
+          // Ride out transient free-tier "high demand" spikes with backoff.
+          maxRetries: 4,
         });
 
         return result.toUIMessageStreamResponse({ originalMessages: body.messages });

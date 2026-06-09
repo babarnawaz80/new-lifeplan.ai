@@ -81,9 +81,7 @@ export const buildAgent = createServerFn({ method: "POST" })
     const key = process.env.GEMINI_API_KEY;
     if (!key) throw new Error("GEMINI_API_KEY is not configured");
 
-    const { createGeminiProvider, DEFAULT_GEMINI_MODEL } = await import("./gemini.server");
-    const gemini = createGeminiProvider(key);
-    const model = gemini(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL);
+    const { withModelFallback } = await import("./gemini.server");
 
     const system = [
       `You are building a complete plan agent for IDD services.`,
@@ -145,23 +143,25 @@ export const buildAgent = createServerFn({ method: "POST" })
     let resultConfig: z.infer<typeof ConfigSchema> | null = null;
 
     try {
-      await generateText({
-        model,
-        system,
-        prompt: userParts.join("\n\n"),
-        stopWhen: stepCountIs(5),
-        tools: {
-          build_agent: tool({
-            description:
-              "Submit the COMPLETE updated agent configuration. Call exactly once.",
-            inputSchema: ConfigSchema,
-            execute: async (input) => {
-              resultConfig = input;
-              return { ok: true };
-            },
-          }),
-        },
-      });
+      await withModelFallback(key, (model) =>
+        generateText({
+          model,
+          system,
+          prompt: userParts.join("\n\n"),
+          stopWhen: stepCountIs(5),
+          tools: {
+            build_agent: tool({
+              description:
+                "Submit the COMPLETE updated agent configuration. Call exactly once.",
+              inputSchema: ConfigSchema,
+              execute: async (input) => {
+                resultConfig = input;
+                return { ok: true };
+              },
+            }),
+          },
+        }),
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("429"))

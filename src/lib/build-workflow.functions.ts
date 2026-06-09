@@ -44,9 +44,7 @@ export const buildWorkflow = createServerFn({ method: "POST" })
     const key = process.env.GEMINI_API_KEY;
     if (!key) throw new Error("GEMINI_API_KEY is not configured");
 
-    const { createGeminiProvider, DEFAULT_GEMINI_MODEL } = await import("./gemini.server");
-    const gemini = createGeminiProvider(key);
-    const model = gemini(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL);
+    const { withModelFallback } = await import("./gemini.server");
 
     const systemPrompt = [
       `You design implementation workflows for clinical plans in Intellectual and Developmental Disabilities (IDD) services.`,
@@ -79,27 +77,29 @@ export const buildWorkflow = createServerFn({ method: "POST" })
     let summary = "";
 
     try {
-      const { text } = await generateText({
-        model,
-        system: systemPrompt,
-        prompt: userParts.join("\n\n"),
-        stopWhen: stepCountIs(5),
-        tools: {
-          update_workflow: tool({
-            description:
-              "Submit the complete, updated phases array for the workflow. Call this exactly once.",
-            inputSchema: z.object({
-              phases: z.array(PhaseSchema),
-              summary: z.string().describe("One short sentence describing what changed."),
+      const { text } = await withModelFallback(key, (model) =>
+        generateText({
+          model,
+          system: systemPrompt,
+          prompt: userParts.join("\n\n"),
+          stopWhen: stepCountIs(5),
+          tools: {
+            update_workflow: tool({
+              description:
+                "Submit the complete, updated phases array for the workflow. Call this exactly once.",
+              inputSchema: z.object({
+                phases: z.array(PhaseSchema),
+                summary: z.string().describe("One short sentence describing what changed."),
+              }),
+              execute: async ({ phases, summary: s }) => {
+                resultPhases = phases;
+                summary = s;
+                return { ok: true };
+              },
             }),
-            execute: async ({ phases, summary: s }) => {
-              resultPhases = phases;
-              summary = s;
-              return { ok: true };
-            },
-          }),
-        },
-      });
+          },
+        }),
+      );
       if (!resultPhases) {
         throw new Error(text || "The model did not return a workflow.");
       }
