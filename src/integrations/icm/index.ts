@@ -24,6 +24,7 @@ import {
   persistTaskAssignment,
   persistTraining,
   persistAgent,
+  persistIndividualAgent,
 } from "@/lib/persistence";
 import type {
   Individual,
@@ -66,13 +67,15 @@ export function getAgentsForIndividual(individualId: string): Agent[] {
   return agents.filter((a) => ids.includes(a.id));
 }
 export function attachAgentToIndividual(individualId: string, agentId: string) {
-  individualAgents.push({
+  const ia = {
     id: `ia_${Date.now()}`,
     individual_id: individualId,
     agent_id: agentId,
-    status: "current",
+    status: "current" as const,
     added_at: new Date().toISOString(),
-  });
+  };
+  individualAgents.push(ia);
+  persistIndividualAgent(ia);
 }
 
 // ---- Org agents ----
@@ -250,12 +253,16 @@ export function createAgentFromConfig(args: {
   instructions: string;
 }): Agent {
   const now = new Date().toISOString();
-  const short = args.name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 3)
-    .toUpperCase() || "NEW";
+  // Multi-word names -> initials (Behavior Support Plan -> BSP); single-word
+  // names -> first few letters (bhyt -> BHYT, PCP -> PCP). Avoids 1-letter codes.
+  const words = args.name.trim().split(/\s+/).filter(Boolean);
+  const short =
+    (words.length >= 2
+      ? words.map((w) => w[0]).join("")
+      : (words[0] ?? "").slice(0, 4)
+    )
+      .toUpperCase()
+      .slice(0, 5) || "NEW";
   const agent: Agent = {
     id: `agent_${Date.now()}`,
     org_id: ORG_ID,

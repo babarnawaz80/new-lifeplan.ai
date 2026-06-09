@@ -8,10 +8,12 @@ import {
   taskAssignments,
   trainings,
   agents,
+  individualAgents,
   type Plan,
   type TaskAssignment,
   type Training,
   type Agent,
+  type IndividualAgent,
 } from "@/data/mock";
 
 function planToRow(p: Plan) {
@@ -51,11 +53,12 @@ export function hydrate(): Promise<void> {
   if (hydrated) return hydrated;
   hydrated = (async () => {
     const sb = supabase;
-    const [planRes, taRes, trRes, agRes] = await Promise.all([
+    const [planRes, taRes, trRes, agRes, iaRes] = await Promise.all([
       sb.from("plans").select("*"),
       sb.from("task_assignments").select("*"),
       sb.from("trainings").select("*"),
       sb.from("agents_created").select("*"),
+      sb.from("individual_agents").select("*"),
     ]);
     for (const r of planRes.data ?? []) {
       upsertInto(plans, {
@@ -70,6 +73,7 @@ export function hydrate(): Promise<void> {
       const a = (r as { data?: Agent }).data;
       if (a) upsertInto(agents, a);
     }
+    for (const r of iaRes.data ?? []) upsertInto(individualAgents, r as unknown as IndividualAgent);
   })().catch((e) => {
     console.warn("[persistence] hydrate failed:", e);
   });
@@ -128,4 +132,18 @@ export function persistAgent(a: Agent) {
     .from("agents_created")
     .upsert({ id: a.id, data: a })
     .then(warn("persistAgent"), ok);
+}
+
+export function persistIndividualAgent(ia: IndividualAgent) {
+  if (!supabase) return;
+  supabase
+    .from("individual_agents")
+    .upsert({
+      id: ia.id,
+      individual_id: ia.individual_id,
+      agent_id: ia.agent_id,
+      status: ia.status,
+      added_at: ia.added_at || null,
+    })
+    .then(warn("persistIndividualAgent"), ok);
 }

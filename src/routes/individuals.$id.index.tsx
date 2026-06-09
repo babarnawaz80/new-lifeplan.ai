@@ -13,7 +13,7 @@ import { Pinwheel } from "@/components/lifeplan/Pinwheel";
 import { AddPlanPicker } from "@/components/lifeplan/AddPlanPicker";
 import {
   getIndividual, getAgentsForIndividual, listAgents,
-  attachAgentToIndividual, listPlansForIndividualAndAgent,
+  attachAgentToIndividual,
 } from "@/integrations/icm";
 import { individualAgents, type Agent } from "@/data/mock";
 
@@ -190,15 +190,10 @@ function IndividualEChart() {
     return listAgents().filter((a) => !attachedIds.has(a.id));
   }, [attachedAgents]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Clicking a plan always opens its log — the history of plans for this plan
+  // type (implemented / draft / in-progress) — where staff open an existing one
+  // or start a new cycle. It never jumps straight into creating a new plan.
   const openAgentLog = (a: Agent) => {
-    const existing = listPlansForIndividualAndAgent(individual.id, a.id);
-    if (existing.length > 0) {
-      navigate({
-        to: "/individuals/$id/plan/$planId",
-        params: { id: individual.id, planId: existing[0].id },
-      });
-      return;
-    }
     navigate({
       to: "/individuals/$id/log/$agentId",
       params: { id: individual.id, agentId: a.id },
