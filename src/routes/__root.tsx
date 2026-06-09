@@ -7,10 +7,11 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { hydrate } from "../lib/persistence";
 import { Toaster } from "sonner";
 
 function NotFoundComponent() {
@@ -115,13 +116,39 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+// Loads persisted data (plans, tasks, trainings, built agents) from Supabase
+// into the in-memory store before rendering routes, so a refresh restores
+// everything instead of showing "Plan not found". Runs once per full load.
+function HydrationGate({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    hydrate().finally(() => {
+      if (alive) setReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-7 w-7 rounded-full border-2 border-navy border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <HydrationGate>
+        <Outlet />
+      </HydrationGate>
       <Toaster richColors position="top-right" />
     </QueryClientProvider>
   );

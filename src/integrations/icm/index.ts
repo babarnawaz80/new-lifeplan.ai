@@ -19,6 +19,12 @@ import {
   ORG_ID,
   originForPlanType,
 } from "@/data/mock";
+import {
+  persistPlan,
+  persistTaskAssignment,
+  persistTraining,
+  persistAgent,
+} from "@/lib/persistence";
 import type {
   Individual,
   Agent,
@@ -80,6 +86,7 @@ export function updateAgent(id: string, patch: Partial<Agent>): Agent | undefine
   const a = agents.find((x) => x.id === id);
   if (!a) return undefined;
   Object.assign(a, patch, { updated_at: new Date().toISOString() });
+  persistAgent(a);
   return a;
 }
 
@@ -120,6 +127,7 @@ export function createAgentFromTemplate(templateId: string): Agent {
     updated_at: now,
   };
   agents.push(agent);
+  persistAgent(agent);
   return agent;
 }
 
@@ -149,6 +157,7 @@ export function createBlankAgent(): Agent {
     updated_at: now,
   };
   agents.push(agent);
+  persistAgent(agent);
   return agent;
 }
 
@@ -275,6 +284,7 @@ export function createAgentFromConfig(args: {
     updated_at: now,
   };
   agents.push(agent);
+  persistAgent(agent);
   return agent;
 }
 
@@ -314,6 +324,7 @@ export function createPlan(args: {
     updated_at: now.toISOString(),
   };
   plans.push(plan);
+  persistPlan(plan);
   return plan;
 }
 export function getPlan(id: string) {
@@ -328,6 +339,7 @@ export function updatePlan(id: string, patch: Partial<Plan>): Plan | undefined {
   const p = plans.find((x) => x.id === id);
   if (!p) return undefined;
   Object.assign(p, patch, { updated_at: new Date().toISOString() });
+  persistPlan(p);
   return p;
 }
 
@@ -349,6 +361,7 @@ export function setTaskAssignment(args: {
     existing.status = args.complete ? "complete" : "pending";
     existing.completed_at = args.complete ? new Date().toISOString() : undefined;
     existing.completed_by = args.complete ? session.userName : undefined;
+    persistTaskAssignment(existing);
     return existing;
   }
   const created: TaskAssignment = {
@@ -361,6 +374,7 @@ export function setTaskAssignment(args: {
     completed_by: args.complete ? session.userName : undefined,
   };
   taskAssignments.push(created);
+  persistTaskAssignment(created);
   return created;
 }
 
@@ -378,6 +392,7 @@ export function createPendingTraining(args: {
     created_at: new Date().toISOString(),
   };
   trainings.push(t);
+  persistTraining(t);
   return t;
 }
 
@@ -609,6 +624,7 @@ export function updateAgentSchema(agentId: string, schema: PlanSchema): Agent | 
   if (!a) return undefined;
   a.plan_schema = schema;
   a.updated_at = new Date().toISOString();
+  persistAgent(a);
   return a;
 }
 
