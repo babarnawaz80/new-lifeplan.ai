@@ -10,10 +10,8 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Pinwheel } from "@/components/lifeplan/Pinwheel";
-import { AddPlanPicker } from "@/components/lifeplan/AddPlanPicker";
 import {
-  getIndividual, getAgentsForIndividual, listAgents,
-  attachAgentToIndividual,
+  getIndividual, getAgentsForIndividual,
 } from "@/integrations/icm";
 import { individualAgents, type Agent } from "@/data/mock";
 
@@ -172,9 +170,8 @@ function IndividualEChart() {
   const individual = getIndividual(id);
   if (!individual) throw notFound();
 
-  // LifePlan state (existing functionality)
-  const [tick, setTick] = useState(0);
-  const bump = () => setTick((t) => t + 1);
+  // LifePlan state. Attachments are mutated on the create/log pages, so this
+  // page just reflects the current store on mount (navigation remounts it).
   const attachedAgents = useMemo(() => {
     const ags = getAgentsForIndividual(individual.id);
     return ags.map((a) => {
@@ -183,13 +180,7 @@ function IndividualEChart() {
       );
       return { agent: a, status: (ia?.status ?? "current") as "current" | "draft" };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [individual.id, tick]);
-  const availableToAdd = useMemo(() => {
-    const attachedIds = new Set(attachedAgents.map((a) => a.agent.id));
-    return listAgents().filter((a) => !attachedIds.has(a.id));
-  }, [attachedAgents]);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  }, [individual.id]);
   // Clicking a plan always opens its log — the history of plans for this plan
   // type (implemented / draft / in-progress) — where staff open an existing one
   // or start a new cycle. It never jumps straight into creating a new plan.
@@ -353,7 +344,12 @@ function IndividualEChart() {
                         individual={individual}
                         agents={attachedAgents}
                         onSelectAgent={openAgentLog}
-                        onAddPlan={() => setPickerOpen(true)}
+                        onAddPlan={() =>
+                          navigate({
+                            to: "/agents/new",
+                            search: { attachTo: individual.id },
+                          })
+                        }
                       />
                     ) : (
 
@@ -370,24 +366,6 @@ function IndividualEChart() {
           })}
         </div>
       </main>
-
-      <AddPlanPicker
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        available={availableToAdd}
-        onPick={(a) => {
-          attachAgentToIndividual(individual.id, a.id);
-          setPickerOpen(false);
-          bump();
-        }}
-        onCreateNew={() => {
-          setPickerOpen(false);
-          navigate({
-            to: "/agents/new",
-            search: { attachTo: individual.id },
-          });
-        }}
-      />
     </AppShell>
   );
 }
