@@ -270,6 +270,11 @@ function PlanRuntime() {
                 profileData={profileData}
                 guidelinesBrief={guidelinesBrief}
                 outputFields={outputFieldNames}
+                sourceDocument={
+                  plan.source_document_text
+                    ? { name: plan.source_document_name ?? "Source document", text: plan.source_document_text }
+                    : null
+                }
                 enabledProfileFieldNames={enabledProfileFieldNames}
                 initialMarkdown={planMarkdown}
                 canImplement={canImplement}

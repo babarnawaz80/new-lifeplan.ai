@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
 import { ChevronRight, Plus, Settings, FileText } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { ManualOrAIDialog } from "@/components/lifeplan/ManualOrAIDialog";
+import { ManualOrAIDialog, type PlanStartSource } from "@/components/lifeplan/ManualOrAIDialog";
 import {
   getIndividual,
   getAgent,
@@ -40,8 +40,15 @@ function PlanLogPage() {
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
-  const handleChoose = (mode: "ai" | "manual") => {
-    const plan = createPlan({ individualId: id, agentId, creationMode: mode });
+  const handleChoose = (mode: "ai" | "manual", source: PlanStartSource) => {
+    const plan = createPlan({
+      individualId: id,
+      agentId,
+      creationMode: mode,
+      sourceDocumentName: source.kind === "uploaded" ? source.name : undefined,
+      sourceDocumentText: source.kind === "uploaded" ? source.text : undefined,
+      awaitingSourceDocument: source.kind === "awaiting",
+    });
     setOpenModal(false);
     navigate({
       to: "/individuals/$id/plan/$planId",

@@ -29,12 +29,22 @@ export type Individual = {
   location: string;
 };
 
+// Where a plan instance's content comes from. Drives whether "Start a plan"
+// requires uploading the individual's source document (from case management).
+export type ContentOrigin = "source_plan" | "assessment_data" | "ai_draft" | "manual";
+
 export type Agent = {
   id: string;
   org_id: string;
   name: string;
   short: string;
   plan_type: string;
+  // Plan-instance content origin. "source_plan" agents (e.g. PCP, Staff Action
+  // Plan) require the individual's source document at plan start, every cycle.
+  content_origin: ContentOrigin;
+  // State-agnostic label for that source document (e.g. "Person-Centered Plan",
+  // "Life Plan", "ISP", "IP", "PCSP"). Configurable per agent — never hardcoded.
+  source_document_label?: string;
   category: "behavioral" | "medical" | "planning" | "risk";
   status: "active" | "draft" | "inactive";
   description: string;
@@ -114,6 +124,12 @@ export type Plan = {
   plan_content: Record<string, unknown>;
   field_values: Record<string, unknown>;
   field_overrides?: import("./lifeplan-types").PlanField[];
+  // Source document (from case management) for source_plan-origin plans.
+  // Text is extracted client-side; we store the extracted text, never the file.
+  source_document_name?: string;
+  source_document_text?: string;
+  // True when a source_plan agent started without its document yet.
+  awaiting_source_document?: boolean;
   auto_renew: boolean;
   annual_plan_date: string;
   implementation_date?: string;
@@ -540,14 +556,28 @@ export const agentTemplates: AgentTemplate[] = [
 
 
 // ---------- Org agents (cloned from templates so the hexagon is populated) ----------
+// Which plan types originate from an uploaded case-management document.
+// State-agnostic: the label is the default; agents can override it.
+const SOURCE_PLAN_ORIGINS: Record<string, { origin: ContentOrigin; label?: string }> = {
+  person_centered: { origin: "source_plan", label: "Person-Centered Plan" },
+  staff_action_plan: { origin: "source_plan", label: "Staff Action Plan" },
+};
+
+export function originForPlanType(planType: string): { origin: ContentOrigin; label?: string } {
+  return SOURCE_PLAN_ORIGINS[planType] ?? { origin: "assessment_data" };
+}
+
 function cloneTemplateAsAgent(t: AgentTemplate, id: string): Agent {
   const now = new Date().toISOString();
+  const { origin, label } = originForPlanType(t.plan_type);
   return {
     id,
     org_id: ORG_ID,
     name: t.name,
     short: t.short,
     plan_type: t.plan_type,
+    content_origin: origin,
+    source_document_label: label,
     category: t.category,
     status: "active",
     description: t.description,

@@ -16,6 +16,9 @@ type Body = {
     required_timelines: string[];
   } | null;
   outputFields: string[];
+  // Individual's source document from case management (source_plan agents).
+  // Extracted text only. When present, it is the PRIMARY source for the plan.
+  sourceDocument?: { name: string; text: string } | null;
 };
 
 function buildSystemPrompt(b: Body) {
@@ -31,11 +34,30 @@ function buildSystemPrompt(b: Body) {
     ? `Compliance rules:\n- ${b.guidelinesBrief.rules.join("\n- ")}\n\nRequired timelines:\n- ${b.guidelinesBrief.required_timelines.join("\n- ")}`
     : "No specific guidelines linked. Use general best practices for IDD services.";
 
+  // When a source document from case management is provided, it is the primary
+  // source: extract its outcomes/strategies and translate them into the plan.
+  const sourceBlock = b.sourceDocument?.text
+    ? [
+        `## Source plan (from case management) — PRIMARY SOURCE`,
+        `This is ${b.individualName}'s actual ${b.planType} from case management (file: ${b.sourceDocument.name}).`,
+        `Extract the goals, outcomes, and strategies from it and translate them into this implementable plan.`,
+        `Prefer the document's content over generic suggestions; preserve the individual's own goals, language, and target dates where present.`,
+        ``,
+        `--- BEGIN SOURCE DOCUMENT ---`,
+        b.sourceDocument.text.slice(0, 20000),
+        `--- END SOURCE DOCUMENT ---`,
+        ``,
+      ].join("\n")
+    : "";
+
   return [
     `You are a senior clinician writing a person-centered, strength-based ${b.planType} for an Intellectual and Developmental Disabilities service.`,
     `Individual: ${b.individualName}. Service type: ${b.serviceType}. Plan agent: ${b.agentName}.`,
-    `Use the individual's profile data below. Honor the compliance brief. Write in warm, professional clinical language. Avoid deficit-only framing.`,
+    b.sourceDocument?.text
+      ? `Base this plan on the SOURCE PLAN below (the individual's document from case management), translated into implementable goals. Honor the compliance brief.`
+      : `Use the individual's profile data below. Honor the compliance brief. Write in warm, professional clinical language. Avoid deficit-only framing.`,
     ``,
+    sourceBlock,
     `## Output structure`,
     `Format the plan as readable Markdown. Begin with a short header block (individual name, service type, plan type, today's date).`,
     `Write 3-5 goals. For each goal, include these fields when relevant: ${outputFieldsList}`,

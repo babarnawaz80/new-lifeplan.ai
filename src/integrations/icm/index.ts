@@ -17,6 +17,7 @@ import {
   guidelinesEngines,
   careTrackerServices,
   ORG_ID,
+  originForPlanType,
 } from "@/data/mock";
 import type {
   Individual,
@@ -100,6 +101,8 @@ export function createAgentFromTemplate(templateId: string): Agent {
     name: t.name,
     short: t.short,
     plan_type: t.plan_type,
+    content_origin: originForPlanType(t.plan_type).origin,
+    source_document_label: originForPlanType(t.plan_type).label,
     category: t.category,
     status: "draft",
     description: t.description,
@@ -128,6 +131,7 @@ export function createBlankAgent(): Agent {
     name: "New plan agent",
     short: "NEW",
     plan_type: "custom",
+    content_origin: "assessment_data",
     category: "planning",
     status: "draft",
     description: "",
@@ -249,6 +253,8 @@ export function createAgentFromConfig(args: {
     name: args.name,
     short,
     plan_type: args.planType,
+    content_origin: originForPlanType(args.planType).origin,
+    source_document_label: originForPlanType(args.planType).label,
     category: "planning",
     status: "draft",
     description: "",
@@ -278,6 +284,11 @@ export function createPlan(args: {
   individualId: string;
   agentId: string;
   creationMode: "ai" | "manual";
+  // Source document from case management (source_plan-origin agents). Text is
+  // extracted client-side; pass the extracted text + file name, never the file.
+  sourceDocumentName?: string;
+  sourceDocumentText?: string;
+  awaitingSourceDocument?: boolean;
 }): Plan {
   const ind = getIndividual(args.individualId);
   const now = new Date();
@@ -294,7 +305,9 @@ export function createPlan(args: {
     status: "draft",
     plan_content: {},
     field_values: {},
-
+    source_document_name: args.sourceDocumentName,
+    source_document_text: args.sourceDocumentText,
+    awaiting_source_document: args.awaitingSourceDocument,
     auto_renew: false,
     annual_plan_date: annual.toISOString(),
     created_at: now.toISOString(),

@@ -19,6 +19,9 @@ export interface AiChatPaneProps {
   profileData: Record<string, string>;
   guidelinesBrief: { rules: string[]; required_timelines: string[] } | null;
   outputFields: string[];
+  // Individual's source document from case management (source_plan agents).
+  // Extracted text only — the AI builds the plan from these outcomes/strategies.
+  sourceDocument?: { name: string; text: string } | null;
   enabledProfileFieldNames: string[];
   initialMarkdown?: string;
   canImplement: boolean;
@@ -42,6 +45,7 @@ export function AiChatPane({
   profileData,
   guidelinesBrief,
   outputFields,
+  sourceDocument,
   enabledProfileFieldNames,
   initialMarkdown,
   canImplement,
@@ -61,6 +65,7 @@ export function AiChatPane({
           agentInstructions,
           guidelinesBrief,
           outputFields,
+          sourceDocument: sourceDocument ?? null,
         },
       }),
     [
@@ -72,6 +77,7 @@ export function AiChatPane({
       agentInstructions,
       guidelinesBrief,
       outputFields,
+      sourceDocument,
     ],
   );
 
