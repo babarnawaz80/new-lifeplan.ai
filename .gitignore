@@ -35,3 +35,6 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Supabase DB password (local only, never commit)
+.supabase-db-pass.txt
