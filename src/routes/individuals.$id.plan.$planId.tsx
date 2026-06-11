@@ -26,7 +26,7 @@ import { CutoverWarningDialog } from "@/components/plan-runtime/CutoverWarningDi
 import { ActionRow } from "@/components/plan-runtime/ActionRow";
 import { PlanPreview } from "@/components/plan-runtime/PlanPreview";
 import { enrichImplementationTasks } from "@/lib/enrich-tasks.functions";
-import { allCompulsoryComplete } from "@/lib/plan-runtime";
+import { allCompulsoryComplete, prePlanningCompulsoryComplete } from "@/lib/plan-runtime";
 
 export const Route = createFileRoute("/individuals/$id/plan/$planId")({
   head: () => ({ meta: [{ title: "Plan — LifePlan" }] }),
@@ -84,15 +84,22 @@ function PlanRuntime() {
   const canImplement = allCompulsoryComplete(agent.workflow_data, isComplete);
 
   // ---- Draft gate (Sections 2 & 3) ----
-  // source_plan agents must have a real, parsed source document before any
-  // generation runs. Force a re-render when one is attached later.
+  // Drafting requires (1) a real, parsed source document for source_plan
+  // agents, and (2) all compulsory pre-planning tasks complete. Both are
+  // driven by the same task-completion data the checklist shows.
   const [sourceTick, setSourceTick] = useState(0);
   void sourceTick;
   const sourceText = plan.source_document_text?.trim() ?? "";
   const sourceMissing = agent.content_origin === "source_plan" && !sourceText;
-  const draftBlockedReason = sourceMissing
-    ? "Attach the individual's source plan to generate. No plan will be drafted without it."
-    : null;
+  const prePlanningDone = prePlanningCompulsoryComplete(agent.workflow_data, isComplete);
+  const draftBlockedReason =
+    sourceMissing && !prePlanningDone
+      ? "Attach the source plan and complete pre-planning to draft."
+      : sourceMissing
+        ? "Attach the individual's source plan to generate. No plan will be drafted without it."
+        : !prePlanningDone
+          ? "Complete the compulsory pre-planning tasks to draft."
+          : null;
   const handleAttachSource = (name: string, text: string) => {
     updatePlan(planId, {
       source_document_name: name,

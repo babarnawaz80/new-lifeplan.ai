@@ -38,6 +38,24 @@ export function allCompulsoryComplete(
   return true;
 }
 
+// ---- Draft gate (Section 2) ----
+// Pre-planning = the phases before the meeting phase. Generic across plan
+// types: everything strictly before the first `is_meeting_phase` phase; when
+// a workflow has no meeting phase, the first phase is the gathering phase.
+export function prePlanningPhases(phases: WorkflowPhase[]): WorkflowPhase[] {
+  const meetingIdx = phases.findIndex((p) => p.is_meeting_phase);
+  if (meetingIdx > 0) return phases.slice(0, meetingIdx);
+  if (meetingIdx === 0) return [];
+  return phases.length > 0 ? [phases[0]] : [];
+}
+
+export function prePlanningCompulsoryComplete(
+  phases: WorkflowPhase[],
+  isComplete: (taskId: string, role: string | null) => boolean,
+): boolean {
+  return allCompulsoryComplete(prePlanningPhases(phases), isComplete);
+}
+
 export function countTasks(phases: WorkflowPhase[]) {
   let total = 0;
   let complete = 0;
