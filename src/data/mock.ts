@@ -582,6 +582,41 @@ export const agentTemplates: AgentTemplate[] = [
 ];
 
 
+// ---------- Plan-type registry (data mapping, single source of truth) ----------
+// Canonical display label, short code, and the Goal-child label ("Strategy"
+// in PCP, "Activity" elsewhere) per plan type. Every surface derives its
+// plan-type label from here — no per-screen string building, no code branches.
+export const PLAN_TYPE_INFO: Record<
+  string,
+  { label: string; short: string; strategy_label: string }
+> = {
+  person_centered: { label: "Person-Centered Plan", short: "PCP", strategy_label: "Strategy" },
+  behavior_support: { label: "Behavior Support Plan", short: "BSP", strategy_label: "Activity" },
+  nursing_care: { label: "Nursing Care Plan", short: "NCP", strategy_label: "Activity" },
+  medication: { label: "Medication Monitoring Plan", short: "Med Plan", strategy_label: "Activity" },
+  high_risk: { label: "High Risk Plan", short: "HRP", strategy_label: "Activity" },
+  staff_action_plan: { label: "Staff Action Plan", short: "SAP", strategy_label: "Activity" },
+};
+
+export function planTypeInfo(planType: string): {
+  label: string;
+  short: string;
+  strategy_label: string;
+} {
+  const known = PLAN_TYPE_INFO[planType];
+  if (known) return known;
+  // Unknown plan types (new agents) fall back to a title-cased label and an
+  // initials short code, derived once here so all surfaces agree.
+  const words = planType.replace(/_/g, " ").trim().split(/\s+/).filter(Boolean);
+  const label = words.map((w) => w[0].toUpperCase() + w.slice(1)).join(" ") || planType;
+  const short =
+    (words.length >= 2
+      ? words.map((w) => w[0]).join("")
+      : (words[0] ?? "").slice(0, 4)
+    ).toUpperCase() || "PLAN";
+  return { label, short, strategy_label: "Activity" };
+}
+
 // ---------- Org agents (cloned from templates so the hexagon is populated) ----------
 // Which plan types originate from an uploaded case-management document.
 // State-agnostic: the label is the default; agents can override it.

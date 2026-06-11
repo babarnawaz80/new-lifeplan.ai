@@ -83,14 +83,39 @@ export function extractCaretrackerBlock(markdown: string): {
   visible: string;
   data: unknown;
 } {
-  const re = /```CARETRACKER_DATA\s*([\s\S]*?)```/i;
-  const match = markdown.match(re);
-  if (!match) return { visible: markdown, data: null };
-  let data: unknown = null;
-  try {
-    data = JSON.parse(match[1].trim());
-  } catch {
-    data = null;
+  const { visible, caretracker } = extractMachineBlocks(markdown);
+  return { visible, data: caretracker };
+}
+
+// Machine payloads the model appends after the readable plan. ICM_PLAN_TREE
+// is the authoritative structured tree (Section 1); CARETRACKER_DATA is the
+// legacy block, still parsed for back-compat. Neither is ever rendered —
+// partial (still-streaming) blocks are hidden too.
+export function extractMachineBlocks(markdown: string): {
+  visible: string;
+  caretracker: unknown;
+  tree: unknown;
+} {
+  let visible = markdown;
+  let caretracker: unknown = null;
+  let tree: unknown = null;
+  for (const tag of ["CARETRACKER_DATA", "ICM_PLAN_TREE"] as const) {
+    const re = new RegExp("```" + tag + "\\s*([\\s\\S]*?)```", "i");
+    const match = visible.match(re);
+    if (match) {
+      let data: unknown = null;
+      try {
+        data = JSON.parse(match[1].trim());
+      } catch {
+        data = null;
+      }
+      if (tag === "CARETRACKER_DATA") caretracker = data;
+      else tree = data;
+      visible = visible.replace(re, "");
+    } else {
+      const openIdx = visible.search(new RegExp("```" + tag, "i"));
+      if (openIdx >= 0) visible = visible.slice(0, openIdx);
+    }
   }
-  return { visible: markdown.replace(re, "").trimEnd(), data };
+  return { visible: visible.trimEnd(), caretracker, tree };
 }

@@ -11,6 +11,7 @@ import {
   getGuidelinesForAgent,
   getProfileData,
   getTaskAssignments,
+  getTaskOutcomes,
   setTaskAssignment,
   setTaskOutcome,
   updatePlan,
@@ -28,6 +29,8 @@ import { ActionRow } from "@/components/plan-runtime/ActionRow";
 import { PlanPreview } from "@/components/plan-runtime/PlanPreview";
 import { enrichImplementationTasks } from "@/lib/enrich-tasks.functions";
 import { allCompulsoryComplete, prePlanningCompulsoryComplete } from "@/lib/plan-runtime";
+import { parseIcmPlanTree, treeFromLegacyCaretracker } from "@/types/icmGoalOutcome";
+import { planTypeInfo } from "@/data/mock";
 
 export const Route = createFileRoute("/individuals/$id/plan/$planId")({
   head: () => ({ meta: [{ title: "Plan — LifePlan" }] }),
@@ -166,6 +169,10 @@ function PlanRuntime() {
     [id, enabledProfileFieldNames],
   );
 
+  // Captured task outcomes feed generation (Section 5.1); recompute when a
+  // task is toggled or an outcome saved.
+  const taskOutcomes = useMemo(() => getTaskOutcomes(planId), [planId, tick]);
+
   const guidelines = getGuidelinesForAgent(agent);
   const guidelinesBrief = guidelines.length
     ? {
@@ -192,9 +199,17 @@ function PlanRuntime() {
     });
   };
 
-  const handlePlanContent = async (markdown: string, ct: unknown) => {
+  const handlePlanContent = async (markdown: string, ct: unknown, treeRaw?: unknown) => {
     setPlanMarkdown(markdown);
     if (ct !== null) setCaretrackerData(ct);
+    // Persist the structured iCM Goal/Outcome tree (Section 5.2). The
+    // ICM_PLAN_TREE block is authoritative; a legacy CARETRACKER_DATA block
+    // is converted when that's all the model emitted. Never overwrite a
+    // stored tree with nothing.
+    const tree =
+      parseIcmPlanTree(treeRaw, agent.plan_type) ??
+      treeFromLegacyCaretracker(ct, agent.plan_type);
+    if (tree) updatePlan(planId, { structured_tree: tree });
     persistContent(markdown, ct ?? caretrackerData);
 
     // Enrich tasks once we have substantial plan content
@@ -317,7 +332,7 @@ function PlanRuntime() {
                 agentName={agent.name}
                 individualName={individual.name}
                 serviceType={individual.service_type}
-                planType={plan.plan_type_label}
+                planType={planTypeInfo(agent.plan_type).label}
                 agentInstructions={agent.instructions}
                 profileData={profileData}
                 guidelinesBrief={guidelinesBrief}
@@ -334,6 +349,9 @@ function PlanRuntime() {
                 needsSourceAttach={sourceMissing}
                 sourceDocLabel={agent.source_document_label}
                 onAttachSource={handleAttachSource}
+                taskOutcomes={taskOutcomes}
+                annualPlanDate={plan.annual_plan_date}
+                strategyLabel={planTypeInfo(agent.plan_type).strategy_label}
                 onPlanContent={handlePlanContent}
                 onImplement={requestImplement}
               />

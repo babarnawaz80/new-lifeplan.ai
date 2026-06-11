@@ -6,7 +6,8 @@ import { extractDocumentText } from "@/lib/docx-extract";
 import { PlanPreview } from "./PlanPreview";
 import { ProcessingSteps, buildProcessingSteps, type ProcessingStep } from "./ProcessingSteps";
 import { ActionRow } from "./ActionRow";
-import { extractCaretrackerBlock } from "@/lib/plan-runtime";
+import { extractMachineBlocks } from "@/lib/plan-runtime";
+import type { CapturedGoal } from "@/data/mock";
 
 type Status = "ready" | "submitted" | "streaming" | "error";
 
@@ -35,7 +36,16 @@ export interface AiChatPaneProps {
   // Label for the missing document (from agent config), e.g. "Person-Centered Plan".
   sourceDocLabel?: string;
   onAttachSource?: (name: string, text: string) => void;
-  onPlanContent: (markdown: string, caretrackerData: unknown) => void;
+  // Section 5 inputs: captured task outcomes (authoritative goals), the
+  // annual plan date all dates derive from, and the Strategy/Activity label.
+  taskOutcomes?: {
+    notes: Array<{ task_title: string; note: string }>;
+    capturedGoals: CapturedGoal[];
+    meetingSummaries: string[];
+  } | null;
+  annualPlanDate?: string;
+  strategyLabel?: string;
+  onPlanContent: (markdown: string, caretrackerData: unknown, treeRaw?: unknown) => void;
   onImplement: () => void;
 }
 
@@ -117,6 +127,9 @@ export function AiChatPane({
   needsSourceAttach,
   sourceDocLabel,
   onAttachSource,
+  taskOutcomes,
+  annualPlanDate,
+  strategyLabel,
   onPlanContent,
   onImplement,
 }: AiChatPaneProps) {
@@ -134,6 +147,9 @@ export function AiChatPane({
           guidelinesBrief,
           outputFields,
           sourceDocument: sourceDocument ?? null,
+          taskOutcomes: taskOutcomes ?? null,
+          annualPlanDate,
+          strategyLabel,
         },
       }),
     [
@@ -146,6 +162,9 @@ export function AiChatPane({
       guidelinesBrief,
       outputFields,
       sourceDocument,
+      taskOutcomes,
+      annualPlanDate,
+      strategyLabel,
     ],
   );
 
@@ -165,10 +184,10 @@ export function AiChatPane({
 
   const isLoading = status === "submitted" || status === "streaming";
 
-  // Latest assistant text (visible portion — caretracker stripped)
+  // Latest assistant text (visible portion — machine blocks stripped)
   const latestAssistant = [...messages].reverse().find((m) => m.role === "assistant");
   const latestAssistantText = latestAssistant ? textFromMessage(latestAssistant) : "";
-  const { visible: liveMarkdown } = extractCaretrackerBlock(latestAssistantText);
+  const { visible: liveMarkdown } = extractMachineBlocks(latestAssistantText);
 
   // Step animation while streaming
   useEffect(() => {
@@ -191,11 +210,11 @@ export function AiChatPane({
     lastFinalizedIdRef.current = latestAssistant.id;
 
     const full = textFromMessage(latestAssistant);
-    const { visible, data } = extractCaretrackerBlock(full);
+    const { visible, caretracker, tree } = extractMachineBlocks(full);
     setSavedMarkdown(visible);
     setShowSteps(false);
     setActiveStepIndex(processingSteps.length);
-    onPlanContent(visible, data);
+    onPlanContent(visible, caretracker, tree);
   }, [latestAssistant, status, onPlanContent, processingSteps.length]);
 
   // Auto-scroll
