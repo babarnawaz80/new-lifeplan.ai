@@ -19,6 +19,10 @@ export type WorkflowTask = {
   notify_roles?: boolean;
   notify_service_contacts?: boolean;
   triggers?: NotifyTrigger[];
+  // Pivotal tasks whose work product is the plan's goals (e.g. the planning
+  // meeting, finalize goals). Drives structured outcome capture — config
+  // flag, never matched by task title.
+  captures_goals?: boolean;
 };
 
 export type WorkflowPhase = {

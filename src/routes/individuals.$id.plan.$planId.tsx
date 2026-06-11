@@ -12,6 +12,7 @@ import {
   getProfileData,
   getTaskAssignments,
   setTaskAssignment,
+  setTaskOutcome,
   updatePlan,
   pushToCareTracker,
   createPendingTraining,
@@ -79,6 +80,28 @@ function PlanRuntime() {
   const onToggle = (taskId: string, role: string | null, complete: boolean) => {
     setTaskAssignment({ planId, taskId, role, complete });
     setTick((t) => t + 1);
+  };
+
+  // ---- Task outcome capture (Section 4) ----
+  const getOutcome = useCallback(
+    (taskId: string) => {
+      const rec = assignments.find((a) => a.task_id === taskId && a.role === null);
+      return { note: rec?.outcome_note, structured: rec?.structured_outcome };
+    },
+    [assignments],
+  );
+  const onSaveOutcome = (
+    taskId: string,
+    value: { note?: string; structured?: import("@/data/mock").TaskStructuredOutcome | null },
+  ) => {
+    setTaskOutcome({
+      planId,
+      taskId,
+      outcomeNote: value.note,
+      structuredOutcome: value.structured,
+    });
+    setTick((t) => t + 1);
+    toast.success("Outcome saved.");
   };
 
   const canImplement = allCompulsoryComplete(agent.workflow_data, isComplete);
@@ -282,6 +305,8 @@ function PlanRuntime() {
               taskInstructions={taskInstructions}
               isComplete={isComplete}
               onToggle={onToggle}
+              getOutcome={getOutcome}
+              onSaveOutcome={onSaveOutcome}
             />
           </aside>
 

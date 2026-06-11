@@ -141,6 +141,23 @@ export type Plan = {
 };
 
 
+// Structured outcome captured on pivotal workflow tasks (flagged
+// captures_goals in the agent config — e.g. the planning meeting and the
+// finalize-goals task). These captured goals are authoritative for the Goal
+// level when the plan is (re)generated.
+export type CapturedGoal = {
+  outcome_statement: string;
+  goal_statement: string;
+  target_date: string; // YYYY-MM-DD or ""
+  person_responsible: string;
+  notes: string;
+};
+
+export type TaskStructuredOutcome = {
+  meeting_summary?: string;
+  goals_captured?: CapturedGoal[];
+};
+
 export type TaskAssignment = {
   id: string;
   plan_id: string;
@@ -149,6 +166,10 @@ export type TaskAssignment = {
   status: "pending" | "complete";
   completed_at?: string;
   completed_by?: string;
+  // Lightweight work product of the task (any task).
+  outcome_note?: string;
+  // Structured capture for captures_goals tasks.
+  structured_outcome?: TaskStructuredOutcome | null;
 };
 
 export type Training = {
@@ -328,11 +349,14 @@ const PCP_WORKFLOW: WorkflowPhase[] = [
     mkTask("Review latest Nursing Assessment", ["Nurse"], true),
   ]),
   mkPhase("Meeting", 0, true, "Hold the person-centered planning meeting", [
-    mkTask("Hold person-centered planning meeting", ["Case Manager", "Clinician", "DSP"], true),
+    {
+      ...mkTask("Hold person-centered planning meeting", ["Case Manager", "Clinician", "DSP"], true),
+      captures_goals: true,
+    },
     mkTask("Capture family input", ["Case Manager"], false),
   ]),
   mkPhase("Pre-Implementation", -15, false, "Within 30 days after the meeting", [
-    mkTask("Finalize goals and services", ["Clinician"], true),
+    { ...mkTask("Finalize goals and services", ["Clinician"], true), captures_goals: true },
   ]),
   mkPhase("Implementation", -30, false, "Effective date and downstream actions", [
     mkTask("Push goals to CareTracker", ["System"], true),

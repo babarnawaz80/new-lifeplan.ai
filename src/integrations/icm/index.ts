@@ -385,6 +385,65 @@ export function setTaskAssignment(args: {
   return created;
 }
 
+// Save a task's work product (Section 4). Outcomes live on the task-level
+// (role = null) assignment record so they read the same for anyone/everyone
+// completion rules; per-role completion records stay untouched.
+export function setTaskOutcome(args: {
+  planId: string;
+  taskId: string;
+  outcomeNote?: string;
+  structuredOutcome?: import("@/data/mock").TaskStructuredOutcome | null;
+}): TaskAssignment {
+  let rec = taskAssignments.find(
+    (a) => a.plan_id === args.planId && a.task_id === args.taskId && a.role === null,
+  );
+  if (!rec) {
+    rec = {
+      id: `ta_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      plan_id: args.planId,
+      task_id: args.taskId,
+      role: null,
+      status: "pending",
+    };
+    taskAssignments.push(rec);
+  }
+  if (args.outcomeNote !== undefined) rec.outcome_note = args.outcomeNote;
+  if (args.structuredOutcome !== undefined) rec.structured_outcome = args.structuredOutcome;
+  persistTaskAssignment(rec);
+  return rec;
+}
+
+// All captured task outcomes for a plan, joined to the agent's workflow tasks.
+// Generation reads this: notes from every task, plus the authoritative
+// captured goals / meeting summary from captures_goals tasks.
+export function getTaskOutcomes(planId: string): {
+  notes: Array<{ task_title: string; note: string }>;
+  capturedGoals: import("@/data/mock").CapturedGoal[];
+  meetingSummaries: string[];
+} {
+  const plan = plans.find((p) => p.id === planId);
+  const agent = plan ? agents.find((a) => a.id === plan.agent_id) : undefined;
+  const titleById = new Map<string, string>();
+  for (const ph of agent?.workflow_data ?? []) {
+    for (const t of ph.tasks) titleById.set(t.id, t.title);
+  }
+  const notes: Array<{ task_title: string; note: string }> = [];
+  const capturedGoals: import("@/data/mock").CapturedGoal[] = [];
+  const meetingSummaries: string[] = [];
+  for (const a of taskAssignments) {
+    if (a.plan_id !== planId) continue;
+    if (a.outcome_note?.trim()) {
+      notes.push({ task_title: titleById.get(a.task_id) ?? a.task_id, note: a.outcome_note.trim() });
+    }
+    const so = a.structured_outcome;
+    if (so?.meeting_summary?.trim()) meetingSummaries.push(so.meeting_summary.trim());
+    for (const g of so?.goals_captured ?? []) {
+      if (g.goal_statement?.trim() || g.outcome_statement?.trim()) capturedGoals.push(g);
+    }
+  }
+  return { notes, capturedGoals, meetingSummaries };
+}
+
 // ---- Trainings ----
 export function createPendingTraining(args: {
   planId: string;

@@ -21,6 +21,9 @@ const TaskSchema = z.object({
   notify_roles: z.boolean().default(false),
   notify_service_contacts: z.boolean().default(false),
   triggers: z.array(TriggerSchema).default([]),
+  // Pivotal tasks whose work product is the plan's goals — drives structured
+  // outcome capture at runtime (config flag, never matched by title).
+  captures_goals: z.boolean().default(false),
 });
 
 const PhaseSchema = z.object({
@@ -88,6 +91,7 @@ export const buildAgent = createServerFn({ method: "POST" })
       `Plan type: "${data.planType}". Agent name: "${data.agentName}".`,
       `Generate a FULL configuration:`,
       `- workflow_data: phases with nested tasks. Each task includes assigned_roles (subset of: DSP, Case Manager, Clinician, Behavior Specialist, Nurse, Supervisor, Program Manager, Administrator, House Manager, System), completion_rule, is_compulsory, due_days_before_annual (positive = before annual date, negative = after), icm_links, notify_roles, notify_service_contacts, and triggers (e.g. {type:'before_due', days:3}).`,
+      `- Set captures_goals: true on the task(s) whose work product is the plan's agreed goals — typically the planning/team meeting task and the finalize-goals-and-services task. Leave it false elsewhere.`,
       `- profile_fields: data-mapping toggles, enable only those relevant to this plan type.`,
       `- output_fields: output structure toggles, enable only those relevant.`,
       `- instructions: concise AI instructions for plan generation, 1-3 sentences.`,

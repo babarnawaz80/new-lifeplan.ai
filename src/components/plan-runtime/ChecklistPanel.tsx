@@ -1,9 +1,15 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, CheckCircle2, Circle, Users, AlertCircle, ChevronRight } from "lucide-react";
+import { Calendar, CheckCircle2, Circle, Users, AlertCircle, ChevronRight, Plus, X } from "lucide-react";
 import type { WorkflowPhase, WorkflowTask } from "@/data/lifeplan-types";
+import type { CapturedGoal, TaskStructuredOutcome } from "@/data/mock";
 import { formatDue, allCompulsoryComplete, countTasks } from "@/lib/plan-runtime";
 import { Checkbox } from "@/components/ui/checkbox";
+
+export type TaskOutcomeValue = {
+  note?: string;
+  structured?: TaskStructuredOutcome | null;
+};
 
 export interface ChecklistPanelProps {
   phases: WorkflowPhase[];
@@ -11,6 +17,10 @@ export interface ChecklistPanelProps {
   taskInstructions: Record<string, string>;
   isComplete: (taskId: string, role: string | null) => boolean;
   onToggle: (taskId: string, role: string | null, complete: boolean) => void;
+  // Section 4: task outcome capture. Optional so the panel renders unchanged
+  // where capture isn't wired.
+  getOutcome?: (taskId: string) => TaskOutcomeValue;
+  onSaveOutcome?: (taskId: string, value: TaskOutcomeValue) => void;
 }
 
 export function ChecklistPanel({
@@ -19,6 +29,8 @@ export function ChecklistPanel({
   taskInstructions,
   isComplete,
   onToggle,
+  getOutcome,
+  onSaveOutcome,
 }: ChecklistPanelProps) {
   const counter = useMemo(() => countTasks(phases), [phases]);
   const { total, complete } = counter(isComplete);
@@ -86,6 +98,8 @@ export function ChecklistPanel({
                 instruction={taskInstructions[task.id]}
                 isComplete={isComplete}
                 onToggle={onToggle}
+                outcome={getOutcome?.(task.id)}
+                onSaveOutcome={onSaveOutcome}
               />
             ))}
           </div>
@@ -101,14 +115,24 @@ function TaskRow({
   instruction,
   isComplete,
   onToggle,
+  outcome,
+  onSaveOutcome,
 }: {
   task: WorkflowTask;
   annualDate: string;
   instruction?: string;
   isComplete: (id: string, role: string | null) => boolean;
   onToggle: (id: string, role: string | null, complete: boolean) => void;
+  outcome?: TaskOutcomeValue;
+  onSaveOutcome?: (taskId: string, value: TaskOutcomeValue) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [outcomeOpen, setOutcomeOpen] = useState(false);
+  const hasOutcome = !!(
+    outcome?.note?.trim() ||
+    outcome?.structured?.meeting_summary?.trim() ||
+    (outcome?.structured?.goals_captured?.length ?? 0) > 0
+  );
   const everyoneMode =
     task.completion_rule === "everyone" && task.assigned_roles.length > 0;
 
@@ -211,7 +235,188 @@ function TaskRow({
               {instruction}
             </p>
           )}
+
+          {onSaveOutcome && (
+            <button
+              type="button"
+              onClick={() => setOutcomeOpen((o) => !o)}
+              className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-indigo hover:underline"
+            >
+              <ChevronRight
+                className={`h-3 w-3 transition-transform ${outcomeOpen ? "rotate-90" : ""}`}
+              />
+              {task.captures_goals
+                ? hasOutcome
+                  ? "Captured goals & summary"
+                  : "Capture goals & summary"
+                : hasOutcome
+                  ? "Outcome note"
+                  : "Add outcome note"}
+            </button>
+          )}
+          {outcomeOpen && onSaveOutcome && (
+            <OutcomeEditor
+              task={task}
+              value={outcome}
+              onSave={(v) => {
+                onSaveOutcome(task.id, v);
+                setOutcomeOpen(false);
+              }}
+            />
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Section 4: outcome capture ----
+// Lightweight note for every task; structured goals + meeting summary for
+// tasks flagged captures_goals in the agent config.
+
+const EMPTY_GOAL: CapturedGoal = {
+  outcome_statement: "",
+  goal_statement: "",
+  target_date: "",
+  person_responsible: "",
+  notes: "",
+};
+
+const inputCls =
+  "w-full px-2.5 py-1.5 rounded-lg border border-line bg-card text-[12px] text-ink placeholder:text-ink3 focus:outline-none focus:border-navy";
+
+function OutcomeEditor({
+  task,
+  value,
+  onSave,
+}: {
+  task: WorkflowTask;
+  value?: TaskOutcomeValue;
+  onSave: (v: TaskOutcomeValue) => void;
+}) {
+  const [note, setNote] = useState(value?.note ?? "");
+  const [summary, setSummary] = useState(value?.structured?.meeting_summary ?? "");
+  const [goals, setGoals] = useState<CapturedGoal[]>(
+    value?.structured?.goals_captured?.length ? value.structured.goals_captured : [],
+  );
+
+  const setGoal = (i: number, patch: Partial<CapturedGoal>) =>
+    setGoals((gs) => gs.map((g, j) => (j === i ? { ...g, ...patch } : g)));
+
+  const save = () => {
+    const cleanedGoals = goals.filter(
+      (g) => g.goal_statement.trim() || g.outcome_statement.trim(),
+    );
+    onSave({
+      note: note.trim(),
+      structured: task.captures_goals
+        ? { meeting_summary: summary.trim(), goals_captured: cleanedGoals }
+        : value?.structured ?? null,
+    });
+  };
+
+  return (
+    <div className="mt-1.5 bg-muted/50 rounded-lg px-3 py-2.5 space-y-2.5">
+      {task.captures_goals && (
+        <>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-ink3 mb-1">
+              Meeting summary / decisions
+            </div>
+            <textarea
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              rows={3}
+              placeholder="What the team discussed and decided…"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-ink3 mb-1">
+              Goals captured
+            </div>
+            <div className="space-y-2">
+              {goals.map((g, i) => (
+                <div key={i} className="rounded-lg border border-line bg-card p-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-ink3">Goal {i + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => setGoals((gs) => gs.filter((_, j) => j !== i))}
+                      className="p-0.5 rounded hover:bg-muted text-ink3"
+                      aria-label="Remove goal"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <input
+                    value={g.outcome_statement}
+                    onChange={(e) => setGoal(i, { outcome_statement: e.target.value })}
+                    placeholder="Outcome statement — e.g. 'To have a healthy lifestyle'"
+                    className={inputCls}
+                  />
+                  <input
+                    value={g.goal_statement}
+                    onChange={(e) => setGoal(i, { goal_statement: e.target.value })}
+                    placeholder="Goal statement — e.g. 'Will exercise 3 times weekly'"
+                    className={inputCls}
+                  />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <input
+                      type="date"
+                      value={g.target_date}
+                      onChange={(e) => setGoal(i, { target_date: e.target.value })}
+                      className={inputCls}
+                    />
+                    <input
+                      value={g.person_responsible}
+                      onChange={(e) => setGoal(i, { person_responsible: e.target.value })}
+                      placeholder="Person responsible"
+                      className={inputCls}
+                    />
+                  </div>
+                  <input
+                    value={g.notes}
+                    onChange={(e) => setGoal(i, { notes: e.target.value })}
+                    placeholder="Notes (optional)"
+                    className={inputCls}
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setGoals((gs) => [...gs, { ...EMPTY_GOAL }])}
+                className="flex items-center gap-1 text-[11px] font-semibold text-indigo hover:underline"
+              >
+                <Plus className="h-3 w-3" />
+                Add goal
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-ink3 mb-1">
+          Outcome note {task.captures_goals ? "(optional)" : ""}
+        </div>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={2}
+          placeholder="Short note on this task's outcome…"
+          className={inputCls}
+        />
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={save}
+          className="px-3 py-1.5 rounded-lg bg-navy text-white text-[11.5px] font-bold hover:opacity-95"
+        >
+          Save outcome
+        </button>
       </div>
     </div>
   );

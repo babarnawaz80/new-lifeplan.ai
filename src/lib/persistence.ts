@@ -130,9 +130,9 @@ export function persistPlan(p: Plan) {
 
 export function persistTaskAssignment(ta: TaskAssignment) {
   if (!supabase) return;
-  supabase
-    .from("task_assignments")
-    .upsert({
+  upsertWithOptionalColumns(
+    "task_assignments",
+    {
       id: ta.id,
       plan_id: ta.plan_id,
       task_id: ta.task_id,
@@ -140,8 +140,12 @@ export function persistTaskAssignment(ta: TaskAssignment) {
       status: ta.status,
       completed_at: ta.completed_at || null,
       completed_by: ta.completed_by || null,
-    })
-    .then(warn("persistTaskAssignment"), ok);
+      outcome_note: ta.outcome_note ?? null,
+      structured_outcome: ta.structured_outcome ?? null,
+    },
+    ["outcome_note", "structured_outcome"],
+    "persistTaskAssignment",
+  );
 }
 
 export function persistTraining(t: Training) {
