@@ -24,7 +24,18 @@ export const extractGuidelines = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }) => {
     const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error("GEMINI_API_KEY is not configured");
+    if (!key) {
+      return {
+        brief: {
+          rules: [],
+          required_timelines: [],
+          required_phases: [],
+          required_tasks: [],
+          required_fields: [],
+          notes: "AI is disabled in this preview — design-only mode.",
+        },
+      };
+    }
 
     const { withModelFallback } = await import("./gemini.server");
 
