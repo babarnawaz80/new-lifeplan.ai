@@ -40,7 +40,27 @@ export const generateTraining = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }) => {
     const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error("GEMINI_API_KEY is not configured");
+    if (!key) {
+      const stubQuestion = {
+        question: "AI is disabled in this preview.",
+        options: ["OK", "OK", "OK", "OK"],
+        correct_index: 0,
+        explanation: "Design-only mode — connect AI to generate real training.",
+      };
+      return {
+        title: `${data.planTypeLabel} training (preview)`,
+        slides: [
+          {
+            heading: "AI disabled",
+            narration: [
+              { speaker: "Alex" as const, text: "This is a design-only preview." },
+              { speaker: "Jamie" as const, text: "Real training will appear when AI is connected." },
+            ],
+          },
+        ],
+        quiz: Array.from({ length: 12 }, () => stubQuestion),
+      };
+    }
 
     const { withModelFallback } = await import("./gemini.server");
 

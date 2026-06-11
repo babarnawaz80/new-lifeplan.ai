@@ -82,7 +82,46 @@ export const buildAgent = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }) => {
     const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error("GEMINI_API_KEY is not configured");
+    if (!key) {
+      // Design / frontend-only mode: AI is disabled. Return current config
+      // (or a blank scaffold) so the UI flow continues without crashing.
+      const PROFILE_FIELDS = [
+        "Diagnosis","Medical History","Goals","Strategies","Outcomes","Assessments",
+        "Abilities & Needs","Previous Plans","Incident Reports","Medications","eMAR",
+        "CareTracker","Labs & Diagnostics","Vital Signs",
+      ];
+      const OUTPUT_FIELDS = [
+        "Strategy Title","Description","Target Date","Person Responsible",
+        "Services / Expected Outcomes","Schedule","Protocol","Capture Readings",
+        "Prompts","Status","Progress","Show on CareTracker","Funding Stream",
+      ];
+      const toToggles = (names: string[]) =>
+        names.map((name) => ({
+          id: name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""),
+          name,
+          enabled: false,
+        }));
+      const stampPhases = (
+        phases: z.infer<typeof PhaseSchema>[] = [],
+      ) =>
+        phases.map((p, i) => ({
+          ...p,
+          id: p.id || `phase_${Math.random().toString(36).slice(2, 9)}`,
+          sort_order: i,
+          tasks: p.tasks.map((t, j) => ({
+            ...t,
+            id: t.id || `task_${Math.random().toString(36).slice(2, 9)}`,
+            sort_order: j,
+          })),
+        }));
+      return {
+        workflow_data: stampPhases(data.currentConfig?.workflow_data ?? []),
+        profile_fields: data.currentConfig?.profile_fields ?? toToggles(PROFILE_FIELDS),
+        output_fields: data.currentConfig?.output_fields ?? toToggles(OUTPUT_FIELDS),
+        instructions: data.currentConfig?.instructions ?? "",
+        summary: "AI is disabled in this preview — design-only mode.",
+      };
+    }
 
     const { withModelFallback } = await import("./gemini.server");
 

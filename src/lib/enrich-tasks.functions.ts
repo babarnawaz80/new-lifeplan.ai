@@ -20,7 +20,7 @@ export const enrichImplementationTasks = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }) => {
     const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error("GEMINI_API_KEY is not configured");
+    if (!key) return { instructions: {} as Record<string, string> };
 
     const { withModelFallback } = await import("./gemini.server");
 

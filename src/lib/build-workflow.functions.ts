@@ -42,7 +42,19 @@ export const buildWorkflow = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }) => {
     const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error("GEMINI_API_KEY is not configured");
+    if (!key) {
+      const phases = (data.currentPhases ?? []).map((p, i) => ({
+        ...p,
+        id: p.id || `phase_${Math.random().toString(36).slice(2, 9)}`,
+        sort_order: i,
+        tasks: p.tasks.map((t, j) => ({
+          ...t,
+          id: t.id || `task_${Math.random().toString(36).slice(2, 9)}`,
+          sort_order: j,
+        })),
+      }));
+      return { phases, summary: "AI is disabled in this preview — design-only mode." };
+    }
 
     const { withModelFallback } = await import("./gemini.server");
 
