@@ -3,7 +3,7 @@ import {
   ArrowRight, Plus, HeartHandshake, Brain, HeartPulse, Pill, ShieldAlert,
   ClipboardList, FileText, type LucideIcon,
 } from "lucide-react";
-import type { Agent, Individual } from "@/data/mock";
+import { planTypeInfo, type Agent, type Individual } from "@/data/mock";
 import eshaAvatar from "@/assets/esha-avatar.jpg";
 
 // ---------------------------------------------------------------------------
@@ -303,10 +303,10 @@ function PlanCard({
       {/* Body */}
       <div className="flex-1 px-5 py-4">
         <div className="text-[24px] leading-none font-extrabold tracking-tight text-ink">
-          {agent.short}
+          {planTypeInfo(agent.plan_type).short}
         </div>
         <div className="mt-2 text-[14px] font-semibold text-ink2 line-clamp-2">
-          {agent.name}
+          {planTypeInfo(agent.plan_type).label}
         </div>
       </div>
 

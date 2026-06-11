@@ -291,7 +291,7 @@ function PlanRuntime() {
             {individual.name}
           </Link>
           <ChevronRight className="h-3 w-3" />
-          <span className="text-ink font-semibold">{agent.short}</span>
+          <span className="text-ink font-semibold">{planTypeInfo(agent.plan_type).short}</span>
         </nav>
 
         <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
@@ -300,7 +300,7 @@ function PlanRuntime() {
               {plan.plan_type_label} · {plan.plan_mode === "annual" ? "Annual" : "On-the-Fly"}
             </div>
             <h1 className="text-[24px] font-extrabold text-ink leading-tight">
-              {agent.name}
+              {planTypeInfo(agent.plan_type).label}
             </h1>
             <p className="text-[13px] text-ink2">For {individual.name}</p>
           </div>
@@ -411,7 +411,7 @@ function PlanRuntime() {
         open={cutoverOpen}
         onOpenChange={setCutoverOpen}
         individualName={individual.name}
-        planTypeLabel={agent.name}
+        planTypeLabel={planTypeInfo(agent.plan_type).label}
         onAcknowledge={() => {
           setCutoverAcked(true);
           setCutoverOpen(false);

@@ -13,7 +13,7 @@ import {
   FileText,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
-import type { Agent, Individual } from "@/data/mock";
+import { planTypeInfo, type Agent, type Individual } from "@/data/mock";
 
 // ---------------------------------------------------------------------------
 // Honeycomb hex-grid (flat-top, axial coordinates).
@@ -529,7 +529,7 @@ function AgentTile({
         fontFamily="Plus Jakarta Sans, system-ui, sans-serif"
         letterSpacing="0.2"
       >
-        {cell.agent.short}
+        {planTypeInfo(cell.agent.plan_type).short}
       </text>
 
       {/* Status pill */}

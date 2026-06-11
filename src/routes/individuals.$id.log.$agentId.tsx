@@ -9,7 +9,7 @@ import {
   listPlansForIndividualAndAgent,
   createPlan,
 } from "@/integrations/icm";
-import { accentColor } from "@/data/mock";
+import { accentColor, planTypeInfo } from "@/data/mock";
 
 export const Route = createFileRoute("/individuals/$id/log/$agentId")({
   head: () => ({ meta: [{ title: "Plan log — LifePlan" }] }),
@@ -36,9 +36,8 @@ function PlanLogPage() {
   const plans = listPlansForIndividualAndAgent(id, agentId);
   const [openModal, setOpenModal] = useState(false);
 
-  const planTypeLabel = agent.plan_type
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  // Single source for the plan-type label/short across all surfaces.
+  const { label: planTypeLabel, short: planTypeShort } = planTypeInfo(agent.plan_type);
 
   const handleChoose = (mode: "ai" | "manual", source: PlanStartSource) => {
     const plan = createPlan({
@@ -66,7 +65,7 @@ function PlanLogPage() {
             {individual.name}
           </Link>
           <ChevronRight className="h-3 w-3" />
-          <span className="text-ink font-semibold">{agent.short} log</span>
+          <span className="text-ink font-semibold">{planTypeShort} log</span>
         </nav>
 
         <div className="flex items-start gap-4 mb-6">
@@ -74,14 +73,14 @@ function PlanLogPage() {
             className="h-12 w-12 rounded-xl flex items-center justify-center text-white text-[13px] font-extrabold shrink-0"
             style={{ background: accentColor[agent.accent] }}
           >
-            {agent.short.slice(0, 3)}
+            {planTypeShort.slice(0, 3)}
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-[24px] font-extrabold text-ink">
-              {agent.short} for {individual.name}
+              {planTypeShort} for {individual.name}
             </h1>
             <p className="text-[13px] text-ink2 mt-0.5">
-              {agent.name} · {plans.length} plan{plans.length === 1 ? "" : "s"} on file
+              {planTypeLabel} · {plans.length} plan{plans.length === 1 ? "" : "s"} on file
             </p>
           </div>
           <Link

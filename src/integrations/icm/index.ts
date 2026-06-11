@@ -18,6 +18,7 @@ import {
   careTrackerServices,
   ORG_ID,
   originForPlanType,
+  planTypeInfo,
 } from "@/data/mock";
 import {
   persistPlan,
@@ -253,16 +254,9 @@ export function createAgentFromConfig(args: {
   instructions: string;
 }): Agent {
   const now = new Date().toISOString();
-  // Multi-word names -> initials (Behavior Support Plan -> BSP); single-word
-  // names -> first few letters (bhyt -> BHYT, PCP -> PCP). Avoids 1-letter codes.
-  const words = args.name.trim().split(/\s+/).filter(Boolean);
-  const short =
-    (words.length >= 2
-      ? words.map((w) => w[0]).join("")
-      : (words[0] ?? "").slice(0, 4)
-    )
-      .toUpperCase()
-      .slice(0, 5) || "NEW";
+  // Short code comes from the plan-type registry (single source of truth for
+  // plan labels), never from the agent's free-typed name.
+  const short = planTypeInfo(args.planType).short;
   const agent: Agent = {
     id: `agent_${Date.now()}`,
     org_id: ORG_ID,

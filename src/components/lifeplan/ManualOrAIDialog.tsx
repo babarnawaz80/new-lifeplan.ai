@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sparkles, Edit3, ShieldCheck, Upload, FileText, Check, Loader2 } from "lucide-react";
-import type { Agent, Individual } from "@/data/mock";
+import { planTypeInfo, type Agent, type Individual } from "@/data/mock";
 import { extractDocumentText } from "@/lib/docx-extract";
 
 // What the plan-start flow hands back so the instance can be created with (or
@@ -75,7 +75,7 @@ export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoo
       <DialogContent className="max-w-2xl bg-card border-line shadow-soft p-0 overflow-hidden">
         <DialogHeader className="px-7 pt-7 pb-2">
           <DialogTitle className="text-[22px] font-extrabold text-ink">
-            Start a {agent.name}
+            Start a {planTypeInfo(agent.plan_type).label}
           </DialogTitle>
           <div className="flex items-center gap-1.5 text-[13px] text-ink2 mt-1">
             <span className="font-semibold text-ink">{individual.name}</span>

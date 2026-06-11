@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Agent, Individual } from "@/data/mock";
+import { planTypeInfo, type Agent, type Individual } from "@/data/mock";
 import eshaAvatar from "@/assets/esha-avatar.jpg";
 
 // ---------------------------------------------------------------------------
@@ -228,12 +228,12 @@ export function Pinwheel({ individual, agents, onSelectAgent, onAddPlan }: Pinwh
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {agent.short}
+                    {planTypeInfo(agent.plan_type).short}
                   </span>
                 </div>
                 {showName && (
                   <div style={{ fontSize: 11, lineHeight: 1.2, marginBottom: 7, color: "#64748B" }}>
-                    {agent.name}
+                    {planTypeInfo(agent.plan_type).label}
                   </div>
                 )}
                 {!compact && <StatusPill status={statusKey(status)} size="sm" />}
