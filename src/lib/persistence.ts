@@ -150,17 +150,20 @@ export function persistTaskAssignment(ta: TaskAssignment) {
 
 export function persistTraining(t: Training) {
   if (!supabase) return;
-  supabase
-    .from("trainings")
-    .upsert({
+  upsertWithOptionalColumns(
+    "trainings",
+    {
       id: t.id,
       plan_id: t.plan_id,
       individual_id: t.individual_id,
       status: t.status,
       video_status: t.video_status,
+      content: t.content ?? null,
       created_at: t.created_at,
-    })
-    .then(warn("persistTraining"), ok);
+    },
+    ["content"],
+    "persistTraining",
+  );
 }
 
 export function persistAgent(a: Agent) {

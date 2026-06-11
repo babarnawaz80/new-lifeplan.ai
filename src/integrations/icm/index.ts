@@ -456,6 +456,14 @@ export function createPendingTraining(args: {
   return t;
 }
 
+export function updateTraining(id: string, patch: Partial<Training>): Training | undefined {
+  const t = trainings.find((x) => x.id === id);
+  if (!t) return undefined;
+  Object.assign(t, patch);
+  persistTraining(t);
+  return t;
+}
+
 // ---- Profile data ----
 // Returns only data we actually hold for this individual. Clinical fields
 // (Diagnosis, Medications, eMAR, ...) come from the host app in production;

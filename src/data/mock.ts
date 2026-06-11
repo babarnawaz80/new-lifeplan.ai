@@ -172,12 +172,29 @@ export type TaskAssignment = {
   structured_outcome?: TaskStructuredOutcome | null;
 };
 
+// Generated training content: narrated slides (browser-TTS stand-in for the
+// video locally) plus the 12-question quiz with answer key and explanations.
+export type TrainingContent = {
+  title: string;
+  slides: Array<{
+    heading: string;
+    narration: Array<{ speaker: "Alex" | "Jamie"; text: string }>;
+  }>;
+  quiz: Array<{
+    question: string;
+    options: string[];
+    correct_index: number;
+    explanation: string;
+  }>;
+};
+
 export type Training = {
   id: string;
   plan_id: string;
   individual_id: string;
   status: "pending" | "ready" | "failed";
   video_status: "pending" | "ready" | "failed";
+  content?: TrainingContent | null;
   created_at: string;
 };
 

@@ -18,6 +18,7 @@ import {
   pushToCareTracker,
   writeGoalOutcomeTree,
   createPendingTraining,
+  updateTraining,
   mayHaveLegacyPlan,
 } from "@/integrations/icm";
 import { ChecklistPanel } from "@/components/plan-runtime/ChecklistPanel";
@@ -29,6 +30,7 @@ import { CutoverWarningDialog } from "@/components/plan-runtime/CutoverWarningDi
 import { ActionRow } from "@/components/plan-runtime/ActionRow";
 import { PlanPreview } from "@/components/plan-runtime/PlanPreview";
 import { enrichImplementationTasks } from "@/lib/enrich-tasks.functions";
+import { generateTraining } from "@/lib/generate-training.functions";
 import { allCompulsoryComplete, prePlanningCompulsoryComplete } from "@/lib/plan-runtime";
 import { parseIcmPlanTree, treeFromLegacyCaretracker } from "@/types/icmGoalOutcome";
 import { planTypeInfo } from "@/data/mock";
@@ -69,6 +71,7 @@ function PlanRuntime() {
   if (!agent) throw notFound();
 
   const enrichTasksFn = useServerFn(enrichImplementationTasks);
+  const generateTrainingFn = useServerFn(generateTraining);
 
   // ---- Task assignment state (track in component so toggles re-render) ----
   const [tick, setTick] = useState(0);
@@ -427,7 +430,31 @@ function PlanRuntime() {
         open={trainingOpen}
         onOpenChange={setTrainingOpen}
         onGenerate={() => {
-          createPendingTraining({ planId, individualId: id });
+          // Section 8: generate the narrated training AND the 12-question
+          // quiz from the implemented plan; both land on the training record
+          // in Individual Trainings when ready.
+          const training = createPendingTraining({ planId, individualId: id });
+          generateTrainingFn({
+            data: {
+              planContent: planMarkdown,
+              individualName: individual.name,
+              planTypeLabel: planTypeInfo(agent.plan_type).label,
+            },
+          })
+            .then((content) => {
+              updateTraining(training.id, {
+                status: "ready",
+                video_status: "ready",
+                content,
+              });
+              toast.success("Training ready — narrated video and 12-question quiz saved.");
+            })
+            .catch((err) => {
+              updateTraining(training.id, { status: "failed", video_status: "failed" });
+              toast.error(
+                err instanceof Error ? err.message : "Training generation failed.",
+              );
+            });
         }}
         onSkip={() => {
           setTrainingOpen(false);
