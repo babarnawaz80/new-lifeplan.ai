@@ -101,8 +101,21 @@ export const buildAgent = createServerFn({ method: "POST" })
           name,
           enabled: false,
         }));
+      const stampPhases = (
+        phases: z.infer<typeof PhaseSchema>[] = [],
+      ) =>
+        phases.map((p, i) => ({
+          ...p,
+          id: p.id || `phase_${Math.random().toString(36).slice(2, 9)}`,
+          sort_order: i,
+          tasks: p.tasks.map((t, j) => ({
+            ...t,
+            id: t.id || `task_${Math.random().toString(36).slice(2, 9)}`,
+            sort_order: j,
+          })),
+        }));
       return {
-        workflow_data: data.currentConfig?.workflow_data ?? [],
+        workflow_data: stampPhases(data.currentConfig?.workflow_data ?? []),
         profile_fields: data.currentConfig?.profile_fields ?? toToggles(PROFILE_FIELDS),
         output_fields: data.currentConfig?.output_fields ?? toToggles(OUTPUT_FIELDS),
         instructions: data.currentConfig?.instructions ?? "",
