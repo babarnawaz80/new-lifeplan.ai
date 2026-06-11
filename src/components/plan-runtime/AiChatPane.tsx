@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { Sparkles, Send, User } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles, Send, Upload, User } from "lucide-react";
+import { extractDocumentText } from "@/lib/docx-extract";
 import { PlanPreview } from "./PlanPreview";
 import { ProcessingSteps, buildProcessingSteps, type ProcessingStep } from "./ProcessingSteps";
 import { ActionRow } from "./ActionRow";
@@ -25,6 +26,15 @@ export interface AiChatPaneProps {
   enabledProfileFieldNames: string[];
   initialMarkdown?: string;
   canImplement: boolean;
+  // Draft gate (Section 2/3): when set, generation is blocked — no model call
+  // fires from any entry point (generate, regenerate, revise, chat).
+  draftBlockedReason?: string | null;
+  // True when the plan still needs its source document; shows the inline
+  // attach affordance next to the blocked message.
+  needsSourceAttach?: boolean;
+  // Label for the missing document (from agent config), e.g. "Person-Centered Plan".
+  sourceDocLabel?: string;
+  onAttachSource?: (name: string, text: string) => void;
   onPlanContent: (markdown: string, caretrackerData: unknown) => void;
   onImplement: () => void;
 }
@@ -33,6 +43,60 @@ function textFromMessage(m: UIMessage): string {
   return m.parts
     .map((p) => (p.type === "text" ? p.text : ""))
     .join("");
+}
+
+// Inline uploader shown when a plan is awaiting its source document. Text is
+// extracted in the browser (same as plan start); the raw file never uploads.
+function AttachSourceInline({
+  docLabel,
+  onAttach,
+}: {
+  docLabel?: string;
+  onAttach: (name: string, text: string) => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const text = (await extractDocumentText(file)).trim();
+      if (!text) {
+        setError("No text could be extracted from that file. Try a text-based PDF or DOCX.");
+        return;
+      }
+      onAttach(file.name, text);
+    } catch {
+      setError("Could not read that file. Try a PDF, DOCX, or text file.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        disabled={busy}
+        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[9px] bg-muted text-ink text-[12.5px] font-semibold hover:bg-muted/70 disabled:opacity-60"
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+        {busy ? "Reading…" : `Attach the ${docLabel || "source plan"}`}
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".pdf,.docx,.doc,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+        className="hidden"
+        onChange={(e) => handleFile(e.target.files?.[0])}
+      />
+      {error && <p className="text-[12px] text-red mt-2">{error}</p>}
+    </div>
+  );
 }
 
 export function AiChatPane({
@@ -49,6 +113,10 @@ export function AiChatPane({
   enabledProfileFieldNames,
   initialMarkdown,
   canImplement,
+  draftBlockedReason,
+  needsSourceAttach,
+  sourceDocLabel,
+  onAttachSource,
   onPlanContent,
   onImplement,
 }: AiChatPaneProps) {
@@ -139,6 +207,9 @@ export function AiChatPane({
   }, [messages, isLoading]);
 
   const startGeneration = (userPrompt: string) => {
+    // Draft gate: never call the model while generation is blocked (missing
+    // source document or incomplete pre-planning tasks).
+    if (draftBlockedReason) return;
     const steps = buildProcessingSteps(enabledProfileFieldNames);
     setProcessingSteps(steps);
     setActiveStepIndex(0);
@@ -200,12 +271,23 @@ export function AiChatPane({
                   `Draft the ${planType} for ${individualName}.`,
                 )
               }
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[9px] text-white text-[13px] font-bold hover:opacity-95"
+              disabled={!!draftBlockedReason}
+              title={draftBlockedReason ?? ""}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[9px] text-white text-[13px] font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: "var(--ai-gradient)" }}
             >
               <Sparkles className="h-3.5 w-3.5" />
               Generate the plan
             </button>
+            {draftBlockedReason && (
+              <div className="mt-3 flex items-start gap-2 text-[11.5px] text-amber">
+                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>{draftBlockedReason}</span>
+              </div>
+            )}
+            {needsSourceAttach && onAttachSource && (
+              <AttachSourceInline docLabel={sourceDocLabel} onAttach={onAttachSource} />
+            )}
           </div>
         )}
 
@@ -267,6 +349,8 @@ export function AiChatPane({
         <div className="mt-3 shrink-0">
           <ActionRow
             canImplement={canImplement}
+            canDraft={!draftBlockedReason}
+            draftDisabledReason={draftBlockedReason ?? undefined}
             reviseInput={reviseInput}
             onReviseInputChange={setReviseInput}
             onRegenerate={handleRegenerate}
@@ -287,18 +371,20 @@ export function AiChatPane({
               handleChatSend();
             }
           }}
-          disabled={isLoading}
+          disabled={isLoading || !!draftBlockedReason}
           placeholder={
             isLoading
               ? "Generating…"
-              : "Ask for a change or refinement…"
+              : draftBlockedReason
+                ? draftBlockedReason
+                : "Ask for a change or refinement…"
           }
           className="flex-1 bg-transparent text-[13.5px] text-ink placeholder:text-ink3 focus:outline-none disabled:opacity-50"
         />
         <button
           type="button"
           onClick={handleChatSend}
-          disabled={!chatInput.trim() || isLoading}
+          disabled={!chatInput.trim() || isLoading || !!draftBlockedReason}
           className="h-8 w-8 rounded-lg bg-navy text-white flex items-center justify-center disabled:opacity-40 hover:opacity-95"
           aria-label="Send"
         >

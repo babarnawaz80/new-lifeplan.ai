@@ -83,6 +83,26 @@ function PlanRuntime() {
 
   const canImplement = allCompulsoryComplete(agent.workflow_data, isComplete);
 
+  // ---- Draft gate (Sections 2 & 3) ----
+  // source_plan agents must have a real, parsed source document before any
+  // generation runs. Force a re-render when one is attached later.
+  const [sourceTick, setSourceTick] = useState(0);
+  void sourceTick;
+  const sourceText = plan.source_document_text?.trim() ?? "";
+  const sourceMissing = agent.content_origin === "source_plan" && !sourceText;
+  const draftBlockedReason = sourceMissing
+    ? "Attach the individual's source plan to generate. No plan will be drafted without it."
+    : null;
+  const handleAttachSource = (name: string, text: string) => {
+    updatePlan(planId, {
+      source_document_name: name,
+      source_document_text: text,
+      awaiting_source_document: false,
+    });
+    setSourceTick((t) => t + 1);
+    toast.success(`${name} attached — ${text.length.toLocaleString()} characters extracted locally.`);
+  };
+
   // ---- Plan content + caretracker + task instructions ----
   const initialMarkdown = (plan.plan_content as { markdown?: string }).markdown || "";
   const [planMarkdown, setPlanMarkdown] = useState<string>(initialMarkdown);
@@ -278,6 +298,10 @@ function PlanRuntime() {
                 enabledProfileFieldNames={enabledProfileFieldNames}
                 initialMarkdown={planMarkdown}
                 canImplement={canImplement}
+                draftBlockedReason={draftBlockedReason}
+                needsSourceAttach={sourceMissing}
+                sourceDocLabel={agent.source_document_label}
+                onAttachSource={handleAttachSource}
                 onPlanContent={handlePlanContent}
                 onImplement={requestImplement}
               />

@@ -69,7 +69,9 @@ function NewAgentPage() {
         setSampleText("");
       } else {
         setSampleText(text);
-        toast.success(`Loaded ${file.name}`);
+        toast.success(
+          `Loaded ${file.name} — ${text.trim().length.toLocaleString()} characters extracted locally`,
+        );
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to read file.");

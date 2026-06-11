@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sparkles, Edit3, ShieldCheck, Upload, FileText, Check, Loader2 } from "lucide-react";
 import type { Agent, Individual } from "@/data/mock";
-import { extractPdfText } from "@/lib/pdf-extract";
-import { extractDocxText } from "@/lib/docx-extract";
+import { extractDocumentText } from "@/lib/docx-extract";
 
 // What the plan-start flow hands back so the instance can be created with (or
 // without) the individual's source document from case management.
@@ -18,13 +17,6 @@ interface Props {
   agent: Agent | null;
   individual: Individual;
   onChoose: (mode: "ai" | "manual", source: PlanStartSource) => void;
-}
-
-async function extractText(file: File): Promise<string> {
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".pdf")) return extractPdfText(file);
-  if (name.endsWith(".docx") || name.endsWith(".doc")) return extractDocxText(file);
-  return file.text(); // plain-text fallback
 }
 
 export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoose }: Props) {
@@ -57,7 +49,13 @@ export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoo
     setBusy(true);
     setError(null);
     try {
-      const text = await extractText(file);
+      const text = (await extractDocumentText(file)).trim();
+      if (!text) {
+        setError(
+          "No text could be extracted from that file. If it's a scanned image PDF, export a text-based copy and try again.",
+        );
+        return;
+      }
       setUploaded({ name: file.name, text });
       setStep("choose");
     } catch {
@@ -146,7 +144,8 @@ export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoo
                   <div className="flex items-center gap-2 rounded-xl bg-[var(--success-bg)] border border-[color-mix(in_oklab,var(--green)_30%,transparent)] px-3 py-2 text-[12px] text-green font-semibold">
                     <Check className="h-3.5 w-3.5" />
                     <FileText className="h-3.5 w-3.5" />
-                    {uploaded.name} read — the AI will build from it
+                    {uploaded.name} — {uploaded.text.length.toLocaleString()} characters extracted
+                    locally. The AI will build from it.
                   </div>
                 ) : (
                   <div className="flex items-center justify-between rounded-xl bg-[var(--warning-bg)] border border-[color-mix(in_oklab,var(--amber)_30%,transparent)] px-3 py-2 text-[12px] text-amber font-semibold">

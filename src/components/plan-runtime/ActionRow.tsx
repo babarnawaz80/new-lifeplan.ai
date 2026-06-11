@@ -2,6 +2,8 @@ import { RefreshCw, Save, Sparkles, Rocket } from "lucide-react";
 
 export function ActionRow({
   canImplement,
+  canDraft = true,
+  draftDisabledReason,
   saving,
   reviseInput,
   onReviseInputChange,
@@ -11,6 +13,9 @@ export function ActionRow({
   onImplement,
 }: {
   canImplement: boolean;
+  // Draft gate: when false, Regenerate and AI revise are disabled (no model call).
+  canDraft?: boolean;
+  draftDisabledReason?: string;
   saving?: boolean;
   reviseInput: string;
   onReviseInputChange: (v: string) => void;
@@ -25,7 +30,9 @@ export function ActionRow({
         <button
           type="button"
           onClick={onRegenerate}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[9px] bg-muted text-ink text-[12.5px] font-semibold hover:bg-muted/70"
+          disabled={!canDraft}
+          title={canDraft ? "" : draftDisabledReason ?? "Complete pre-planning to draft"}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[9px] bg-muted text-ink text-[12.5px] font-semibold hover:bg-muted/70 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Regenerate
@@ -59,16 +66,21 @@ export function ActionRow({
             value={reviseInput}
             onChange={(e) => onReviseInputChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && reviseInput.trim()) onAiRevise();
+              if (e.key === "Enter" && reviseInput.trim() && canDraft) onAiRevise();
             }}
-            placeholder="AI revise: e.g. 'make goal 2 measurable in 90 days'…"
-            className="flex-1 bg-transparent text-[13px] text-ink placeholder:text-ink3 focus:outline-none"
+            disabled={!canDraft}
+            placeholder={
+              canDraft
+                ? "AI revise: e.g. 'make goal 2 measurable in 90 days'…"
+                : draftDisabledReason ?? "Complete pre-planning to draft"
+            }
+            className="flex-1 bg-transparent text-[13px] text-ink placeholder:text-ink3 focus:outline-none disabled:opacity-60"
           />
         </div>
         <button
           type="button"
           onClick={onAiRevise}
-          disabled={!reviseInput.trim()}
+          disabled={!reviseInput.trim() || !canDraft}
           className="px-3 py-2 rounded-[9px] text-[12.5px] font-bold text-white disabled:opacity-50"
           style={{ background: "var(--ai-gradient)" }}
         >
