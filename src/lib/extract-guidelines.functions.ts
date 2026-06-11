@@ -26,7 +26,7 @@ export const extractGuidelines = createServerFn({ method: "POST" })
     const key = process.env.GEMINI_API_KEY;
     if (!key) {
       return {
-        brief: {
+        compliance_brief: {
           rules: [],
           required_timelines: [],
           required_phases: [],
@@ -34,6 +34,8 @@ export const extractGuidelines = createServerFn({ method: "POST" })
           required_fields: [],
           notes: "AI is disabled in this preview — design-only mode.",
         },
+        services_extracted: 0,
+        summary: "AI is disabled in this preview — design-only mode.",
       };
     }
 
