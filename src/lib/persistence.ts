@@ -31,6 +31,7 @@ function planToRow(p: Plan) {
     source_document_name: p.source_document_name ?? null,
     source_document_text: p.source_document_text ?? null,
     awaiting_source_document: p.awaiting_source_document ?? false,
+    structured_tree: p.structured_tree ?? null,
     auto_renew: p.auto_renew ?? false,
     annual_plan_date: p.annual_plan_date || null,
     implementation_date: p.implementation_date || null,
@@ -90,9 +91,41 @@ function warn(label: string) {
   };
 }
 
+// Columns added after the original tables were created (the user applies the
+// ALTER TABLE in the dashboard SQL Editor). Until then Supabase rejects rows
+// that mention them — so on that specific error, retry without those columns
+// instead of dropping the whole write.
+function upsertWithOptionalColumns(
+  table: string,
+  row: Record<string, unknown>,
+  optionalColumns: string[],
+  label: string,
+) {
+  if (!supabase) return;
+  const sb = supabase;
+  sb.from(table)
+    .upsert(row)
+    .then((r) => {
+      if (!r?.error) return;
+      const msg = String((r.error as { message?: string })?.message ?? "");
+      if (optionalColumns.some((c) => msg.includes(c))) {
+        const fallback = { ...row };
+        for (const c of optionalColumns) delete fallback[c];
+        sb.from(table)
+          .upsert(fallback)
+          .then(warn(`${label} (without ${optionalColumns.join(",")})`), ok);
+        console.warn(
+          `[persistence] ${label}: column missing in DB (run the pending SQL migration); saved without ${optionalColumns.join(", ")}`,
+        );
+      } else {
+        console.warn(`[persistence] ${label} failed:`, r.error);
+      }
+    }, ok);
+}
+
 export function persistPlan(p: Plan) {
   if (!supabase) return;
-  supabase.from("plans").upsert(planToRow(p)).then(warn("persistPlan"), ok);
+  upsertWithOptionalColumns("plans", planToRow(p), ["structured_tree"], "persistPlan");
 }
 
 export function persistTaskAssignment(ta: TaskAssignment) {

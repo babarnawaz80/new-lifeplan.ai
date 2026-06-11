@@ -130,6 +130,9 @@ export type Plan = {
   source_document_text?: string;
   // True when a source_plan agent started without its document yet.
   awaiting_source_document?: boolean;
+  // Structured iCM Goal and Outcome tree produced by generation. Authoritative
+  // machine payload for Implement; plan_content.markdown stays the display copy.
+  structured_tree?: import("@/types/icmGoalOutcome").IcmPlanTree | null;
   auto_renew: boolean;
   annual_plan_date: string;
   implementation_date?: string;
