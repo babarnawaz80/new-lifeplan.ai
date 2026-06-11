@@ -542,6 +542,98 @@ export function discontinueCareTrackerSource(args: {
   }
 }
 
+// ---- iCM Goal and Outcome (Section 6) ----
+// Implement writes the structured tree into the iCM Goal and Outcome module
+// through this seam. Mock adapter: logs the payload and stores it locally so
+// the mapping can be verified end-to-end without a live iCM. Strategies
+// flagged show_on_care_tracker also surface as CareTracker services
+// (single-active-source rule preserved, source='lifeplan').
+export type GoalOutcomeWrite = {
+  id: string;
+  individual_id: string;
+  plan_id: string | null;
+  plan_type: string;
+  written_at: string;
+  tree: import("@/types/icmGoalOutcome").IcmPlanTree;
+};
+
+export const goalOutcomeWrites: GoalOutcomeWrite[] = [];
+
+export function writeGoalOutcomeTree(
+  individualId: string,
+  planType: string,
+  tree: import("@/types/icmGoalOutcome").IcmPlanTree,
+  opts?: { planId?: string; effectiveDate?: string },
+): { write: GoalOutcomeWrite; careTrackerServices: CareTrackerService[] } {
+  const effective_date = opts?.effectiveDate ?? new Date().toISOString();
+  const write: GoalOutcomeWrite = {
+    id: `gow_${Date.now()}`,
+    individual_id: individualId,
+    plan_id: opts?.planId ?? null,
+    plan_type: planType,
+    written_at: effective_date,
+    tree,
+  };
+  goalOutcomeWrites.push(write);
+  console.log("[icm] writeGoalOutcomeTree", {
+    individualId,
+    planType,
+    planId: opts?.planId,
+    outcomes: tree.outcomes.length,
+    goals: tree.outcomes.reduce((n, o) => n + o.goals.length, 0),
+    strategies: tree.outcomes.reduce(
+      (n, o) => n + o.goals.reduce((m, g) => m + g.strategies.length, 0),
+      0,
+    ),
+    payload: tree,
+  });
+
+  // One active source per (individual, plan type): close any prior source
+  // before surfacing this plan's strategies in CareTracker.
+  discontinueCareTrackerSource({
+    individualId,
+    planType,
+    endDate: effective_date,
+    exceptPlanId: opts?.planId,
+  });
+
+  const created: CareTrackerService[] = [];
+  for (const outcome of tree.outcomes) {
+    for (const goal of outcome.goals) {
+      for (const strat of goal.strategies) {
+        if (!strat.service_delivery.show_on_care_tracker) continue;
+        const svc: CareTrackerService = {
+          id: `cts_${opts?.planId ?? individualId}_${created.length}_${Date.now()}`,
+          individual_id: individualId,
+          plan_id: opts?.planId ?? "",
+          plan_type: planType,
+          source: "lifeplan",
+          title: strat.title,
+          description: strat.description ?? undefined,
+          responsible: strat.person_responsible ?? goal.person_responsible ?? undefined,
+          effective_date,
+          raw: {
+            outcome_statement: outcome.outcome_statement,
+            goal_statement: goal.goal_statement,
+            services_and_expected_outcomes:
+              strat.service_delivery.services_and_expected_outcomes,
+            capture_readings: strat.service_delivery.capture_readings,
+            prompts: strat.service_delivery.prompts,
+            protocol: strat.service_delivery.protocol,
+            funding_stream: strat.service_delivery.funding_stream,
+            schedule: strat.schedule,
+            service_provided_by: strat.service_provided_by,
+          },
+        };
+        careTrackerServices.push(svc);
+        created.push(svc);
+      }
+    }
+  }
+  console.log("[icm] writeGoalOutcomeTree → CareTracker services", created.length);
+  return { write, careTrackerServices: created };
+}
+
 // LifePlan emits its CareTracker payload in the legacy shape through the
 // same existing entry point. Each service is tagged with source='lifeplan'
 // and dated with the plan's implementation date. Enforces: one active

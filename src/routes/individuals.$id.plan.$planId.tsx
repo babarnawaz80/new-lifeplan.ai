@@ -16,6 +16,7 @@ import {
   setTaskOutcome,
   updatePlan,
   pushToCareTracker,
+  writeGoalOutcomeTree,
   createPendingTraining,
   mayHaveLegacyPlan,
 } from "@/integrations/icm";
@@ -249,9 +250,25 @@ function PlanRuntime() {
         implementation_date: date.toISOString(),
       },
     });
-    if (caretrackerData) pushToCareTracker(planId, caretrackerData);
+    // Section 6: the structured tree is the authoritative payload — write it
+    // into iCM Goal and Outcome through the adapter (which also surfaces
+    // show_on_care_tracker strategies in CareTracker under the single-active-
+    // source rule). Legacy caretracker payload is the fallback for plans
+    // generated before the tree existed.
+    const tree = getPlan(planId)?.structured_tree;
+    if (tree) {
+      writeGoalOutcomeTree(id, agent.plan_type, tree, {
+        planId,
+        effectiveDate: date.toISOString(),
+      });
+      toast.success("Plan implemented. Goals written to iCM Goal & Outcome and CareTracker.");
+    } else if (caretrackerData) {
+      pushToCareTracker(planId, caretrackerData);
+      toast.success("Plan implemented. Goals pushed to CareTracker.");
+    } else {
+      toast.success("Plan implemented.");
+    }
     setImplementOpen(false);
-    toast.success("Plan implemented. Goals pushed to CareTracker.");
     setTrainingOpen(true);
   };
 
