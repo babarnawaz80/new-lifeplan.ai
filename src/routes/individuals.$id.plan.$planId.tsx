@@ -8,6 +8,7 @@ import {
   getPlan,
   getIndividual,
   getAgent,
+  listPlansForIndividualAndAgent,
   getGuidelinesForAgent,
   getProfileData,
   getTaskAssignments,
@@ -146,6 +147,19 @@ function PlanRuntime() {
   const [caretrackerData, setCaretrackerData] = useState<unknown>(
     (plan.plan_content as { caretracker?: unknown }).caretracker ?? null,
   );
+  // Structured iCM tree for the clean plan view + comparison (Section: UI).
+  const [structuredTree, setStructuredTree] = useState(plan.structured_tree ?? null);
+
+  // Most recent *implemented* plan for this individual + agent (not this one)
+  // that has a structured tree — the "currently implemented" side of the
+  // old-vs-new comparison.
+  const previousImplemented = useMemo(() => {
+    return listPlansForIndividualAndAgent(id, plan.agent_id)
+      .filter((p) => p.id !== planId && p.status === "implemented" && p.structured_tree)
+      .sort((a, b) =>
+        (b.implementation_date ?? b.created_at).localeCompare(a.implementation_date ?? a.created_at),
+      )[0];
+  }, [id, plan.agent_id, planId, structuredTree]);
   const [taskInstructions, setTaskInstructions] = useState<Record<string, string>>(
     (plan.plan_content as { taskInstructions?: Record<string, string> }).taskInstructions || {},
   );
@@ -213,7 +227,10 @@ function PlanRuntime() {
     const tree =
       parseIcmPlanTree(treeRaw, agent.plan_type) ??
       treeFromLegacyCaretracker(ct, agent.plan_type);
-    if (tree) updatePlan(planId, { structured_tree: tree });
+    if (tree) {
+      setStructuredTree(tree);
+      updatePlan(planId, { structured_tree: tree });
+    }
     persistContent(markdown, ct ?? caretrackerData);
 
     // Enrich tasks once we have substantial plan content
@@ -372,6 +389,23 @@ function PlanRuntime() {
                 taskOutcomes={taskOutcomes}
                 annualPlanDate={plan.annual_plan_date}
                 strategyLabel={planTypeInfo(agent.plan_type).strategy_label}
+                structuredTree={structuredTree}
+                previousTree={previousImplemented?.structured_tree ?? null}
+                previousLabel={
+                  previousImplemented
+                    ? `Implemented ${new Date(
+                        previousImplemented.implementation_date ?? previousImplemented.created_at,
+                      ).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
+                    : ""
+                }
+                planMeta={{
+                  individualName: individual.name,
+                  serviceType: individual.service_type,
+                  planTypeLabel: planTypeInfo(agent.plan_type).label,
+                  strategyLabel: planTypeInfo(agent.plan_type).strategy_label,
+                  todayDate: new Date().toISOString().slice(0, 10),
+                  annualDate: plan.annual_plan_date,
+                }}
                 onPlanContent={handlePlanContent}
                 onImplement={requestImplement}
               />

@@ -4,10 +4,14 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { AlertCircle, Loader2, Sparkles, Send, Upload, User } from "lucide-react";
 import { extractDocumentText } from "@/lib/docx-extract";
 import { PlanPreview } from "./PlanPreview";
+import { StructuredPlanView } from "./StructuredPlanView";
+import { PlanComparison } from "./PlanComparison";
+import type { PlanMeta } from "./plan-view-shared";
 import { ProcessingSteps, buildProcessingSteps, type ProcessingStep } from "./ProcessingSteps";
 import { ActionRow } from "./ActionRow";
 import { extractMachineBlocks } from "@/lib/plan-runtime";
 import type { CapturedGoal } from "@/data/mock";
+import type { IcmPlanTree } from "@/types/icmGoalOutcome";
 
 type Status = "ready" | "submitted" | "streaming" | "error";
 
@@ -45,6 +49,11 @@ export interface AiChatPaneProps {
   } | null;
   annualPlanDate?: string;
   strategyLabel?: string;
+  // Structured rendering + old-vs-new comparison (UI overhaul).
+  structuredTree?: IcmPlanTree | null;
+  previousTree?: IcmPlanTree | null;
+  previousLabel?: string;
+  planMeta?: PlanMeta;
   onPlanContent: (markdown: string, caretrackerData: unknown, treeRaw?: unknown) => void;
   onImplement: () => void;
 }
@@ -53,6 +62,28 @@ function textFromMessage(m: UIMessage): string {
   return m.parts
     .map((p) => (p.type === "text" ? p.text : ""))
     .join("");
+}
+
+function ViewTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-[7px] text-[12.5px] font-semibold transition-colors ${
+        active ? "bg-card text-ink shadow-soft" : "text-ink2 hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 // Inline uploader shown when a plan is awaiting its source document. Text is
@@ -130,6 +161,10 @@ export function AiChatPane({
   taskOutcomes,
   annualPlanDate,
   strategyLabel,
+  structuredTree,
+  previousTree,
+  previousLabel,
+  planMeta,
   onPlanContent,
   onImplement,
 }: AiChatPaneProps) {
@@ -258,6 +293,17 @@ export function AiChatPane({
   const planMarkdown = liveMarkdown || savedMarkdown;
   const planStreaming = isLoading && liveMarkdown.length > 0;
 
+  // View mode for the finished draft: clean structured cards, side-by-side
+  // comparison (when a prior implemented plan exists), or the raw text.
+  const [viewMode, setViewMode] = useState<"structured" | "compare" | "text">("structured");
+  const hasTree = !!structuredTree && !!planMeta;
+  const hasCompare = hasTree && !!previousTree;
+  const effectiveMode = !hasTree
+    ? "text"
+    : viewMode === "compare" && !hasCompare
+      ? "structured"
+      : viewMode;
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <div
@@ -342,19 +388,53 @@ export function AiChatPane({
           <ProcessingSteps steps={processingSteps} activeIndex={activeStepIndex} />
         )}
 
-        {showPlan && (
-          <PlanPreview
-            markdown={planMarkdown}
-            streaming={planStreaming}
-            onSave={
-              planStreaming
-                ? undefined
-                : (next) => {
-                    setSavedMarkdown(next);
-                    onPlanContent(next, null);
-                  }
-            }
-          />
+        {/* While streaming, always show the live markdown draft. */}
+        {showPlan && planStreaming && <PlanPreview markdown={planMarkdown} streaming />}
+
+        {/* Once finished: tabbed structured view + comparison, or raw text. */}
+        {showPlan && !planStreaming && (
+          <div className="space-y-3">
+            {hasTree && (
+              <div className="inline-flex items-center gap-1 rounded-[10px] bg-muted p-1">
+                <ViewTab active={effectiveMode === "structured"} onClick={() => setViewMode("structured")}>
+                  Plan
+                </ViewTab>
+                {hasCompare && (
+                  <ViewTab active={effectiveMode === "compare"} onClick={() => setViewMode("compare")}>
+                    Compare to current
+                  </ViewTab>
+                )}
+                <ViewTab active={effectiveMode === "text"} onClick={() => setViewMode("text")}>
+                  Text
+                </ViewTab>
+              </div>
+            )}
+
+            {effectiveMode === "structured" && hasTree && (
+              <StructuredPlanView
+                tree={structuredTree!}
+                meta={planMeta!}
+                onEditText={() => setViewMode("text")}
+              />
+            )}
+            {effectiveMode === "compare" && hasCompare && (
+              <PlanComparison
+                previous={previousTree!}
+                current={structuredTree!}
+                meta={planMeta!}
+                previousLabel={previousLabel || "Currently implemented"}
+              />
+            )}
+            {effectiveMode === "text" && (
+              <PlanPreview
+                markdown={planMarkdown}
+                onSave={(next) => {
+                  setSavedMarkdown(next);
+                  onPlanContent(next, null);
+                }}
+              />
+            )}
+          </div>
         )}
 
         {error && (
