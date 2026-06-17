@@ -11,7 +11,7 @@ import {
 import { AppShell } from "@/components/layout/AppShell";
 import { Pinwheel } from "@/components/lifeplan/Pinwheel";
 import {
-  getIndividual, getAgentsForIndividual,
+  getIndividual, getAgentsForIndividual, listPlansForIndividualAndAgent,
 } from "@/integrations/icm";
 import { individualAgents, type Agent } from "@/data/mock";
 
@@ -172,13 +172,22 @@ function IndividualEChart() {
 
   // LifePlan state. Attachments are mutated on the create/log pages, so this
   // page just reflects the current store on mount (navigation remounts it).
+  // The blade badge reflects REAL plan state: "Current" once a plan of this
+  // type is implemented, "Draft" while only drafts/in-progress exist, and the
+  // seeded attachment status when no plans exist yet.
   const attachedAgents = useMemo(() => {
     const ags = getAgentsForIndividual(individual.id);
     return ags.map((a) => {
       const ia = individualAgents.find(
         (x) => x.individual_id === individual.id && x.agent_id === a.id,
       );
-      return { agent: a, status: (ia?.status ?? "current") as "current" | "draft" };
+      const plans = listPlansForIndividualAndAgent(individual.id, a.id);
+      const status: "current" | "draft" = plans.some((p) => p.status === "implemented")
+        ? "current"
+        : plans.length > 0
+          ? "draft"
+          : ((ia?.status ?? "current") as "current" | "draft");
+      return { agent: a, status };
     });
   }, [individual.id]);
   // Clicking a plan always opens its log — the history of plans for this plan
