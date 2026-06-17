@@ -364,7 +364,20 @@ function IndividualEChart() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                         {cat.items.map((item, idx) => (
-                          <ActionItemCard key={idx} item={item} sectionColor={cat.color} />
+                          <ActionItemCard
+                            key={idx}
+                            item={item}
+                            sectionColor={cat.color}
+                            onClick={
+                              item.label === "Individual Trainings"
+                                ? () =>
+                                    navigate({
+                                      to: "/individuals/$id/trainings",
+                                      params: { id: individual.id },
+                                    })
+                                : undefined
+                            }
+                          />
                         ))}
                       </div>
                     )}
@@ -380,12 +393,13 @@ function IndividualEChart() {
 }
 
 function ActionItemCard({
-
   item,
   sectionColor,
+  onClick,
 }: {
   item: ActionItem;
   sectionColor: string;
+  onClick?: () => void;
 }) {
   const Icon = item.icon;
   const style = { ["--sec" as string]: sectionColor } as React.CSSProperties;
@@ -395,7 +409,7 @@ function ActionItemCard({
       : "bg-[hsl(28,92%,90%)] text-[hsl(28,92%,36%)]";
   return (
     <button
-      onClick={() => {}}
+      onClick={onClick}
       style={style}
       className="group relative flex items-center gap-3 pl-[18px] pr-[14px] py-[14px] rounded-[12px] text-left w-full bg-card border border-line transition-all duration-150 overflow-hidden hover:-translate-y-px hover:border-[hsl(var(--sec)/0.45)] hover:bg-[hsl(var(--sec)/0.06)]"
       title={item.description}
