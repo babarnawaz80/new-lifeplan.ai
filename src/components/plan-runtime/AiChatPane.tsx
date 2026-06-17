@@ -42,10 +42,12 @@ export interface AiChatPaneProps {
   // Label for the missing document (from agent config), e.g. "Person-Centered Plan".
   sourceDocLabel?: string;
   onAttachSource?: (name: string, text: string) => void;
-  // "No new document — use the previous implemented plan" affordance.
+  // "Proceed without a new document" affordance (uses the previous plan when
+  // one exists, otherwise generates from chart data).
   canUsePrevious?: boolean;
   usePrevious?: boolean;
   onUsePreviousChange?: (v: boolean) => void;
+  hasPreviousPlan?: boolean;
   // Section 5 inputs: captured task outcomes (authoritative goals), the
   // annual plan date all dates derive from, and the Strategy/Activity label.
   taskOutcomes?: {
@@ -168,6 +170,7 @@ export function AiChatPane({
   canUsePrevious,
   usePrevious,
   onUsePreviousChange,
+  hasPreviousPlan,
   taskOutcomes,
   annualPlanDate,
   strategyLabel,
@@ -371,10 +374,19 @@ export function AiChatPane({
                   className="mt-0.5 h-4 w-4 accent-[var(--indigo)] shrink-0"
                 />
                 <span className="text-[12.5px] text-ink2 leading-relaxed">
-                  <span className="font-semibold text-ink">No new document?</span> Base this plan on
-                  the previous implemented plan
-                  {previousLabel ? ` (${previousLabel.toLowerCase()})` : ""}. The AI carries it
-                  forward and you'll get a side-by-side comparison.
+                  <span className="font-semibold text-ink">No new document?</span>{" "}
+                  {hasPreviousPlan ? (
+                    <>
+                      Proceed without one — base this plan on the previous implemented plan
+                      {previousLabel ? ` (${previousLabel.toLowerCase()})` : ""}. The AI carries it
+                      forward and you'll get a side-by-side comparison.
+                    </>
+                  ) : (
+                    <>
+                      Proceed without one — the AI will draft from {individualName}'s chart and
+                      assessment data. Review carefully before implementing.
+                    </>
+                  )}
                 </span>
               </label>
             )}

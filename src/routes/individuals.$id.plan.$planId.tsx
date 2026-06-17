@@ -118,12 +118,14 @@ function PlanRuntime() {
   // Structured iCM tree for the clean plan view + comparison.
   const [structuredTree, setStructuredTree] = useState(plan.structured_tree ?? null);
 
-  // Most recent *implemented* plan for this individual + agent (not this one)
-  // that has a structured tree — the "currently implemented" side of the
-  // old-vs-new comparison, and the basis when no new document is uploaded.
+  // Most recent *implemented* plan for this individual + agent (not this one).
+  // Used as the "currently implemented" side of the comparison AND as the
+  // basis when there's no new document. We do NOT require a structured tree
+  // here — a plan implemented before trees existed (or before the DB column
+  // was added) still has its readable markdown to carry forward.
   const previousImplemented = useMemo(() => {
     return listPlansForIndividualAndAgent(id, plan.agent_id)
-      .filter((p) => p.id !== planId && p.status === "implemented" && p.structured_tree)
+      .filter((p) => p.id !== planId && p.status === "implemented")
       .sort((a, b) =>
         (b.implementation_date ?? b.created_at).localeCompare(a.implementation_date ?? a.created_at),
       )[0];
@@ -138,35 +140,48 @@ function PlanRuntime() {
   const sourceText = plan.source_document_text?.trim() ?? "";
   const uploadedMissing = agent.content_origin === "source_plan" && !sourceText;
 
-  // When there's no new document from the state, the team can base this plan
-  // on the previously-implemented plan instead of uploading anything.
-  const hasPreviousTree = !!previousImplemented?.structured_tree;
-  const [usePreviousAsBasis, setUsePreviousAsBasis] = useState(false);
+  // When there's no new document from the state, the team can proceed without
+  // an upload by opting in. If a previous implemented plan exists we carry it
+  // forward; otherwise we generate from chart/assessment data.
+  const hasPrevious = !!previousImplemented;
+  const [proceedWithoutUpload, setProceedWithoutUpload] = useState(false);
 
-  // The source is only truly "missing" (blocking) when there's neither an
-  // uploaded document NOR an opted-in previous plan to build from.
-  const sourceMissing = uploadedMissing && !(usePreviousAsBasis && hasPreviousTree);
+  // Readable text of the previous plan: its structured tree if present,
+  // otherwise the saved markdown (covers plans implemented before trees, or
+  // before the DB column existed).
+  const previousPlanText = useMemo(() => {
+    if (!previousImplemented) return "";
+    if (previousImplemented.structured_tree) {
+      return treeToPlainText(previousImplemented.structured_tree);
+    }
+    const md = (previousImplemented.plan_content as { markdown?: string })?.markdown;
+    return md?.trim() ?? "";
+  }, [previousImplemented]);
+
+  // Source is only "missing" (blocking) when there's no upload AND the user
+  // hasn't opted to proceed without one.
+  const sourceMissing = uploadedMissing && !proceedWithoutUpload;
   const prePlanningDone = prePlanningCompulsoryComplete(agent.workflow_data, isComplete);
   const draftBlockedReason =
     sourceMissing && !prePlanningDone
-      ? "Attach the source plan (or use the previous plan) and complete pre-planning to draft."
+      ? "Attach the source plan (or choose to proceed without one) and complete pre-planning to draft."
       : sourceMissing
-        ? "Attach the individual's source plan to generate. No plan will be drafted without it."
+        ? "Attach the individual's source plan, or choose to proceed without a new document."
         : !prePlanningDone
           ? "Complete the compulsory pre-planning tasks to draft."
           : null;
 
-  // What the generator builds from: an uploaded document, or — when opted in —
-  // the previous implemented plan serialized to text.
+  // What the generator builds from: an uploaded document, the previous plan's
+  // text (when opted in and available), or nothing (chart-only generation).
   const sourceForGeneration: { name: string; text: string; kind: "case_management" | "previous_plan" } | null =
     sourceText
       ? { name: plan.source_document_name ?? "Source document", text: sourceText, kind: "case_management" }
-      : usePreviousAsBasis && previousImplemented?.structured_tree
+      : proceedWithoutUpload && previousPlanText
         ? {
-            name: `Previous plan — ${previousImplemented.plan_type_label} (${new Date(
-              previousImplemented.implementation_date ?? previousImplemented.created_at,
+            name: `Previous plan — ${previousImplemented!.plan_type_label} (${new Date(
+              previousImplemented!.implementation_date ?? previousImplemented!.created_at,
             ).toLocaleDateString()})`,
-            text: treeToPlainText(previousImplemented.structured_tree),
+            text: previousPlanText,
             kind: "previous_plan",
           }
         : null;
@@ -413,9 +428,10 @@ function PlanRuntime() {
                 needsSourceAttach={sourceMissing}
                 sourceDocLabel={agent.source_document_label}
                 onAttachSource={handleAttachSource}
-                canUsePrevious={uploadedMissing && hasPreviousTree}
-                usePrevious={usePreviousAsBasis}
-                onUsePreviousChange={setUsePreviousAsBasis}
+                canUsePrevious={uploadedMissing}
+                usePrevious={proceedWithoutUpload}
+                onUsePreviousChange={setProceedWithoutUpload}
+                hasPreviousPlan={hasPrevious}
                 taskOutcomes={taskOutcomes}
                 annualPlanDate={plan.annual_plan_date}
                 strategyLabel={planTypeInfo(agent.plan_type).strategy_label}
