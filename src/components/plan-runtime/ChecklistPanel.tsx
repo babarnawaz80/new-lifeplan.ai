@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, CheckCircle2, Circle, Users, AlertCircle, ChevronRight, Plus, X } from "lucide-react";
+import { Calendar, CheckCircle2, Circle, Users, AlertCircle, ChevronRight, Plus, X, Sparkles, Loader2 } from "lucide-react";
 import type { WorkflowPhase, WorkflowTask } from "@/data/lifeplan-types";
 import type { CapturedGoal, TaskStructuredOutcome } from "@/data/mock";
 import { formatDue, allCompulsoryComplete, countTasks } from "@/lib/plan-runtime";
@@ -21,6 +21,9 @@ export interface ChecklistPanelProps {
   // where capture isn't wired.
   getOutcome?: (taskId: string) => TaskOutcomeValue;
   onSaveOutcome?: (taskId: string, value: TaskOutcomeValue) => void;
+  // AI assist: drafts the note (or goals + summary for pivotal tasks) from the
+  // individual's background and basis plan. Resolves to the suggested value.
+  onAiDraft?: (task: WorkflowTask) => Promise<TaskOutcomeValue>;
 }
 
 export function ChecklistPanel({
@@ -31,6 +34,7 @@ export function ChecklistPanel({
   onToggle,
   getOutcome,
   onSaveOutcome,
+  onAiDraft,
 }: ChecklistPanelProps) {
   const counter = useMemo(() => countTasks(phases), [phases]);
   const { total, complete } = counter(isComplete);
@@ -100,6 +104,7 @@ export function ChecklistPanel({
                 onToggle={onToggle}
                 outcome={getOutcome?.(task.id)}
                 onSaveOutcome={onSaveOutcome}
+                onAiDraft={onAiDraft}
               />
             ))}
           </div>
@@ -117,6 +122,7 @@ function TaskRow({
   onToggle,
   outcome,
   onSaveOutcome,
+  onAiDraft,
 }: {
   task: WorkflowTask;
   annualDate: string;
@@ -125,6 +131,7 @@ function TaskRow({
   onToggle: (id: string, role: string | null, complete: boolean) => void;
   outcome?: TaskOutcomeValue;
   onSaveOutcome?: (taskId: string, value: TaskOutcomeValue) => void;
+  onAiDraft?: (task: WorkflowTask) => Promise<TaskOutcomeValue>;
 }) {
   const [open, setOpen] = useState(false);
   const [outcomeOpen, setOutcomeOpen] = useState(false);
@@ -262,6 +269,7 @@ function TaskRow({
                 onSaveOutcome(task.id, v);
                 setOutcomeOpen(false);
               }}
+              onAiDraft={onAiDraft}
             />
           )}
         </div>
@@ -289,19 +297,47 @@ function OutcomeEditor({
   task,
   value,
   onSave,
+  onAiDraft,
 }: {
   task: WorkflowTask;
   value?: TaskOutcomeValue;
   onSave: (v: TaskOutcomeValue) => void;
+  onAiDraft?: (task: WorkflowTask) => Promise<TaskOutcomeValue>;
 }) {
   const [note, setNote] = useState(value?.note ?? "");
   const [summary, setSummary] = useState(value?.structured?.meeting_summary ?? "");
   const [goals, setGoals] = useState<CapturedGoal[]>(
     value?.structured?.goals_captured?.length ? value.structured.goals_captured : [],
   );
+  const [drafting, setDrafting] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const setGoal = (i: number, patch: Partial<CapturedGoal>) =>
     setGoals((gs) => gs.map((g, j) => (j === i ? { ...g, ...patch } : g)));
+
+  // AI fills the fields; the user reviews and edits before saving. Suggested
+  // goals are appended so nothing already typed is lost.
+  const runAiDraft = async () => {
+    if (!onAiDraft) return;
+    setDrafting(true);
+    setAiError(null);
+    try {
+      const s = await onAiDraft(task);
+      if (task.captures_goals) {
+        if (s.structured?.meeting_summary && !summary.trim()) {
+          setSummary(s.structured.meeting_summary);
+        }
+        if (s.structured?.goals_captured?.length) {
+          setGoals((gs) => [...gs.filter((g) => g.goal_statement.trim() || g.outcome_statement.trim()), ...s.structured!.goals_captured!]);
+        }
+      }
+      if (s.note && !note.trim()) setNote(s.note);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "AI draft failed.");
+    } finally {
+      setDrafting(false);
+    }
+  };
 
   const save = () => {
     const cleanedGoals = goals.filter(
@@ -317,6 +353,27 @@ function OutcomeEditor({
 
   return (
     <div className="mt-1.5 bg-muted/50 rounded-lg px-3 py-2.5 space-y-2.5">
+      {onAiDraft && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-ink3">
+            {task.captures_goals
+              ? "Let AI draft the goals and summary from the chart and prior plan."
+              : "Let AI draft this note from the chart and prior plan."}
+          </span>
+          <button
+            type="button"
+            onClick={runAiDraft}
+            disabled={drafting}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-white text-[11.5px] font-bold hover:opacity-95 disabled:opacity-60 shrink-0"
+            style={{ background: "var(--ai-gradient)" }}
+          >
+            {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {drafting ? "Drafting…" : "Draft with AI"}
+          </button>
+        </div>
+      )}
+      {aiError && <p className="text-[11.5px] text-red">{aiError}</p>}
+
       {task.captures_goals && (
         <>
           <div>

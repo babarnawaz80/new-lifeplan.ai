@@ -33,6 +33,8 @@ import { ActionRow } from "@/components/plan-runtime/ActionRow";
 import { PlanPreview } from "@/components/plan-runtime/PlanPreview";
 import { enrichImplementationTasks } from "@/lib/enrich-tasks.functions";
 import { generateTraining } from "@/lib/generate-training.functions";
+import { suggestTaskOutcome } from "@/lib/suggest-outcome.functions";
+import type { WorkflowTask } from "@/data/lifeplan-types";
 import { allCompulsoryComplete, prePlanningCompulsoryComplete } from "@/lib/plan-runtime";
 import { parseIcmPlanTree, treeFromLegacyCaretracker, treeToPlainText } from "@/types/icmGoalOutcome";
 import { planTypeInfo } from "@/data/mock";
@@ -74,6 +76,7 @@ function PlanRuntime() {
 
   const enrichTasksFn = useServerFn(enrichImplementationTasks);
   const generateTrainingFn = useServerFn(generateTraining);
+  const suggestOutcomeFn = useServerFn(suggestTaskOutcome);
 
   // ---- Task assignment state (track in component so toggles re-render) ----
   const [tick, setTick] = useState(0);
@@ -231,6 +234,32 @@ function PlanRuntime() {
   // Captured task outcomes feed generation (Section 5.1); recompute when a
   // task is toggled or an outcome saved.
   const taskOutcomes = useMemo(() => getTaskOutcomes(planId), [planId, tick]);
+
+  // AI assist for outcome capture: draft the note (or goals + summary for
+  // pivotal tasks) from the individual's chart and the basis plan (uploaded
+  // source or previous implemented plan). User reviews before saving.
+  const handleAiDraftOutcome = async (task: WorkflowTask) => {
+    const basisText = sourceForGeneration?.text || previousPlanText || "";
+    const basisKind = sourceForGeneration?.kind ?? (previousPlanText ? "previous_plan" : "none");
+    const res = await suggestOutcomeFn({
+      data: {
+        individualName: individual.name,
+        serviceType: individual.service_type,
+        planTypeLabel: planTypeInfo(agent.plan_type).label,
+        taskTitle: task.title,
+        capturesGoals: !!task.captures_goals,
+        profile: profileData,
+        basisText,
+        basisKind,
+      },
+    });
+    return {
+      note: res.note,
+      structured: task.captures_goals
+        ? { meeting_summary: res.meeting_summary, goals_captured: res.goals_captured }
+        : null,
+    };
+  };
 
   const guidelines = getGuidelinesForAgent(agent);
   const guidelinesBrief = guidelines.length
@@ -404,6 +433,7 @@ function PlanRuntime() {
               onToggle={onToggle}
               getOutcome={getOutcome}
               onSaveOutcome={onSaveOutcome}
+              onAiDraft={handleAiDraftOutcome}
             />
           </aside>
 
