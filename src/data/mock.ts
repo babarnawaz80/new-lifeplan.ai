@@ -15,6 +15,7 @@ import {
   defaultSchemaFromOutputFields,
   applyLocks,
 } from "./lifeplan-types";
+import eshaAvatar from "@/assets/esha-avatar.jpg";
 
 
 export type Individual = {
@@ -27,6 +28,9 @@ export type Individual = {
   program: string;
   status: "active" | "inactive";
   location: string;
+  // Single source of truth for the individual's photo — used by the list,
+  // the e-Chart header, and the pinwheel so they never diverge.
+  avatar?: string;
 };
 
 // Where a plan instance's content comes from. Drives whether "Start a plan"
@@ -229,6 +233,7 @@ export const individuals: Individual[] = [
     program: "Heart Program 2",
     status: "active",
     location: "Cecil Street, Heart Program 2",
+    avatar: eshaAvatar,
   },
   {
     id: "marcus",

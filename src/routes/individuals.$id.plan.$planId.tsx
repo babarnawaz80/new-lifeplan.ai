@@ -8,6 +8,7 @@ import {
   getPlan,
   getIndividual,
   getAgent,
+  getCurrentSession,
   listPlansForIndividualAndAgent,
   getGuidelinesForAgent,
   getProfileData,
@@ -260,6 +261,9 @@ function PlanRuntime() {
   };
 
   const handleImplement = (date: Date) => {
+    // Record who implemented + when, so the plan log reads as a real audit
+    // trail. Stored in plan_content (jsonb) to avoid a new column.
+    const implementedBy = getCurrentSession().userName;
     updatePlan(planId, {
       status: "implemented",
       implementation_date: date.toISOString(),
@@ -268,6 +272,7 @@ function PlanRuntime() {
         caretracker: caretrackerData,
         taskInstructions,
         implementation_date: date.toISOString(),
+        implemented_by: implementedBy,
       },
     });
     // Section 6: the structured tree is the authoritative payload — write it

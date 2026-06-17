@@ -191,9 +191,10 @@ function IndividualEChart() {
     });
   };
 
-  // Collapse state: LifePlan open by default, others open too (per screenshots)
+  // Collapse state: LifePlan.ai collapsed by default (per request); the other
+  // sections stay open.
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(categories.map((c) => [c.key, true])),
+    Object.fromEntries(categories.map((c) => [c.key, c.key !== "lifeplan"])),
   );
   const toggle = (k: string) => setOpenMap((m) => ({ ...m, [k]: !m[k] }));
 
@@ -219,9 +220,17 @@ function IndividualEChart() {
           <div className="rounded-2xl bg-card border border-line shadow-soft p-6">
             <div className="flex flex-col lg:flex-row lg:items-start gap-6">
               <div className="flex items-start gap-4 flex-1">
-                <div className="h-16 w-16 shrink-0 rounded-full bg-navy text-white text-lg font-bold flex items-center justify-center">
-                  {initialsOf(individual.name)}
-                </div>
+                {individual.avatar ? (
+                  <img
+                    src={individual.avatar}
+                    alt={individual.name}
+                    className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-line"
+                  />
+                ) : (
+                  <div className="h-16 w-16 shrink-0 rounded-full bg-navy text-white text-lg font-bold flex items-center justify-center">
+                    {initialsOf(individual.name)}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
                     <h1 className="text-xl font-extrabold text-ink">

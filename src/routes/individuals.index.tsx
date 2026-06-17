@@ -31,6 +31,7 @@ import {
   Shield,
   User,
 } from "lucide-react";
+import eshaAvatar from "@/assets/esha-avatar.jpg";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,7 +119,7 @@ type MockIndividual = {
 };
 
 const mockIndividuals: MockIndividual[] = [
-  { id: "esha", name: "16, Esha", gender: "M", age: 0, dob: "12/16/2025", admittedOn: "12/16/2025", location: "Cecil Street", status: "Active", updatedOn: "12/18/2023", updatedBy: "Esha Shehzad", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face", tags: [] },
+  { id: "esha", name: "Esha", gender: "F", age: 16, dob: "04/12/2009", admittedOn: "12/16/2025", location: "Cecil Street", status: "Active", updatedOn: "12/18/2023", updatedBy: "Esha Shehzad", avatar: eshaAvatar, tags: [] },
   { id: "esha2", name: "6-Nov, Esha", gender: "TS", age: 0, dob: "11/02/2025", admittedOn: "10/28/2025", pcpDate: "11/12", location: "Annie's Site", status: "Jail", updatedOn: "12/16/2025", updatedBy: "Esha Shehzad", tags: [] },
   { id: "aaaa", name: "Aaaa, Bbbb", gender: "M", age: 26, dob: "01/01/2000", admittedOn: "02/06/2025", pcpDate: "01/29", location: "Cecil Street", status: "Active", updatedOn: "09/05/2025", updatedBy: "Esha Shehzad", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face", tags: ["No Consent To Photograph"] },
   { id: "lilla", name: "Abshire, Lilla", gender: "M", age: 0, dob: "01/05/2026", admittedOn: "01/07/2026", location: "Easy Street", status: "Active", updatedOn: "01/05/2026", updatedBy: "Abdul Saboor", tags: [] },

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { planTypeInfo, type Agent, type Individual } from "@/data/mock";
-import eshaAvatar from "@/assets/esha-avatar.jpg";
 
 // ---------------------------------------------------------------------------
 // Pinwheel — radial "care plan wheel" (exact port of the Claw Design handoff).
@@ -300,17 +299,40 @@ export function Pinwheel({ individual, agents, onSelectAgent, onAddPlan }: Pinwh
               zIndex: 5,
             }}
           >
-            <img
-              src={eshaAvatar}
-              alt={individual.name}
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
+            {individual.avatar ? (
+              <img
+                src={individual.avatar}
+                alt={individual.name}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "#1F2A5E",
+                  color: "#fff",
+                  fontSize: 56,
+                  fontWeight: 800,
+                }}
+              >
+                {individual.name
+                  .split(" ")
+                  .map((p) => p[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </div>
+            )}
             <div
               style={{
                 position: "absolute",
