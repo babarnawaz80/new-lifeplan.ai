@@ -28,6 +28,8 @@ export interface AiChatPaneProps {
   // Individual's source document from case management (source_plan agents).
   // Extracted text only — the AI builds the plan from these outcomes/strategies.
   sourceDocument?: { name: string; text: string } | null;
+  // Whether the source is the case-management document or the prior plan.
+  sourceKind?: "case_management" | "previous_plan";
   enabledProfileFieldNames: string[];
   initialMarkdown?: string;
   canImplement: boolean;
@@ -40,6 +42,10 @@ export interface AiChatPaneProps {
   // Label for the missing document (from agent config), e.g. "Person-Centered Plan".
   sourceDocLabel?: string;
   onAttachSource?: (name: string, text: string) => void;
+  // "No new document — use the previous implemented plan" affordance.
+  canUsePrevious?: boolean;
+  usePrevious?: boolean;
+  onUsePreviousChange?: (v: boolean) => void;
   // Section 5 inputs: captured task outcomes (authoritative goals), the
   // annual plan date all dates derive from, and the Strategy/Activity label.
   taskOutcomes?: {
@@ -151,6 +157,7 @@ export function AiChatPane({
   guidelinesBrief,
   outputFields,
   sourceDocument,
+  sourceKind,
   enabledProfileFieldNames,
   initialMarkdown,
   canImplement,
@@ -158,6 +165,9 @@ export function AiChatPane({
   needsSourceAttach,
   sourceDocLabel,
   onAttachSource,
+  canUsePrevious,
+  usePrevious,
+  onUsePreviousChange,
   taskOutcomes,
   annualPlanDate,
   strategyLabel,
@@ -182,6 +192,7 @@ export function AiChatPane({
           guidelinesBrief,
           outputFields,
           sourceDocument: sourceDocument ?? null,
+          sourceKind: sourceKind ?? "case_management",
           taskOutcomes: taskOutcomes ?? null,
           annualPlanDate,
           strategyLabel,
@@ -197,6 +208,7 @@ export function AiChatPane({
       guidelinesBrief,
       outputFields,
       sourceDocument,
+      sourceKind,
       taskOutcomes,
       annualPlanDate,
       strategyLabel,
@@ -349,6 +361,22 @@ export function AiChatPane({
                 <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                 <span>{draftBlockedReason}</span>
               </div>
+            )}
+            {canUsePrevious && onUsePreviousChange && (
+              <label className="mt-3 flex items-start gap-2.5 rounded-xl border border-line bg-muted/30 px-3.5 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!usePrevious}
+                  onChange={(e) => onUsePreviousChange(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-[var(--indigo)] shrink-0"
+                />
+                <span className="text-[12.5px] text-ink2 leading-relaxed">
+                  <span className="font-semibold text-ink">No new document?</span> Base this plan on
+                  the previous implemented plan
+                  {previousLabel ? ` (${previousLabel.toLowerCase()})` : ""}. The AI carries it
+                  forward and you'll get a side-by-side comparison.
+                </span>
+              </label>
             )}
             {needsSourceAttach && onAttachSource && (
               <AttachSourceInline docLabel={sourceDocLabel} onAttach={onAttachSource} />

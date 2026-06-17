@@ -200,6 +200,36 @@ export function parseIcmPlanTree(raw: unknown, planTypeFallback = ""): IcmPlanTr
 }
 
 /**
+ * Serialize a plan tree to a readable plain-text outline. Used to feed a
+ * previously-implemented plan into generation as the basis when no new source
+ * document is available (e.g. nursing care plans with no new state document).
+ */
+export function treeToPlainText(tree: IcmPlanTree): string {
+  const lines: string[] = [];
+  const outcomes = [...tree.outcomes].sort((a, b) => a.sort_order - b.sort_order);
+  outcomes.forEach((o, oi) => {
+    lines.push(`OUTCOME ${oi + 1}: ${o.outcome_statement}`);
+    o.goals.forEach((g, gi) => {
+      lines.push(`  GOAL ${oi + 1}.${gi + 1}: ${g.goal_statement}`);
+      if (g.description) lines.push(`    Description: ${g.description}`);
+      if (g.target_completion_date) lines.push(`    Target completion: ${g.target_completion_date}`);
+      if (g.person_responsible) lines.push(`    Person responsible: ${g.person_responsible}`);
+      if (g.frequency_worked_on) lines.push(`    Frequency: ${g.frequency_worked_on}`);
+      if (g.review_frequency) lines.push(`    Review: ${g.review_frequency}`);
+      if (g.status) lines.push(`    Status: ${g.status}`);
+      g.strategies.forEach((s) => {
+        lines.push(`    STRATEGY: ${s.title}`);
+        if (s.description) lines.push(`      ${s.description}`);
+        const svc = s.service_delivery.services_and_expected_outcomes;
+        if (svc.length) lines.push(`      Services/outcomes: ${svc.join("; ")}`);
+        if (s.service_delivery.protocol) lines.push(`      Protocol: ${s.service_delivery.protocol}`);
+      });
+    });
+  });
+  return lines.join("\n");
+}
+
+/**
  * Back-compat: convert a legacy CARETRACKER_DATA payload
  * ({goals:[{title,target_date,services,responsible}], plan_summary}) into a
  * minimal IcmPlanTree so older model output still produces a tree.

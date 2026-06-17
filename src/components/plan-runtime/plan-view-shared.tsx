@@ -1,6 +1,7 @@
 // Shared building blocks for rendering an IcmPlanTree (structured view +
 // side-by-side comparison). Purely presentational; no data fetching.
 import type { ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import type { IcmGoal, IcmStrategy } from "@/types/icmGoalOutcome";
 
 export type PlanMeta = {
@@ -162,51 +163,97 @@ export function StrategyCard({ strat, strategyLabel }: { strat: IcmStrategy; str
   );
 }
 
-// One Goal card with its metadata grid + nested strategies.
+// One Goal card with its metadata grid + nested strategies. Collapsible so a
+// large plan can be skimmed by goal headers and expanded one at a time.
 export function GoalCard({
   goal,
   strategyLabel,
   index,
+  open,
+  onToggle,
 }: {
   goal: IcmGoal;
   strategyLabel: string;
   index?: string | number;
+  // When open/onToggle are provided the card is collapsible (header summary
+  // always visible). Omit them to render the card fully expanded (static).
+  open?: boolean;
+  onToggle?: () => void;
 }) {
+  const collapsible = onToggle != null;
+  const expanded = collapsible ? !!open : true;
+
   return (
-    <div className="rounded-2xl border border-line bg-card p-5 shadow-soft space-y-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="rounded-2xl border border-line bg-card shadow-soft overflow-hidden">
+      {/* Header — always visible; clickable when collapsible */}
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={!collapsible}
+        className={`w-full flex items-start justify-between gap-3 p-5 text-left ${
+          collapsible ? "hover:bg-muted/30 transition-colors" : "cursor-default"
+        }`}
+      >
         <div className="min-w-0">
           <div className="text-[10px] font-bold uppercase tracking-wider text-ink3">
             Goal{index != null ? ` ${index}` : ""}
           </div>
           <h4 className="text-[15.5px] font-bold text-ink mt-1 leading-snug">{goal.goal_statement}</h4>
+          {/* Collapsed summary line */}
+          {collapsible && !expanded && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[12px] text-ink3">
+              {goal.target_completion_date && (
+                <span>Target {fmtDate(goal.target_completion_date)}</span>
+              )}
+              {goal.person_responsible && <span>· {goal.person_responsible}</span>}
+              {goal.strategies.length > 0 && (
+                <span>
+                  · {goal.strategies.length}{" "}
+                  {goal.strategies.length === 1 ? strategyLabel : `${strategyLabel}s`}
+                </span>
+              )}
+            </div>
+          )}
         </div>
-        <StatusBadge status={goal.status} />
-      </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <StatusBadge status={goal.status} />
+          {collapsible && (
+            <ChevronDown
+              className={`h-4 w-4 text-ink3 transition-transform ${expanded ? "rotate-180" : ""}`}
+            />
+          )}
+        </div>
+      </button>
 
-      {goal.description && (
-        <p className="text-[13.5px] text-ink2 leading-relaxed">{goal.description}</p>
-      )}
+      {/* Body */}
+      {expanded && (
+        <div className="px-5 pb-5 space-y-4">
+          {goal.description && (
+            <p className="text-[13.5px] text-ink2 leading-relaxed">{goal.description}</p>
+          )}
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3 rounded-xl bg-muted/40 p-3.5">
-        <MetaPair label="Target implementation" value={fmtDate(goal.target_implementation_date)} />
-        <MetaPair label="Target completion" value={fmtDate(goal.target_completion_date)} />
-        <MetaPair label="Person responsible" value={goal.person_responsible} />
-        <MetaPair label="Who will help" value={goal.who_will_help} />
-        <MetaPair label="Frequency worked on" value={goal.frequency_worked_on} />
-        <MetaPair label="Who reviews progress" value={goal.who_reviews_progress} />
-        <MetaPair label="Review frequency" value={goal.review_frequency} />
-        <MetaPair label="Family / responsible person" value={goal.family_or_responsible_person} />
-      </div>
-
-      {goal.strategies.length > 0 && (
-        <div className="space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-ink3">
-            {goal.strategies.length} {goal.strategies.length === 1 ? strategyLabel : `${strategyLabel}s`}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3 rounded-xl bg-muted/40 p-3.5">
+            <MetaPair label="Target implementation" value={fmtDate(goal.target_implementation_date)} />
+            <MetaPair label="Target completion" value={fmtDate(goal.target_completion_date)} />
+            <MetaPair label="Person responsible" value={goal.person_responsible} />
+            <MetaPair label="Who will help" value={goal.who_will_help} />
+            <MetaPair label="Frequency worked on" value={goal.frequency_worked_on} />
+            <MetaPair label="Who reviews progress" value={goal.who_reviews_progress} />
+            <MetaPair label="Review frequency" value={goal.review_frequency} />
+            <MetaPair label="Family / responsible person" value={goal.family_or_responsible_person} />
           </div>
-          {goal.strategies.map((s) => (
-            <StrategyCard key={s.id} strat={s} strategyLabel={strategyLabel} />
-          ))}
+
+          {goal.strategies.length > 0 && (
+            <div className="space-y-3">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-ink3">
+                {goal.strategies.length}{" "}
+                {goal.strategies.length === 1 ? strategyLabel : `${strategyLabel}s`}
+              </div>
+              {goal.strategies.map((s) => (
+                <StrategyCard key={s.id} strat={s} strategyLabel={strategyLabel} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

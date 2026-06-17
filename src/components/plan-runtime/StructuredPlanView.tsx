@@ -1,7 +1,9 @@
 // Clean, readable rendering of a generated plan from its structured tree
 // (Outcome → Goal → Strategy/Activity). Replaces the jumbled markdown view
-// once a structured_tree exists for the plan.
-import { Sparkles, Pencil } from "lucide-react";
+// once a structured_tree exists for the plan. Goals are collapsible so large
+// plans can be skimmed by header and expanded one section at a time.
+import { useMemo, useState } from "react";
+import { Sparkles, Pencil, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import type { IcmPlanTree } from "@/types/icmGoalOutcome";
 import { GoalCard, PlanMetaHeader, type PlanMeta } from "./plan-view-shared";
 
@@ -15,10 +17,27 @@ export function StructuredPlanView({
   // Falls back to the raw markdown editor (the AI's prose) for manual tweaks.
   onEditText?: () => void;
 }) {
-  const outcomes = [...tree.outcomes].sort((a, b) => a.sort_order - b.sort_order);
+  const outcomes = useMemo(
+    () => [...tree.outcomes].sort((a, b) => a.sort_order - b.sort_order),
+    [tree],
+  );
+  const allGoalIds = useMemo(
+    () => outcomes.flatMap((o) => o.goals.map((g) => g.id)),
+    [outcomes],
+  );
+
+  // Collapsed by default — the reader sees every outcome + goal title at a
+  // glance and opens only what they need (plans can be very large).
+  const [openGoals, setOpenGoals] = useState<Record<string, boolean>>({});
+  const toggleGoal = (gid: string) => setOpenGoals((m) => ({ ...m, [gid]: !m[gid] }));
+  const expandAll = () =>
+    setOpenGoals(Object.fromEntries(allGoalIds.map((gid) => [gid, true])));
+  const collapseAll = () => setOpenGoals({});
+  const anyOpen = allGoalIds.some((gid) => openGoals[gid]);
+
   return (
     <div className="rounded-2xl bg-card border border-line p-6 shadow-soft">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-3">
         <div className="flex items-center gap-2">
           <div
             className="h-6 w-6 rounded-md flex items-center justify-center"
@@ -28,15 +47,32 @@ export function StructuredPlanView({
           </div>
           <span className="text-[12px] font-bold uppercase tracking-wider text-ink3">Plan draft</span>
         </div>
-        {onEditText && (
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={onEditText}
+            onClick={anyOpen ? collapseAll : expandAll}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-ink2 hover:bg-muted"
           >
-            <Pencil className="h-3.5 w-3.5" /> Edit as text
+            {anyOpen ? (
+              <>
+                <ChevronsDownUp className="h-3.5 w-3.5" /> Collapse all
+              </>
+            ) : (
+              <>
+                <ChevronsUpDown className="h-3.5 w-3.5" /> Expand all
+              </>
+            )}
           </button>
-        )}
+          {onEditText && (
+            <button
+              type="button"
+              onClick={onEditText}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-ink2 hover:bg-muted"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit as text
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -52,13 +88,15 @@ export function StructuredPlanView({
                 {outcome.outcome_statement}
               </h3>
             </div>
-            <div className="space-y-4 pl-0 md:pl-3 md:border-l-2 md:border-line">
+            <div className="space-y-3 pl-0 md:pl-3 md:border-l-2 md:border-line">
               {outcome.goals.map((goal, gi) => (
                 <GoalCard
                   key={goal.id}
                   goal={goal}
                   strategyLabel={meta.strategyLabel}
                   index={`${oi + 1}.${gi + 1}`}
+                  open={!!openGoals[goal.id]}
+                  onToggle={() => toggleGoal(goal.id)}
                 />
               ))}
             </div>

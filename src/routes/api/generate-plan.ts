@@ -39,6 +39,9 @@ type Body = {
   // Individual's source document from case management (source_plan agents).
   // Extracted text only. When present, it is the PRIMARY source for the plan.
   sourceDocument?: { name: string; text: string } | null;
+  // Whether sourceDocument is a new case-management document or the prior
+  // implemented plan being carried forward (no new state document).
+  sourceKind?: "case_management" | "previous_plan";
 };
 
 function buildSystemPrompt(b: Body) {
@@ -56,19 +59,31 @@ function buildSystemPrompt(b: Body) {
 
   // When a source document from case management is provided, it is the primary
   // source: extract its outcomes/strategies and translate them into the plan.
+  const isPrevious = b.sourceKind === "previous_plan";
   const sourceBlock = b.sourceDocument?.text
-    ? [
-        `## Source plan (from case management) — PRIMARY SOURCE`,
-        `This document was uploaded as ${b.individualName}'s ${b.planType} from case management (file: ${b.sourceDocument.name}).`,
-        `Extract the goals, outcomes, and strategies from it and translate them into this implementable plan.`,
-        `Prefer the document's content over generic suggestions; preserve the individual's own goals, language, and target dates where present.`,
-        `IMPORTANT: if the document appears to be about a DIFFERENT person than ${b.individualName} (different name, age, or details), do NOT silently rewrite it. Begin the plan with a prominent "⚠️ SOURCE DOCUMENT MISMATCH" warning naming the person the document describes, and ask the user to confirm or upload the correct document before relying on its clinical content.`,
-        ``,
-        `--- BEGIN SOURCE DOCUMENT ---`,
-        b.sourceDocument.text.slice(0, 20000),
-        `--- END SOURCE DOCUMENT ---`,
-        ``,
-      ].join("\n")
+    ? isPrevious
+      ? [
+          `## Previous implemented plan — PRIMARY SOURCE (carry forward)`,
+          `There is no new document from the state. Base this new ${b.planType} on ${b.individualName}'s PREVIOUS implemented plan below (${b.sourceDocument.name}).`,
+          `Carry forward goals and strategies that are still appropriate, refresh target dates relative to the new annual plan date, and update progress/status. Keep continuity — do not invent unrelated goals. Where the team's captured outcomes differ, the captured outcomes win.`,
+          ``,
+          `--- BEGIN PREVIOUS PLAN ---`,
+          b.sourceDocument.text.slice(0, 20000),
+          `--- END PREVIOUS PLAN ---`,
+          ``,
+        ].join("\n")
+      : [
+          `## Source plan (from case management) — PRIMARY SOURCE`,
+          `This document was uploaded as ${b.individualName}'s ${b.planType} from case management (file: ${b.sourceDocument.name}).`,
+          `Extract the goals, outcomes, and strategies from it and translate them into this implementable plan.`,
+          `Prefer the document's content over generic suggestions; preserve the individual's own goals, language, and target dates where present.`,
+          `IMPORTANT: if the document appears to be about a DIFFERENT person than ${b.individualName} (different name, age, or details), do NOT silently rewrite it. Begin the plan with a prominent "⚠️ SOURCE DOCUMENT MISMATCH" warning naming the person the document describes, and ask the user to confirm or upload the correct document before relying on its clinical content.`,
+          ``,
+          `--- BEGIN SOURCE DOCUMENT ---`,
+          b.sourceDocument.text.slice(0, 20000),
+          `--- END SOURCE DOCUMENT ---`,
+          ``,
+        ].join("\n")
     : "";
 
   // Team-captured outcomes (Section 5.1): captured goals are authoritative —
@@ -105,7 +120,9 @@ function buildSystemPrompt(b: Body) {
     `Individual: ${b.individualName}. Service type: ${b.serviceType}. Plan agent: ${b.agentName}. Today's date: ${today}.${annual ? ` Annual plan date: ${annual}.` : ""}`,
     `Use ${today} as the plan date. Derive every target/implementation/review date from the annual plan date${annual ? ` (${annual})` : ""} and the captured goals — real dates only, never placeholders, never invented past dates.`,
     b.sourceDocument?.text
-      ? `Base this plan on the SOURCE PLAN below (the individual's document from case management), translated into implementable goals. Honor the compliance brief.`
+      ? isPrevious
+        ? `Base this plan on the PREVIOUS IMPLEMENTED PLAN below, carried forward and refreshed for the new cycle. Honor the compliance brief.`
+        : `Base this plan on the SOURCE PLAN below (the individual's document from case management), translated into implementable goals. Honor the compliance brief.`
       : `Use the individual's profile data below. Honor the compliance brief. Write in warm, professional clinical language. Avoid deficit-only framing.`,
     ``,
     sourceBlock,

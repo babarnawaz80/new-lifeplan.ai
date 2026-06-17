@@ -34,7 +34,7 @@ import { PlanPreview } from "@/components/plan-runtime/PlanPreview";
 import { enrichImplementationTasks } from "@/lib/enrich-tasks.functions";
 import { generateTraining } from "@/lib/generate-training.functions";
 import { allCompulsoryComplete, prePlanningCompulsoryComplete } from "@/lib/plan-runtime";
-import { parseIcmPlanTree, treeFromLegacyCaretracker } from "@/types/icmGoalOutcome";
+import { parseIcmPlanTree, treeFromLegacyCaretracker, treeToPlainText } from "@/types/icmGoalOutcome";
 import { planTypeInfo } from "@/data/mock";
 
 export const Route = createFileRoute("/individuals/$id/plan/$planId")({
@@ -115,6 +115,20 @@ function PlanRuntime() {
 
   const canImplement = allCompulsoryComplete(agent.workflow_data, isComplete);
 
+  // Structured iCM tree for the clean plan view + comparison.
+  const [structuredTree, setStructuredTree] = useState(plan.structured_tree ?? null);
+
+  // Most recent *implemented* plan for this individual + agent (not this one)
+  // that has a structured tree — the "currently implemented" side of the
+  // old-vs-new comparison, and the basis when no new document is uploaded.
+  const previousImplemented = useMemo(() => {
+    return listPlansForIndividualAndAgent(id, plan.agent_id)
+      .filter((p) => p.id !== planId && p.status === "implemented" && p.structured_tree)
+      .sort((a, b) =>
+        (b.implementation_date ?? b.created_at).localeCompare(a.implementation_date ?? a.created_at),
+      )[0];
+  }, [id, plan.agent_id, planId, structuredTree]);
+
   // ---- Draft gate (Sections 2 & 3) ----
   // Drafting requires (1) a real, parsed source document for source_plan
   // agents, and (2) all compulsory pre-planning tasks complete. Both are
@@ -122,16 +136,40 @@ function PlanRuntime() {
   const [sourceTick, setSourceTick] = useState(0);
   void sourceTick;
   const sourceText = plan.source_document_text?.trim() ?? "";
-  const sourceMissing = agent.content_origin === "source_plan" && !sourceText;
+  const uploadedMissing = agent.content_origin === "source_plan" && !sourceText;
+
+  // When there's no new document from the state, the team can base this plan
+  // on the previously-implemented plan instead of uploading anything.
+  const hasPreviousTree = !!previousImplemented?.structured_tree;
+  const [usePreviousAsBasis, setUsePreviousAsBasis] = useState(false);
+
+  // The source is only truly "missing" (blocking) when there's neither an
+  // uploaded document NOR an opted-in previous plan to build from.
+  const sourceMissing = uploadedMissing && !(usePreviousAsBasis && hasPreviousTree);
   const prePlanningDone = prePlanningCompulsoryComplete(agent.workflow_data, isComplete);
   const draftBlockedReason =
     sourceMissing && !prePlanningDone
-      ? "Attach the source plan and complete pre-planning to draft."
+      ? "Attach the source plan (or use the previous plan) and complete pre-planning to draft."
       : sourceMissing
         ? "Attach the individual's source plan to generate. No plan will be drafted without it."
         : !prePlanningDone
           ? "Complete the compulsory pre-planning tasks to draft."
           : null;
+
+  // What the generator builds from: an uploaded document, or — when opted in —
+  // the previous implemented plan serialized to text.
+  const sourceForGeneration: { name: string; text: string; kind: "case_management" | "previous_plan" } | null =
+    sourceText
+      ? { name: plan.source_document_name ?? "Source document", text: sourceText, kind: "case_management" }
+      : usePreviousAsBasis && previousImplemented?.structured_tree
+        ? {
+            name: `Previous plan — ${previousImplemented.plan_type_label} (${new Date(
+              previousImplemented.implementation_date ?? previousImplemented.created_at,
+            ).toLocaleDateString()})`,
+            text: treeToPlainText(previousImplemented.structured_tree),
+            kind: "previous_plan",
+          }
+        : null;
   const handleAttachSource = (name: string, text: string) => {
     updatePlan(planId, {
       source_document_name: name,
@@ -148,19 +186,6 @@ function PlanRuntime() {
   const [caretrackerData, setCaretrackerData] = useState<unknown>(
     (plan.plan_content as { caretracker?: unknown }).caretracker ?? null,
   );
-  // Structured iCM tree for the clean plan view + comparison (Section: UI).
-  const [structuredTree, setStructuredTree] = useState(plan.structured_tree ?? null);
-
-  // Most recent *implemented* plan for this individual + agent (not this one)
-  // that has a structured tree — the "currently implemented" side of the
-  // old-vs-new comparison.
-  const previousImplemented = useMemo(() => {
-    return listPlansForIndividualAndAgent(id, plan.agent_id)
-      .filter((p) => p.id !== planId && p.status === "implemented" && p.structured_tree)
-      .sort((a, b) =>
-        (b.implementation_date ?? b.created_at).localeCompare(a.implementation_date ?? a.created_at),
-      )[0];
-  }, [id, plan.agent_id, planId, structuredTree]);
   const [taskInstructions, setTaskInstructions] = useState<Record<string, string>>(
     (plan.plan_content as { taskInstructions?: Record<string, string> }).taskInstructions || {},
   );
@@ -379,11 +404,8 @@ function PlanRuntime() {
                 profileData={profileData}
                 guidelinesBrief={guidelinesBrief}
                 outputFields={outputFieldNames}
-                sourceDocument={
-                  plan.source_document_text
-                    ? { name: plan.source_document_name ?? "Source document", text: plan.source_document_text }
-                    : null
-                }
+                sourceDocument={sourceForGeneration}
+                sourceKind={sourceForGeneration?.kind}
                 enabledProfileFieldNames={enabledProfileFieldNames}
                 initialMarkdown={planMarkdown}
                 canImplement={canImplement}
@@ -391,6 +413,9 @@ function PlanRuntime() {
                 needsSourceAttach={sourceMissing}
                 sourceDocLabel={agent.source_document_label}
                 onAttachSource={handleAttachSource}
+                canUsePrevious={uploadedMissing && hasPreviousTree}
+                usePrevious={usePreviousAsBasis}
+                onUsePreviousChange={setUsePreviousAsBasis}
                 taskOutcomes={taskOutcomes}
                 annualPlanDate={plan.annual_plan_date}
                 strategyLabel={planTypeInfo(agent.plan_type).strategy_label}

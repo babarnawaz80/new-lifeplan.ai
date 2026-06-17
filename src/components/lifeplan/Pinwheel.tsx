@@ -360,7 +360,6 @@ export function Pinwheel({ individual, agents, onSelectAgent, onAddPlan }: Pinwh
               >
                 {individual.name}
               </div>
-              <StatusPill status="current" />
             </div>
           </div>
         </div>
