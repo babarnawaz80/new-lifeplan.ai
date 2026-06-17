@@ -17,7 +17,7 @@ const W = 760;
 const H = 760;
 const CX = W / 2; // 380
 const CY = H / 2 + 18; // 398
-const RI = 150;
+const RI = 120; // smaller hub → blades grow inward and read bigger
 const RO = 300;
 const GAP = 8;
 const RMID = (RI + RO) / 2; // 225
@@ -282,7 +282,7 @@ export function Pinwheel({ individual, agents, onSelectAgent, onAddPlan }: Pinwh
             );
           })()}
 
-          {/* Center hub */}
+          {/* Center hub — photo fills the circle; name + status overlay the base */}
           <div
             style={{
               position: "absolute",
@@ -292,13 +292,11 @@ export function Pinwheel({ individual, agents, onSelectAgent, onAddPlan }: Pinwh
               width: (RI - 12) * 2,
               height: (RI - 12) * 2,
               borderRadius: 999,
+              overflow: "hidden",
               background: "#fff",
+              border: "4px solid #fff",
+              boxSizing: "border-box",
               boxShadow: "0 14px 36px rgba(15,23,42,0.14)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 11,
               zIndex: 5,
             }}
           >
@@ -306,21 +304,41 @@ export function Pinwheel({ individual, agents, onSelectAgent, onAddPlan }: Pinwh
               src={eshaAvatar}
               alt={individual.name}
               style={{
-                width: 128,
-                height: 128,
-                borderRadius: 999,
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
                 objectFit: "cover",
-                border: "3px solid #fff",
-                boxShadow: "0 6px 18px rgba(15,23,42,0.18)",
               }}
             />
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontWeight: 700, fontSize: 20, color: "#0F172A", letterSpacing: "-0.01em" }}>
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                paddingTop: 40,
+                paddingBottom: 26,
+                background:
+                  "linear-gradient(to top, rgba(15,23,42,0.72) 0%, rgba(15,23,42,0.32) 55%, rgba(15,23,42,0) 100%)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 7,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 22,
+                  color: "#fff",
+                  letterSpacing: "-0.01em",
+                  textShadow: "0 1px 6px rgba(15,23,42,0.4)",
+                }}
+              >
                 {individual.name}
               </div>
-              <div style={{ marginTop: 6 }}>
-                <StatusPill status="current" />
-              </div>
+              <StatusPill status="current" />
             </div>
           </div>
         </div>
