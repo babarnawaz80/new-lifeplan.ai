@@ -128,6 +128,16 @@ export function persistPlan(p: Plan) {
   upsertWithOptionalColumns("plans", planToRow(p), ["structured_tree"], "persistPlan");
 }
 
+export function deletePlanRow(id: string) {
+  if (!supabase) return;
+  supabase.from("plans").delete().eq("id", id).then(warn("deletePlan"), ok);
+  supabase
+    .from("task_assignments")
+    .delete()
+    .eq("plan_id", id)
+    .then(warn("deleteTaskAssignments"), ok);
+}
+
 export function persistTaskAssignment(ta: TaskAssignment) {
   if (!supabase) return;
   upsertWithOptionalColumns(

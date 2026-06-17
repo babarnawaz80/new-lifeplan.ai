@@ -36,8 +36,25 @@ import { generateTraining } from "@/lib/generate-training.functions";
 import { suggestTaskOutcome } from "@/lib/suggest-outcome.functions";
 import type { WorkflowTask } from "@/data/lifeplan-types";
 import { allCompulsoryComplete, prePlanningCompulsoryComplete } from "@/lib/plan-runtime";
-import { parseIcmPlanTree, treeFromLegacyCaretracker, treeToPlainText } from "@/types/icmGoalOutcome";
-import { planTypeInfo } from "@/data/mock";
+import {
+  parseIcmPlanTree,
+  treeFromLegacyCaretracker,
+  treeToPlainText,
+  type IcmPlanTree,
+} from "@/types/icmGoalOutcome";
+import { planTypeInfo, type Plan } from "@/data/mock";
+
+// Read a plan's structured tree, preferring the top-level field but falling
+// back to plan_content (which persists in the existing jsonb column even when
+// the dedicated structured_tree column hasn't been added to the DB yet).
+function planTree(p?: Plan | null): IcmPlanTree | null {
+  if (!p) return null;
+  return (
+    p.structured_tree ??
+    (p.plan_content as { structured_tree?: IcmPlanTree } | undefined)?.structured_tree ??
+    null
+  );
+}
 
 export const Route = createFileRoute("/individuals/$id/plan/$planId")({
   head: () => ({ meta: [{ title: "Plan — LifePlan" }] }),
@@ -119,7 +136,7 @@ function PlanRuntime() {
   const canImplement = allCompulsoryComplete(agent.workflow_data, isComplete);
 
   // Structured iCM tree for the clean plan view + comparison.
-  const [structuredTree, setStructuredTree] = useState(plan.structured_tree ?? null);
+  const [structuredTree, setStructuredTree] = useState<IcmPlanTree | null>(planTree(plan));
 
   // Most recent *implemented* plan for this individual + agent (not this one).
   // Used as the "currently implemented" side of the comparison AND as the
@@ -133,6 +150,7 @@ function PlanRuntime() {
         (b.implementation_date ?? b.created_at).localeCompare(a.implementation_date ?? a.created_at),
       )[0];
   }, [id, plan.agent_id, planId, structuredTree]);
+  const previousTree = planTree(previousImplemented);
 
   // ---- Draft gate (Sections 2 & 3) ----
   // Drafting requires (1) a real, parsed source document for source_plan
@@ -154,12 +172,10 @@ function PlanRuntime() {
   // before the DB column existed).
   const previousPlanText = useMemo(() => {
     if (!previousImplemented) return "";
-    if (previousImplemented.structured_tree) {
-      return treeToPlainText(previousImplemented.structured_tree);
-    }
+    if (previousTree) return treeToPlainText(previousTree);
     const md = (previousImplemented.plan_content as { markdown?: string })?.markdown;
     return md?.trim() ?? "";
-  }, [previousImplemented]);
+  }, [previousImplemented, previousTree]);
 
   // Source is only "missing" (blocking) when there's no upload AND the user
   // hasn't opted to proceed without one.
@@ -276,13 +292,24 @@ function PlanRuntime() {
     .map((f) => f.name);
 
   // ---- Persist plan content ----
-  const persistContent = (markdown: string, ct: unknown, ti?: Record<string, string>) => {
+  // The structured tree is stored BOTH at the top level (column, if present)
+  // and inside plan_content (the jsonb column that always persists) so the
+  // comparison survives reloads even before the structured_tree column exists.
+  const persistContent = (
+    markdown: string,
+    ct: unknown,
+    ti?: Record<string, string>,
+    tree?: IcmPlanTree | null,
+  ) => {
+    const treeForContent = tree ?? structuredTree ?? null;
     updatePlan(planId, {
       status: plan.status === "draft" ? "in_progress" : plan.status,
+      structured_tree: treeForContent ?? undefined,
       plan_content: {
         markdown,
         caretracker: ct,
         taskInstructions: ti ?? taskInstructions,
+        structured_tree: treeForContent,
       },
     });
   };
@@ -297,11 +324,8 @@ function PlanRuntime() {
     const tree =
       parseIcmPlanTree(treeRaw, agent.plan_type) ??
       treeFromLegacyCaretracker(ct, agent.plan_type);
-    if (tree) {
-      setStructuredTree(tree);
-      updatePlan(planId, { structured_tree: tree });
-    }
-    persistContent(markdown, ct ?? caretrackerData);
+    if (tree) setStructuredTree(tree);
+    persistContent(markdown, ct ?? caretrackerData, undefined, tree ?? undefined);
 
     // Enrich tasks once we have substantial plan content
     if (markdown.length > 200 && Object.keys(taskInstructions).length === 0) {
@@ -322,7 +346,7 @@ function PlanRuntime() {
           },
         });
         setTaskInstructions(result.instructions);
-        persistContent(markdown, ct ?? caretrackerData, result.instructions);
+        persistContent(markdown, ct ?? caretrackerData, result.instructions, tree ?? undefined);
       } catch (err) {
         console.warn("enrich-tasks failed", err);
       }
@@ -333,15 +357,18 @@ function PlanRuntime() {
     // Record who implemented + when, so the plan log reads as a real audit
     // trail. Stored in plan_content (jsonb) to avoid a new column.
     const implementedBy = getCurrentSession().userName;
+    const tree = structuredTree ?? planTree(getPlan(planId));
     updatePlan(planId, {
       status: "implemented",
       implementation_date: date.toISOString(),
+      structured_tree: tree ?? undefined,
       plan_content: {
         markdown: planMarkdown,
         caretracker: caretrackerData,
         taskInstructions,
         implementation_date: date.toISOString(),
         implemented_by: implementedBy,
+        structured_tree: tree,
       },
     });
     // Section 6: the structured tree is the authoritative payload — write it
@@ -349,7 +376,6 @@ function PlanRuntime() {
     // show_on_care_tracker strategies in CareTracker under the single-active-
     // source rule). Legacy caretracker payload is the fallback for plans
     // generated before the tree existed.
-    const tree = getPlan(planId)?.structured_tree;
     if (tree) {
       writeGoalOutcomeTree(id, agent.plan_type, tree, {
         planId,
@@ -466,7 +492,7 @@ function PlanRuntime() {
                 annualPlanDate={plan.annual_plan_date}
                 strategyLabel={planTypeInfo(agent.plan_type).strategy_label}
                 structuredTree={structuredTree}
-                previousTree={previousImplemented?.structured_tree ?? null}
+                previousTree={previousTree}
                 previousLabel={
                   previousImplemented
                     ? `Implemented ${new Date(

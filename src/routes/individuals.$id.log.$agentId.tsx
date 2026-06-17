@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
-import { ChevronRight, Plus, Settings, FileText, Sparkles, CheckCircle2, Clock, PencilLine } from "lucide-react";
+import { ChevronRight, Plus, Settings, FileText, Sparkles, CheckCircle2, Clock, PencilLine, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { ManualOrAIDialog, type PlanStartSource } from "@/components/lifeplan/ManualOrAIDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   getIndividual,
   getAgent,
   listPlansForIndividualAndAgent,
   createPlan,
+  deletePlan,
 } from "@/integrations/icm";
 import { accentColor, planTypeInfo, type Plan } from "@/data/mock";
 
@@ -33,8 +42,12 @@ function PlanLogPage() {
   const agent = getAgent(agentId);
   if (!individual || !agent) throw notFound();
 
+  const [tick, setTick] = useState(0);
+  void tick;
   const plans = listPlansForIndividualAndAgent(id, agentId);
   const [openModal, setOpenModal] = useState(false);
+  // The draft/in-progress plan queued for deletion (null = dialog closed).
+  const [toDelete, setToDelete] = useState<Plan | null>(null);
 
   // Single source for the plan-type label/short across all surfaces.
   const { label: planTypeLabel, short: planTypeShort } = planTypeInfo(agent.plan_type);
@@ -127,7 +140,13 @@ function PlanLogPage() {
         ) : (
           <div className="space-y-2.5">
             {plans.map((p) => (
-              <PlanLogRow key={p.id} plan={p} planTypeLabel={planTypeLabel} id={id} />
+              <PlanLogRow
+                key={p.id}
+                plan={p}
+                planTypeLabel={planTypeLabel}
+                id={id}
+                onDelete={p.status !== "implemented" ? () => setToDelete(p) : undefined}
+              />
             ))}
           </div>
         )}
@@ -140,7 +159,101 @@ function PlanLogPage() {
         individual={individual}
         onChoose={handleChoose}
       />
+
+      <DeletePlanDialog
+        plan={toDelete}
+        planTypeLabel={planTypeLabel}
+        onClose={() => setToDelete(null)}
+        onConfirm={() => {
+          if (!toDelete) return;
+          const ok = deletePlan(toDelete.id);
+          setToDelete(null);
+          setTick((t) => t + 1);
+          if (ok) toast.success("Plan deleted.");
+          else toast.error("Only draft plans can be deleted.");
+        }}
+      />
     </AppShell>
+  );
+}
+
+function DeletePlanDialog({
+  plan,
+  planTypeLabel,
+  onClose,
+  onConfirm,
+}: {
+  plan: Plan | null;
+  planTypeLabel: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const [text, setText] = useState("");
+  const armed = text.trim().toLowerCase() === "delete";
+  // Reset the input whenever a new plan is queued.
+  const open = !!plan;
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          setText("");
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-md bg-card border-line">
+        <DialogHeader>
+          <DialogTitle className="text-ink text-[18px]">Delete this plan?</DialogTitle>
+          <DialogDescription className="text-ink2 leading-relaxed">
+            This permanently deletes the {plan?.plan_type_label} {planTypeLabel} draft and its task
+            progress. This can't be undone. Implemented plans can't be deleted — replace them by
+            implementing a new plan.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <label className="text-[12px] font-semibold text-ink2">
+            Type <span className="font-bold text-ink">delete</span> to confirm
+          </label>
+          <input
+            autoFocus
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && armed) {
+                setText("");
+                onConfirm();
+              }
+            }}
+            placeholder="delete"
+            className="w-full h-10 px-3 rounded-[9px] border border-line bg-card text-[14px] text-ink focus:outline-none focus:border-red"
+          />
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={() => {
+              setText("");
+              onClose();
+            }}
+            className="px-4 py-2 rounded-[9px] text-[13px] font-semibold text-ink2 hover:bg-muted"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={!armed}
+            onClick={() => {
+              setText("");
+              onConfirm();
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[9px] text-white text-[13px] font-bold hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: "var(--red)" }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete plan
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -161,7 +274,17 @@ function fmt(iso?: string) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function PlanLogRow({ plan, planTypeLabel, id }: { plan: Plan; planTypeLabel: string; id: string }) {
+function PlanLogRow({
+  plan,
+  planTypeLabel,
+  id,
+  onDelete,
+}: {
+  plan: Plan;
+  planTypeLabel: string;
+  id: string;
+  onDelete?: () => void;
+}) {
   const s = STATUS_META[plan.status];
   const content = plan.plan_content as { implementation_date?: string; implemented_by?: string };
   const implDate = fmt(plan.implementation_date ?? content?.implementation_date);
@@ -212,6 +335,21 @@ function PlanLogRow({ plan, planTypeLabel, id }: { plan: Plan; planTypeLabel: st
         </div>
       </div>
 
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="p-2 rounded-lg text-ink3 hover:text-red hover:bg-red/10 shrink-0"
+          title="Delete draft plan"
+          aria-label="Delete draft plan"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
       <ChevronRight className="h-4 w-4 text-ink3 shrink-0" />
     </Link>
   );

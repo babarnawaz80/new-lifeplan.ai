@@ -26,6 +26,7 @@ import {
   persistTraining,
   persistAgent,
   persistIndividualAgent,
+  deletePlanRow,
 } from "@/lib/persistence";
 import type {
   Individual,
@@ -342,6 +343,22 @@ export function updatePlan(id: string, patch: Partial<Plan>): Plan | undefined {
   Object.assign(p, patch, { updated_at: new Date().toISOString() });
   persistPlan(p);
   return p;
+}
+
+// Delete a plan and its task assignments. Caller must enforce that only
+// non-implemented plans are deletable — an implemented plan is a committed
+// record and is replaced by starting + implementing a new plan, never deleted.
+export function deletePlan(planId: string): boolean {
+  const p = plans.find((x) => x.id === planId);
+  if (!p) return false;
+  if (p.status === "implemented") return false; // safety net
+  const i = plans.findIndex((x) => x.id === planId);
+  if (i >= 0) plans.splice(i, 1);
+  for (let j = taskAssignments.length - 1; j >= 0; j--) {
+    if (taskAssignments[j].plan_id === planId) taskAssignments.splice(j, 1);
+  }
+  deletePlanRow(planId);
+  return true;
 }
 
 // ---- Task assignments ----
