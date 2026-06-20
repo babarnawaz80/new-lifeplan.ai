@@ -10,8 +10,10 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Pinwheel } from "@/components/lifeplan/Pinwheel";
+import { AgentPickerDialog } from "@/components/lifeplan/AgentPickerDialog";
 import {
   getIndividual, getAgentsForIndividual, listPlansForIndividualAndAgent,
+  listAgents, attachAgentToIndividual,
 } from "@/integrations/icm";
 import { individualAgents, type Agent } from "@/data/mock";
 
@@ -200,6 +202,23 @@ function IndividualEChart() {
     });
   };
 
+  // The orbit "+" opens an agent picker of shared agents (created on the
+  // dashboard). Picking one attaches it (if needed) and opens its plan log,
+  // where the staff member starts the plan. Agent CREATION is not here anymore.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const attachedAgentIds = useMemo(
+    () => new Set(attachedAgents.map((x) => x.agent.id)),
+    [attachedAgents],
+  );
+  const handlePickAgent = (a: Agent) => {
+    if (!attachedAgentIds.has(a.id)) attachAgentToIndividual(individual.id, a.id);
+    setPickerOpen(false);
+    navigate({
+      to: "/individuals/$id/log/$agentId",
+      params: { id: individual.id, agentId: a.id },
+    });
+  };
+
   // Collapse state: LifePlan.ai collapsed by default (per request); the other
   // sections stay open.
   const [openMap, setOpenMap] = useState<Record<string, boolean>>(() =>
@@ -362,12 +381,7 @@ function IndividualEChart() {
                         individual={individual}
                         agents={attachedAgents}
                         onSelectAgent={openAgentLog}
-                        onAddPlan={() =>
-                          navigate({
-                            to: "/agents/new",
-                            search: { attachTo: individual.id },
-                          })
-                        }
+                        onAddPlan={() => setPickerOpen(true)}
                       />
                     ) : (
 
@@ -397,6 +411,15 @@ function IndividualEChart() {
           })}
         </div>
       </main>
+
+      <AgentPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        individual={individual}
+        agents={listAgents()}
+        attachedAgentIds={attachedAgentIds}
+        onPick={handlePickAgent}
+      />
     </AppShell>
   );
 }

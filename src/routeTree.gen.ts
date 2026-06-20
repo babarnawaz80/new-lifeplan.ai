@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LifeplanRouteImport } from './routes/lifeplan'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as IndividualsIndexRouteImport } from './routes/individuals.index'
 import { Route as GuidelinesIndexRouteImport } from './routes/guidelines.index'
@@ -24,6 +25,11 @@ import { Route as AgentsIdEditRouteImport } from './routes/agents.$id.edit'
 import { Route as IndividualsIdPlanPlanIdRouteImport } from './routes/individuals.$id.plan.$planId'
 import { Route as IndividualsIdLogAgentIdRouteImport } from './routes/individuals.$id.log.$agentId'
 
+const LifeplanRoute = LifeplanRouteImport.update({
+  id: '/lifeplan',
+  path: '/lifeplan',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -97,6 +103,7 @@ const IndividualsIdLogAgentIdRoute = IndividualsIdLogAgentIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/lifeplan': typeof LifeplanRoute
   '/agents/new': typeof AgentsNewRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/lifeplan': typeof LifeplanRoute
   '/agents/new': typeof AgentsNewRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
@@ -129,6 +137,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/lifeplan': typeof LifeplanRoute
   '/agents/new': typeof AgentsNewRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/lifeplan'
     | '/agents/new'
     | '/api/generate-plan'
     | '/guidelines/$id'
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/lifeplan'
     | '/agents/new'
     | '/api/generate-plan'
     | '/guidelines/$id'
@@ -178,6 +189,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/lifeplan'
     | '/agents/new'
     | '/api/generate-plan'
     | '/guidelines/$id'
@@ -195,6 +207,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LifeplanRoute: typeof LifeplanRoute
   AgentsNewRoute: typeof AgentsNewRoute
   ApiGeneratePlanRoute: typeof ApiGeneratePlanRoute
   GuidelinesIdRoute: typeof GuidelinesIdRoute
@@ -208,6 +221,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/lifeplan': {
+      id: '/lifeplan'
+      path: '/lifeplan'
+      fullPath: '/lifeplan'
+      preLoaderRoute: typeof LifeplanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -329,6 +349,7 @@ const IndividualsIdRouteWithChildren = IndividualsIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LifeplanRoute: LifeplanRoute,
   AgentsNewRoute: AgentsNewRoute,
   ApiGeneratePlanRoute: ApiGeneratePlanRoute,
   GuidelinesIdRoute: GuidelinesIdRoute,

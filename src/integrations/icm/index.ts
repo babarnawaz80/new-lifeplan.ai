@@ -332,6 +332,33 @@ export function createPlan(args: {
 export function getPlan(id: string) {
   return plans.find((p) => p.id === id);
 }
+
+// ---- Org-level / portfolio reads (LifePlan dashboard) ----
+// All plans across the org. The dashboard aggregation joins these with
+// individuals, agents, and org context.
+export function listAllPlans(): Plan[] {
+  return plans;
+}
+
+// Program + site for an individual. In production these come from iCM; the
+// mock derives them from the individual record (program + location).
+export function getIndividualOrgContext(individualId: string): {
+  program: string;
+  site: string;
+} {
+  const ind = individuals.find((i) => i.id === individualId);
+  return {
+    program: ind?.program?.trim() || "Unassigned program",
+    site: ind?.location?.trim() || "Unassigned site",
+  };
+}
+
+// How many distinct individuals currently have this shared agent attached.
+export function countIndividualsForAgent(agentId: string): number {
+  return new Set(
+    individualAgents.filter((ia) => ia.agent_id === agentId).map((ia) => ia.individual_id),
+  ).size;
+}
 export function listPlansForIndividualAndAgent(individualId: string, agentId: string): Plan[] {
   return plans
     .filter((p) => p.individual_id === individualId && p.agent_id === agentId)

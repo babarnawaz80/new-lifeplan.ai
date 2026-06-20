@@ -1,13 +1,15 @@
 // Dashboard — landing page (DEMO MOCK of the iCareManager dashboard).
 // Static/mock data; "Individuals" in the top nav opens the real list.
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Users, AlertTriangle, Pill, Sun, ChevronRight, TrendingUp, ShieldCheck,
   ClipboardCheck, Building2, GraduationCap, Calendar, FileText, Truck,
   CalendarDays, StickyNote, Wrench, Briefcase, Clock, Flame, NotebookPen,
-  BarChart3, Brain, Home, Droplets, type LucideIcon,
+  BarChart3, Brain, Home, Droplets, ArrowRight, Sparkles, type LucideIcon,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { Ring, SegmentDonut } from "@/components/dashboard/Charts";
+import { LifeplanBrand } from "@/components/lifeplan-dashboard/LifeplanBrand";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Dashboard — iCareManager" }] }),
@@ -49,49 +51,9 @@ function greeting() {
   return h < 12 ? "Good Morning" : h < 18 ? "Good Afternoon" : "Good Evening";
 }
 
-function Ring({ pct, color, center }: { pct: number; color: string; center: string }) {
-  const r = 30;
-  const c = 2 * Math.PI * r;
-  return (
-    <svg width="76" height="76" viewBox="0 0 76 76" className="shrink-0">
-      <circle cx="38" cy="38" r={r} fill="none" stroke="var(--muted)" strokeWidth="8" />
-      <circle
-        cx="38" cy="38" r={r} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
-        strokeDasharray={c} strokeDashoffset={c * (1 - pct / 100)}
-        transform="rotate(-90 38 38)"
-      />
-      <text x="38" y="43" textAnchor="middle" className="fill-ink" style={{ fontSize: 16, fontWeight: 800 }}>
-        {center}
-      </text>
-    </svg>
-  );
-}
-
-function SegmentDonut({ segments }: { segments: { value: number; color: string }[] }) {
-  const r = 30;
-  const c = 2 * Math.PI * r;
-  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
-  let offset = 0;
-  return (
-    <svg width="76" height="76" viewBox="0 0 76 76" className="shrink-0">
-      <circle cx="38" cy="38" r={r} fill="none" stroke="var(--muted)" strokeWidth="8" />
-      {segments.map((seg, i) => {
-        const len = (seg.value / total) * c;
-        const el = (
-          <circle
-            key={i} cx="38" cy="38" r={r} fill="none" stroke={seg.color} strokeWidth="8"
-            strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offset}
-            transform="rotate(-90 38 38)"
-          />
-        );
-        offset += len;
-        return el;
-      })}
-    </svg>
-  );
-}
-
 function DashboardPage() {
+  const navigate = useNavigate();
+  const openLifeplan = () => navigate({ to: "/lifeplan" });
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
@@ -165,6 +127,27 @@ function DashboardPage() {
               <span className="text-[12px] font-bold uppercase tracking-wider text-ink3">Quick Actions</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* LifePlan.ai — branded entry into the org dashboard */}
+              <button
+                onClick={openLifeplan}
+                className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left hover:-translate-y-0.5 transition-all shadow-soft border-2"
+                style={{
+                  borderColor: "color-mix(in oklab, var(--indigo) 35%, transparent)",
+                  background: "color-mix(in oklab, var(--indigo) 7%, var(--card))",
+                }}
+              >
+                <span className="flex items-center gap-2.5">
+                  <span
+                    className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: "var(--ai-gradient)" }}
+                  >
+                    <Sparkles className="h-5 w-5 text-white" />
+                  </span>
+                  <LifeplanBrand size="sm" />
+                </span>
+                <ArrowRight className="h-4 w-4 text-indigo" />
+              </button>
+
               {QUICK_ACTIONS.map((a, i) => {
                 const color = COLS[i % 4];
                 const Icon = a.icon;
@@ -184,6 +167,21 @@ function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Floating LifePlan.ai launcher */}
+        <button
+          onClick={openLifeplan}
+          className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2.5 pl-3 pr-4 py-3 rounded-2xl bg-card border border-line shadow-card-hover hover:-translate-y-0.5 transition-all"
+          title="Open LifePlan.ai"
+        >
+          <span
+            className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: "var(--ai-gradient)" }}
+          >
+            <Sparkles className="h-5 w-5 text-white" />
+          </span>
+          <LifeplanBrand size="sm" />
+        </button>
       </main>
     </AppShell>
   );
