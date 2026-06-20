@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Ring, SegmentDonut } from "@/components/dashboard/Charts";
-import { LifeplanBrand } from "@/components/lifeplan-dashboard/LifeplanBrand";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [{ title: "Dashboard — iCareManager" }] }),
@@ -36,7 +35,6 @@ const QUICK_ACTIONS: { label: string; icon: LucideIcon }[] = [
   { label: "Ratio Compliance", icon: BarChart3 },
   { label: "Plan of Correction", icon: FileText },
   { label: "Group Activity Management", icon: Users },
-  { label: "Staff Scheduler", icon: CalendarDays },
   { label: "Psych Referral Form", icon: Brain },
   { label: "Home Inspection", icon: Home },
   { label: "Water Temperature Reading", icon: Droplets },
@@ -127,27 +125,6 @@ function DashboardPage() {
               <span className="text-[12px] font-bold uppercase tracking-wider text-ink3">Quick Actions</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* LifePlan.ai — branded entry into the org dashboard */}
-              <button
-                onClick={openLifeplan}
-                className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left hover:-translate-y-0.5 transition-all shadow-soft border-2"
-                style={{
-                  borderColor: "color-mix(in oklab, var(--indigo) 35%, transparent)",
-                  background: "color-mix(in oklab, var(--indigo) 7%, var(--card))",
-                }}
-              >
-                <span className="flex items-center gap-2.5">
-                  <span
-                    className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: "var(--ai-gradient)" }}
-                  >
-                    <Sparkles className="h-5 w-5 text-white" />
-                  </span>
-                  <LifeplanBrand size="sm" />
-                </span>
-                <ArrowRight className="h-4 w-4 text-indigo" />
-              </button>
-
               {QUICK_ACTIONS.map((a, i) => {
                 const color = COLS[i % 4];
                 const Icon = a.icon;
@@ -164,24 +141,25 @@ function DashboardPage() {
                   </button>
                 );
               })}
+
+              {/* LifePlan.ai — branded entry, bottom-right of the grid */}
+              <button
+                onClick={openLifeplan}
+                className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left text-white font-semibold text-[14px] hover:opacity-95 hover:-translate-y-0.5 transition-all shadow-soft"
+                style={{ background: "var(--ai-gradient)" }}
+                title="Open LifePlan.ai"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                    <Sparkles className="h-5 w-5" />
+                  </span>
+                  LifePlan.ai
+                </span>
+                <ArrowRight className="h-4 w-4 text-white/90" />
+              </button>
             </div>
           </div>
         </div>
-
-        {/* Floating LifePlan.ai launcher */}
-        <button
-          onClick={openLifeplan}
-          className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2.5 pl-3 pr-4 py-3 rounded-2xl bg-card border border-line shadow-card-hover hover:-translate-y-0.5 transition-all"
-          title="Open LifePlan.ai"
-        >
-          <span
-            className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: "var(--ai-gradient)" }}
-          >
-            <Sparkles className="h-5 w-5 text-white" />
-          </span>
-          <LifeplanBrand size="sm" />
-        </button>
       </main>
     </AppShell>
   );
