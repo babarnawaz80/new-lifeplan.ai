@@ -10,9 +10,10 @@ import { LifeplanBrand } from "@/components/lifeplan-dashboard/LifeplanBrand";
 import { OverviewTab } from "@/components/lifeplan-dashboard/OverviewTab";
 import { AgentsTab } from "@/components/lifeplan-dashboard/AgentsTab";
 import { GuidelinesTab } from "@/components/lifeplan-dashboard/GuidelinesTab";
+import { ProgressTab } from "@/components/lifeplan-dashboard/ProgressTab";
 import { useLifeplanPortfolio } from "@/lib/useLifeplanPortfolio";
 
-const TABS = ["overview", "agents", "guidelines"] as const;
+const TABS = ["overview", "progress", "agents", "guidelines"] as const;
 type Tab = (typeof TABS)[number];
 
 const searchSchema = z.object({
@@ -52,7 +53,7 @@ function LifeplanDashboard() {
                 iCareManager · Demo Org
               </span>
             </div>
-            {active === "overview" && (
+            {(active === "overview" || active === "progress") && (
               <div className="flex flex-wrap items-center gap-2">
                 <Select value={program} onChange={setProgram} all="All programs" options={programs} />
                 <Select value={site} onChange={setSite} all="All sites" options={sites} />
@@ -88,6 +89,7 @@ function LifeplanDashboard() {
         </div>
 
         {active === "overview" && <OverviewTab program={program} site={site} search={search} />}
+        {active === "progress" && <ProgressTab program={program} site={site} search={search} />}
         {active === "agents" && <AgentsTab />}
         {active === "guidelines" && <GuidelinesTab />}
       </div>

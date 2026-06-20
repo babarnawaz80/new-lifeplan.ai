@@ -47,6 +47,8 @@ import {
   uid,
 } from "@/data/lifeplan-types";
 import type { PlanSchema, OptionSet } from "@/data/lifeplan-types";
+import { generateProgressForTree } from "@/lib/caretracker-progress";
+import type { ServiceProgress } from "@/lib/caretracker-progress";
 
 
 export function getCurrentSession() {
@@ -358,6 +360,85 @@ export function countIndividualsForAgent(agentId: string): number {
   return new Set(
     individualAgents.filter((ia) => ia.agent_id === agentId).map((ia) => ia.individual_id),
   ).size;
+}
+
+// ---- CareTracker progress (INBOUND) ----
+// The director cockpit reads day-to-day documentation progress back from
+// CareTracker, keyed to the goals/services we pushed on implement. This is the
+// integration seam: today it derives mock progress from each implemented
+// plan's structured tree; when the real CareTracker API is provided, replace
+// the body of these two functions with API calls returning the same shapes.
+function planStructuredTree(p: Plan): import("@/types/icmGoalOutcome").IcmPlanTree | null {
+  return (
+    p.structured_tree ??
+    (p.plan_content as { structured_tree?: import("@/types/icmGoalOutcome").IcmPlanTree } | undefined)
+      ?.structured_tree ??
+    null
+  );
+}
+
+export type CareTrackerProgressFilters = {
+  individualId?: string;
+  planId?: string;
+  goalId?: string;
+  program?: string;
+  site?: string;
+};
+
+export function getCareTrackerProgress(
+  filters: CareTrackerProgressFilters = {},
+): ServiceProgress[] {
+  const nowMs = Date.now();
+  const out: ServiceProgress[] = [];
+
+  for (const plan of plans) {
+    if (plan.status !== "implemented") continue; // progress only exists post-implement
+    if (filters.planId && plan.id !== filters.planId) continue;
+    if (filters.individualId && plan.individual_id !== filters.individualId) continue;
+    const tree = planStructuredTree(plan);
+    if (!tree) continue;
+    const agent = agents.find((a) => a.id === plan.agent_id);
+    const individual = individuals.find((i) => i.id === plan.individual_id);
+    if (!agent || !individual) continue;
+    const { program, site } = getIndividualOrgContext(plan.individual_id);
+    if (filters.program && filters.program !== "all" && program !== filters.program) continue;
+    if (filters.site && filters.site !== "all" && site !== filters.site) continue;
+
+    const { services: svc } = generateProgressForTree(
+      {
+        individualId: individual.id,
+        individualName: individual.name,
+        program,
+        site,
+        planId: plan.id,
+        planTypeLabel: planTypeInfo(agent.plan_type).label,
+        nowMs,
+      },
+      tree,
+    );
+    for (const s of svc) {
+      if (filters.goalId && s.goalId !== filters.goalId) continue;
+      out.push(s);
+    }
+  }
+  return out;
+}
+
+export function getProgressSummary(filters: CareTrackerProgressFilters = {}): {
+  services: number;
+  onTrack: number;
+  needsAttention: number;
+  notStarted: number;
+  avgCompletion: number;
+} {
+  const rows = getCareTrackerProgress(filters);
+  const onTrack = rows.filter((r) => r.status === "on_track").length;
+  const needsAttention = rows.filter((r) => r.status === "needs_attention").length;
+  const notStarted = rows.filter((r) => r.status === "not_started").length;
+  const avgCompletion = rows.length
+    ? Math.round(rows.reduce((s, r) => s + r.pctComplete, 0) / rows.length)
+    : 0;
+  return { services: rows.length, onTrack, needsAttention, notStarted, avgCompletion };
 }
 export function listPlansForIndividualAndAgent(individualId: string, agentId: string): Plan[] {
   return plans
