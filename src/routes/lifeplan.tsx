@@ -1,30 +1,40 @@
-// LifePlan org dashboard — shell with Overview / Agents / Guidelines tabs.
-// Header strip carries the brand, org context, and the shared Program / Site
-// filters + global individual search consumed by the Overview tab.
-import { useState } from "react";
+// LifePlan org dashboard — Claude Design handoff implemented. Brand header +
+// filters + Run intelligence, design-styled tab strip, and the consolidated
+// executive Overview cockpit. Board/Progress/Agents/Guidelines tabs bind to
+// real data; the executive Overview uses the seeded org rollup (swap for the
+// real org/CareTracker rollup later).
+import { useState, type CSSProperties } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { Search } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { LifeplanBrand } from "@/components/lifeplan-dashboard/LifeplanBrand";
+import { BrandMark, aiBtn, AiSpark } from "@/components/lifeplan-dashboard/dashboard-ui";
+import { ConsolidatedOverview } from "@/components/lifeplan-dashboard/ConsolidatedOverview";
 import { OverviewTab } from "@/components/lifeplan-dashboard/OverviewTab";
+import { ProgressTab } from "@/components/lifeplan-dashboard/ProgressTab";
 import { AgentsTab } from "@/components/lifeplan-dashboard/AgentsTab";
 import { GuidelinesTab } from "@/components/lifeplan-dashboard/GuidelinesTab";
-import { ProgressTab } from "@/components/lifeplan-dashboard/ProgressTab";
 import { useLifeplanPortfolio } from "@/lib/useLifeplanPortfolio";
+import { INDIVIDUALS } from "@/lib/lifeplan-org-seed";
+import "@/components/lifeplan-dashboard/dashboard.css";
 
-const TABS = ["overview", "progress", "agents", "guidelines"] as const;
-type Tab = (typeof TABS)[number];
+const TABS = [
+  { k: "overview", label: "Overview" },
+  { k: "board", label: "Board" },
+  { k: "progress", label: "Progress" },
+  { k: "agents", label: "Agents" },
+  { k: "guidelines", label: "Guidelines" },
+] as const;
+type Tab = (typeof TABS)[number]["k"];
 
-const searchSchema = z.object({
-  tab: z.enum(TABS).optional(),
-});
+const searchSchema = z.object({ tab: z.enum(["overview", "board", "progress", "agents", "guidelines"]).optional() });
 
 export const Route = createFileRoute("/lifeplan")({
   head: () => ({ meta: [{ title: "LifePlan.ai — Dashboard" }] }),
   validateSearch: searchSchema,
   component: LifeplanDashboard,
 });
+
+const chip: CSSProperties = { fontFamily: "var(--font-text)", fontSize: 12.5, color: "var(--fg3)", background: "#fff", border: "1px solid var(--border)", borderRadius: 10, padding: "7px 10px", whiteSpace: "nowrap", outline: "none" };
 
 function LifeplanDashboard() {
   const navigate = useNavigate();
@@ -34,90 +44,83 @@ function LifeplanDashboard() {
   const [program, setProgram] = useState("all");
   const [site, setSite] = useState("all");
   const [search, setSearch] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [updated, setUpdated] = useState("2 minutes ago");
 
-  // Unfiltered pass for the filter option lists.
   const { programs, sites } = useLifeplanPortfolio({});
+  const setTab = (t: Tab) => navigate({ to: "/lifeplan", search: t === "overview" ? {} : { tab: t } });
+  const runIntelligence = () => {
+    setAnalyzing(true);
+    setTimeout(() => { setAnalyzing(false); setUpdated("just now"); }, 1100);
+  };
 
-  const setTab = (t: Tab) =>
-    navigate({ to: "/lifeplan", search: t === "overview" ? {} : { tab: t } });
+  const showFilters = active === "board" || active === "progress";
 
   return (
     <AppShell>
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-5">
-        {/* Header strip */}
-        <div className="rounded-2xl bg-card border border-line shadow-soft p-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <LifeplanBrand size="md" />
-              <span className="text-[12px] text-ink3 border-l border-line pl-3">
-                iCareManager · Demo Org
-              </span>
-            </div>
-            {(active === "overview" || active === "progress") && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Select value={program} onChange={setProgram} all="All programs" options={programs} />
-                <Select value={site} onChange={setSite} all="All sites" options={sites} />
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink3" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search individuals"
-                    className="w-52 pl-8 h-9 rounded-lg bg-card border border-line text-[13px] text-ink placeholder:text-ink3 focus:outline-none focus:border-navy"
-                  />
-                </div>
+      <div className="lp-dash" style={{ minHeight: "calc(100vh - 64px)" }}>
+        <div style={{ maxWidth: 1340, margin: "0 auto", padding: 24 }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <BrandMark size={24} />
+              <div style={{ fontFamily: "var(--font-text)", fontSize: 12.5, color: "var(--fg3)" }}>
+                Richcroft, Inc. · {INDIVIDUALS.length} individuals on LifePlan
               </div>
+            </div>
+            <span style={{ flex: 1 }} />
+            {showFilters && (
+              <>
+                <div style={{ position: "relative" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2.2" style={{ position: "absolute", left: 11, top: 9 }}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search individual…" style={{ width: 190, padding: "8px 12px 8px 32px", border: "1px solid var(--border)", borderRadius: 10, fontFamily: "var(--font-sans)", fontSize: 13, outline: "none" }} />
+                </div>
+                <select value={program} onChange={(e) => setProgram(e.target.value)} style={chip}>
+                  <option value="all">Program: All</option>
+                  {programs.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <select value={site} onChange={(e) => setSite(e.target.value)} style={chip}>
+                  <option value="all">Site: All</option>
+                  {sites.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </>
             )}
+            <button onClick={runIntelligence} className="lp-act" style={{ ...aiBtn, padding: "10px 18px" }}>
+              {analyzing ? <svg className="lp-spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6"><path d="M21 12a9 9 0 1 1-6.2-8.5" /></svg> : <AiSpark size={15} />}
+              {analyzing ? "Analyzing…" : "Run intelligence"}
+            </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex items-center gap-1 mt-4 border-b border-line -mb-5 -mx-5 px-5">
-            {TABS.map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-4 py-2.5 text-[13px] font-bold capitalize border-b-2 -mb-px transition-colors ${
-                  active === t
-                    ? "border-navy text-ink"
-                    : "border-transparent text-ink2 hover:text-ink"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+          {/* Tab strip */}
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 4, borderBottom: "1px solid var(--border-soft)", marginBottom: 18 }}>
+            {TABS.map((t) => {
+              const on = active === t.k;
+              return (
+                <button
+                  key={t.k}
+                  onClick={() => setTab(t.k)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", fontSize: 13, fontWeight: 700,
+                    fontFamily: "var(--font-sans)", cursor: "pointer", background: on ? "#fff" : "transparent",
+                    color: on ? "var(--fg1)" : "var(--fg3)", borderRadius: "10px 10px 0 0",
+                    border: on ? "1px solid var(--border-soft)" : "1px solid transparent", borderBottom: on ? "1px solid #fff" : "1px solid transparent",
+                    position: "relative", top: 1,
+                  }}
+                >
+                  {t.k === "overview" && <span style={{ width: 7, height: 7, borderRadius: 999, background: "linear-gradient(100deg,#16C0E8,#8B5CF6)" }} />}
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
+
+          {active === "overview" && <ConsolidatedOverview updated={updated} />}
+          {active === "board" && <OverviewTab program={program} site={site} search={search} />}
+          {active === "progress" && <ProgressTab program={program} site={site} search={search} />}
+          {active === "agents" && <AgentsTab />}
+          {active === "guidelines" && <GuidelinesTab />}
         </div>
-
-        {active === "overview" && <OverviewTab program={program} site={site} search={search} />}
-        {active === "progress" && <ProgressTab program={program} site={site} search={search} />}
-        {active === "agents" && <AgentsTab />}
-        {active === "guidelines" && <GuidelinesTab />}
       </div>
     </AppShell>
-  );
-}
-
-function Select({
-  value,
-  onChange,
-  all,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  all: string;
-  options: string[];
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 px-3 rounded-lg bg-card border border-line text-[13px] text-ink focus:outline-none focus:border-navy"
-    >
-      <option value="all">{all}</option>
-      {options.map((o) => (
-        <option key={o} value={o}>{o}</option>
-      ))}
-    </select>
   );
 }

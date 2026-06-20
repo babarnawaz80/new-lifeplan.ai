@@ -1,0 +1,56 @@
+/* iCM design-system tokens, scoped to the LifePlan dashboard so they never
+   leak into the rest of the app. Ported from the Claude Design handoff
+   (colors_and_type.css). Fonts map to the app's Inter/system stack. */
+.lp-dash {
+  --icm-orange: #E85C2C;
+  --icm-orange-50: #FDEEE6;
+  --icm-green: #3CB54A;
+  --icm-green-50: #E8F6EA;
+  --icm-blue: #2D87C9;
+  --icm-blue-50: #E5F1FA;
+  --icm-navy: #1B3D8F;
+  --icm-ink: #0F172A;
+  --icm-slate-900: #1E293B;
+  --icm-slate-800: #334155;
+  --icm-slate-700: #475569;
+  --icm-slate-600: #64748B;
+  --icm-slate-500: #94A3B8;
+  --icm-slate-400: #CBD5E1;
+  --icm-slate-300: #E2E8F0;
+  --icm-slate-200: #EEF2F7;
+  --icm-slate-100: #F5F7FA;
+  --icm-slate-50: #F9FAFB;
+
+  --fg1: var(--icm-ink);
+  --fg2: var(--icm-slate-700);
+  --fg3: var(--icm-slate-600);
+  --fg4: var(--icm-slate-500);
+  --border: var(--icm-slate-300);
+  --border-soft: var(--icm-slate-200);
+
+  --warning: #F5A524;
+  --danger: #DC2626;
+
+  --font-display: "Inter", system-ui, -apple-system, sans-serif;
+  --font-text: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  background: var(--icm-slate-100);
+  color: var(--fg2);
+  font-family: var(--font-sans);
+}
+
+@keyframes lpUp { from { transform: translateY(6px); opacity: 0 } to { transform: none; opacity: 1 } }
+.lp-dash .lp-rise { animation: lpUp 0.3s var(--ease-out); }
+.lp-dash .lp-chip { transition: background 0.14s, border-color 0.14s, color 0.14s; }
+.lp-dash .lp-chip:hover { background: var(--icm-slate-100); border-color: var(--icm-slate-400); }
+.lp-dash .lp-act:hover { filter: brightness(1.04); }
+.lp-dash .lp-prog { transition: box-shadow 0.14s, border-color 0.14s; }
+.lp-dash .lp-prog:hover { box-shadow: var(--shadow-md); }
+@keyframes lpSpin { to { transform: rotate(360deg) } }
+.lp-dash .lp-spin { animation: lpSpin 0.8s linear infinite; }
