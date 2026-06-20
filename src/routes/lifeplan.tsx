@@ -9,7 +9,6 @@ import { z } from "zod";
 import { AppShell } from "@/components/layout/AppShell";
 import { BrandMark, aiBtn, AiSpark } from "@/components/lifeplan-dashboard/dashboard-ui";
 import { ConsolidatedOverview } from "@/components/lifeplan-dashboard/ConsolidatedOverview";
-import { ProgressTab } from "@/components/lifeplan-dashboard/ProgressTab";
 import { AgentsTab } from "@/components/lifeplan-dashboard/AgentsTab";
 import { useLifeplanPortfolio } from "@/lib/useLifeplanPortfolio";
 import { INDIVIDUALS } from "@/lib/lifeplan-org-seed";
@@ -17,12 +16,11 @@ import "@/components/lifeplan-dashboard/dashboard.css";
 
 const TABS = [
   { k: "overview", label: "Overview" },
-  { k: "progress", label: "Progress" },
   { k: "agents", label: "Agents" },
 ] as const;
 type Tab = (typeof TABS)[number]["k"];
 
-const searchSchema = z.object({ tab: z.enum(["overview", "progress", "agents"]).optional() });
+const searchSchema = z.object({ tab: z.enum(["overview", "agents"]).optional() });
 
 export const Route = createFileRoute("/lifeplan")({
   head: () => ({ meta: [{ title: "LifePlan.ai — Dashboard" }] }),
@@ -50,7 +48,7 @@ function LifeplanDashboard() {
     setTimeout(() => { setAnalyzing(false); setUpdated("just now"); }, 1100);
   };
 
-  const showFilters = active === "progress";
+  const showFilters = active === "overview";
 
   return (
     <AppShell>
@@ -111,7 +109,6 @@ function LifeplanDashboard() {
           </div>
 
           {active === "overview" && <ConsolidatedOverview updated={updated} />}
-          {active === "progress" && <ProgressTab program={program} site={site} search={search} />}
           {active === "agents" && <AgentsTab />}
         </div>
       </div>
