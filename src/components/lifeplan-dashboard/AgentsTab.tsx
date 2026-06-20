@@ -1,100 +1,147 @@
-// Agents tab — gallery of shared agents. The ONLY place agents are created
-// (relocated from the individual e-chart). Reuses the existing agent builder.
-import { Link } from "@tanstack/react-router";
-import { Plus, Users, Shield, Sparkles } from "lucide-react";
-import {
-  listAgents,
-  listGuidelines,
-  countIndividualsForAgent,
-} from "@/integrations/icm";
-import { planTypeInfo, accentColor } from "@/data/mock";
+// Agents screen for the LifePlan dashboard — the single place agents are
+// created, with Guidelines merged in (top-right toggle, no separate tab).
+// Design-system styled (.lp-dash tokens) to match the Overview cockpit.
+import { useState, type CSSProperties } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { Plus, Users, Shield, Sparkles, FileText, ChevronLeft } from "lucide-react";
+import { listAgents, listGuidelines, countIndividualsForAgent } from "@/integrations/icm";
+import { planTypeInfo } from "@/data/mock";
+import { aiBtn } from "./dashboard-ui";
+import { PLAN_TYPES } from "@/lib/lifeplan-org-seed";
+
+const HUE: Record<string, string> = Object.fromEntries(PLAN_TYPES.map((t) => [t.abbr, t.hue]));
+function hueFor(planType: string): string {
+  return HUE[planTypeInfo(planType).short] ?? "#1B3D8F";
+}
+
+const card: CSSProperties = { background: "#fff", border: "1px solid var(--border-soft)", borderRadius: 16, boxShadow: "var(--shadow-sm)", padding: 18, display: "flex", flexDirection: "column", cursor: "pointer" };
+const ghostBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "#fff", fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 13, color: "var(--fg2)", cursor: "pointer" };
+const navyBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 16px", borderRadius: 10, border: "none", background: "var(--icm-ink)", color: "#fff", fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: 13, cursor: "pointer" };
 
 export function AgentsTab() {
+  const navigate = useNavigate();
+  const [view, setView] = useState<"agents" | "guidelines">("agents");
   const agents = listAgents();
   const guidelines = listGuidelines();
   const guidelineName = (id: string) => guidelines.find((g) => g.id === id)?.name ?? id;
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-4 gap-3 flex-wrap">
-        <p className="text-[13px] text-ink2 max-w-2xl">
-          Shared plan agents for the whole organization. Editing an agent applies to every
-          individual it's attached to.
-        </p>
-        <Link
-          to="/agents/new"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[9px] text-white text-[13px] font-semibold hover:opacity-95 shadow-soft"
-          style={{ background: "var(--ai-gradient)" }}
-        >
-          <Plus className="h-4 w-4" /> Create agent
-        </Link>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 800, color: "var(--fg1)", letterSpacing: "-0.02em" }}>
+            {view === "agents" ? "Plan agents" : "Guideline engines"}
+          </div>
+          <div style={{ fontFamily: "var(--font-text)", fontSize: 12.5, color: "var(--fg3)", marginTop: 3, maxWidth: 560 }}>
+            {view === "agents"
+              ? "Shared across the organization. Editing an agent applies to every individual it is attached to."
+              : "Regulatory rule sets extracted from state documents. Link them to agents to enforce compliance."}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {view === "agents" ? (
+            <>
+              <button style={ghostBtn} onClick={() => setView("guidelines")}>
+                <Shield className="h-4 w-4" /> Guidelines
+              </button>
+              <button className="lp-act" style={aiBtn} onClick={() => navigate({ to: "/agents/new" })}>
+                <Plus className="h-4 w-4" /> Create agent
+              </button>
+            </>
+          ) : (
+            <>
+              <button style={ghostBtn} onClick={() => setView("agents")}>
+                <ChevronLeft className="h-4 w-4" /> Agents
+              </button>
+              <button style={navyBtn} onClick={() => navigate({ to: "/guidelines/new" })}>
+                <Plus className="h-4 w-4" /> Create guideline engine
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {agents.length === 0 ? (
-        <div className="rounded-2xl bg-card border border-line p-12 text-center">
-          <Sparkles className="h-8 w-8 text-ink3 mx-auto mb-3" />
-          <h3 className="text-[16px] font-extrabold text-ink">No agents yet</h3>
-          <p className="text-[13px] text-ink2 mt-1">Create your first shared plan agent.</p>
-        </div>
+      {view === "agents" ? (
+        agents.length === 0 ? (
+          <Empty icon={Sparkles} title="No agents yet" sub="Create your first shared plan agent." />
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+            {agents.map((a) => {
+              const info = planTypeInfo(a.plan_type);
+              const used = countIndividualsForAgent(a.id);
+              const hue = hueFor(a.plan_type);
+              return (
+                <div key={a.id} className="lp-prog" style={card} onClick={() => navigate({ to: "/agents/$id/edit", params: { id: a.id } })}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ height: 44, width: 44, borderRadius: 12, background: hue, color: "#fff", display: "grid", placeItems: "center", fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 13, flex: "none" }}>
+                      {info.short.slice(0, 3)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 700, color: "var(--fg1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</div>
+                      <div style={{ fontFamily: "var(--font-text)", fontSize: 11, color: "var(--fg4)", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700, marginTop: 2 }}>{info.label}</div>
+                    </div>
+                    <span style={{ fontFamily: "var(--font-text)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#fff", background: a.status === "active" ? "var(--icm-green)" : "var(--warning)", padding: "2px 7px", borderRadius: 6 }}>{a.status}</span>
+                  </div>
+
+                  {a.guidelines_engine_ids.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
+                      {a.guidelines_engine_ids.map((gid) => (
+                        <span key={gid} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--font-text)", fontSize: 11.5, fontWeight: 500, padding: "3px 8px", borderRadius: 8, background: "var(--icm-slate-100)", color: "var(--fg2)" }}>
+                          <Shield className="h-3 w-3" style={{ color: "#0E9C8A" }} /> {guidelineName(gid)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border-soft)", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "var(--font-text)", fontSize: 12, color: "var(--fg3)" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <Users className="h-3.5 w-3.5" /> {used} individual{used === 1 ? "" : "s"}
+                    </span>
+                    <span style={{ fontWeight: 600, color: "var(--fg2)" }}>Configure →</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : guidelines.length === 0 ? (
+        <Empty icon={Shield} title="No guideline engines yet" sub="Upload a state PDF to extract a compliance brief." />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agents.map((a) => {
-            const info = planTypeInfo(a.plan_type);
-            const used = countIndividualsForAgent(a.id);
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {guidelines.map((g) => {
+            const count = g.services_extracted ?? g.compliance_brief.rules.length;
             return (
-              <Link
-                key={a.id}
-                to="/agents/$id/edit"
-                params={{ id: a.id }}
-                className="rounded-2xl bg-card border border-line p-5 hover:-translate-y-1 hover:shadow-soft transition-all flex flex-col"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="h-11 w-11 rounded-xl flex items-center justify-center text-white text-[12px] font-extrabold shrink-0"
-                    style={{ background: accentColor[a.accent] }}
-                  >
-                    {info.short.slice(0, 3)}
+              <div key={g.id} className="lp-prog" style={card} onClick={() => navigate({ to: "/guidelines/$id", params: { id: g.id } })}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ height: 40, width: 40, borderRadius: 12, background: "var(--icm-slate-100)", display: "grid", placeItems: "center", flex: "none" }}>
+                    <FileText className="h-5 w-5" style={{ color: "#0E9C8A" }} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-[15px] font-extrabold text-ink truncate">{a.name}</h3>
-                    <p className="text-[11px] text-ink3 uppercase tracking-wider font-semibold">
-                      {info.label}
-                    </p>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 700, color: "var(--fg1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</div>
+                    <div style={{ fontFamily: "var(--font-text)", fontSize: 11, color: "var(--fg4)", textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700, marginTop: 2 }}>{g.state} · {g.program_type}</div>
                   </div>
-                  <span
-                    className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded text-white"
-                    style={{ background: a.status === "active" ? "var(--green)" : "var(--amber)" }}
-                  >
-                    {a.status}
-                  </span>
+                  <span style={{ fontFamily: "var(--font-text)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#fff", background: g.status === "published" ? "var(--icm-green)" : "var(--warning)", padding: "2px 7px", borderRadius: 6 }}>{g.status}</span>
                 </div>
-
-                {a.guidelines_engine_ids.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {a.guidelines_engine_ids.map((gid) => (
-                      <span
-                        key={gid}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-muted text-ink2"
-                      >
-                        <Shield className="h-3 w-3 text-teal" />
-                        {guidelineName(gid)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-4 pt-4 border-t border-line flex items-center justify-between text-[12px] text-ink3">
-                  <span className="inline-flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5" />
-                    {used} individual{used === 1 ? "" : "s"}
-                  </span>
-                  <span>Configure →</span>
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border-soft)", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "var(--font-text)", fontSize: 12, color: "var(--fg3)" }}>
+                  <span>v{g.version} · {count} items</span>
+                  <span>{new Date(g.updated_at).toLocaleDateString()}</span>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function Empty({ icon: Icon, title, sub }: { icon: typeof Shield; title: string; sub: string }) {
+  return (
+    <div style={{ background: "#fff", border: "1px solid var(--border-soft)", borderRadius: 16, padding: 48, textAlign: "center", boxShadow: "var(--shadow-sm)" }}>
+      <Icon className="h-8 w-8" style={{ color: "var(--fg4)", margin: "0 auto 12px" }} />
+      <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 800, color: "var(--fg1)" }}>{title}</div>
+      <div style={{ fontFamily: "var(--font-text)", fontSize: 13, color: "var(--fg3)", marginTop: 4 }}>{sub}</div>
     </div>
   );
 }
