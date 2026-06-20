@@ -6,6 +6,7 @@
 import { useState, type CSSProperties } from "react";
 import { V_STATS, V_BYPROG, vKpis, exRanked, PROGRAMS, orgStats } from "@/lib/lifeplan-org-seed";
 import { AI_GRAD, aiBtn, AiSpark, AiBadge, AiBorder, ComplianceRing, RingGauge } from "./dashboard-ui";
+import { ProgressDrawer } from "./ProgressDrawer";
 
 const vCard: CSSProperties = { background: "#fff", border: "1px solid var(--border-soft)", borderRadius: 16, boxShadow: "var(--shadow-sm)", overflow: "hidden" };
 const vCardHead: CSSProperties = { padding: "13px 20px", borderBottom: "1px solid var(--border-soft)", display: "flex", justifyContent: "space-between", alignItems: "center" };
@@ -26,9 +27,11 @@ const CS_RECS = [
 
 export function ConsolidatedOverview({ updated }: { updated: string }) {
   const [done, setDone] = useState<Record<number, boolean>>({});
+  const [drillProgram, setDrillProgram] = useState<string | null>(null);
   const ranked = exRanked().slice().sort((a, b) => a.pct - b.pct); // worst first
 
   return (
+    <>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 16, alignItems: "start" }}>
       {/* left: executive scorecard */}
       <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
@@ -74,13 +77,13 @@ export function ConsolidatedOverview({ updated }: { updated: string }) {
               const pct = Math.round((st.onT / Math.max(1, st.people)) * 100);
               const c = pct >= 80 ? "#3CB54A" : pct >= 60 ? "#F5A524" : "#DC2626";
               return (
-                <div key={p} className="lp-prog" style={{ border: "1px solid var(--border-soft)", borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 9, textAlign: "center", cursor: "pointer" }}>
+                <button key={p} className="lp-prog" onClick={() => setDrillProgram(p)} style={{ border: "1px solid var(--border-soft)", borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 9, textAlign: "center", cursor: "pointer", background: "#fff" }}>
                   <RingGauge value={pct} size={84} stroke={9} color={c} label={`${pct}%`} />
                   <div>
                     <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700, color: "var(--fg1)" }}>{p}</div>
                     <div style={{ fontFamily: "var(--font-text)", fontSize: 11, color: "var(--fg4)", marginTop: 2 }}>{st.people} people</div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -95,7 +98,7 @@ export function ConsolidatedOverview({ updated }: { updated: string }) {
           {ranked.map(({ p, st, pct }) => {
             const c = pct >= 80 ? "#3CB54A" : pct >= 60 ? "#F5A524" : "#DC2626";
             return (
-              <div key={p} style={{ display: "grid", gridTemplateColumns: "1.6fr 110px 100px 100px 1fr", gap: 14, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--border-soft)" }}>
+              <div key={p} className="lp-prog" onClick={() => setDrillProgram(p)} style={{ display: "grid", gridTemplateColumns: "1.6fr 110px 100px 100px 1fr", gap: 14, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--border-soft)", cursor: "pointer" }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--fg1)" }}>{p}</div>
                 <div style={{ fontFamily: "var(--font-text)", fontSize: 13, color: "var(--fg2)" }}>{st.onT}/{st.people}</div>
                 <div style={{ fontFamily: "var(--font-text)", fontSize: 13, fontWeight: 700, color: st.overdue ? "#b91c1c" : "var(--fg4)" }}>{st.overdue}</div>
@@ -146,6 +149,8 @@ export function ConsolidatedOverview({ updated }: { updated: string }) {
         <AskCard />
       </div>
     </div>
+    {drillProgram && <ProgressDrawer program={drillProgram} onClose={() => setDrillProgram(null)} />}
+    </>
   );
 }
 
