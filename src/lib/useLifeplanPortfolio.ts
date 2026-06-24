@@ -146,6 +146,51 @@ export function useLifeplanPortfolio(filters: PortfolioFilters = {}) {
       };
     });
 
-    return { rows, programs, sites, planTypes, kpis, compliance, byPlanType, totalAll: all.length };
+    // Per-INDIVIDUAL compliance rollup (an individual is out/off if any plan
+    // is) — the hero ring counts people, not plans.
+    const worst = (bs: ComplianceBucket[]): ComplianceBucket =>
+      bs.includes("out_of_compliance") ? "out_of_compliance" : bs.includes("off_track") ? "off_track" : "on_track";
+    const indMap = new Map<string, { program: string; site: string; buckets: ComplianceBucket[] }>();
+    for (const r of rows) {
+      if (!indMap.has(r.individualId)) indMap.set(r.individualId, { program: r.program, site: r.site, buckets: [] });
+      indMap.get(r.individualId)!.buckets.push(r.compliance);
+    }
+    const indCompliance = new Map<string, ComplianceBucket>();
+    let pOn = 0, pOff = 0, pOut = 0;
+    for (const [id, v] of indMap) {
+      const b = worst(v.buckets);
+      indCompliance.set(id, b);
+      if (b === "on_track") pOn++; else if (b === "off_track") pOff++; else pOut++;
+    }
+    const people = { onT: pOn, offT: pOff, outC: pOut, total: indMap.size };
+
+    // Per-program stats (people-based on-track %, plan-based risk counts).
+    const progMap = new Map<string, { people: Set<string>; plans: number; onT: number; overdue: number; missing: number }>();
+    for (const [id, v] of indMap) {
+      if (!progMap.has(v.program)) progMap.set(v.program, { people: new Set(), plans: 0, onT: 0, overdue: 0, missing: 0 });
+      const g = progMap.get(v.program)!;
+      g.people.add(id);
+      if (indCompliance.get(id) === "on_track") g.onT++;
+    }
+    for (const r of rows) {
+      const g = progMap.get(r.program);
+      if (!g) continue;
+      g.plans++;
+      if (r.overdue) g.overdue++;
+      if (r.missingSource) g.missing++;
+    }
+    const byProgram = [...progMap.entries()]
+      .map(([program, g]) => ({
+        program,
+        people: g.people.size,
+        plans: g.plans,
+        onT: g.onT,
+        overdue: g.overdue,
+        missing: g.missing,
+        pct: Math.round((g.onT / Math.max(1, g.people.size)) * 100),
+      }))
+      .sort((a, b) => a.program.localeCompare(b.program));
+
+    return { rows, programs, sites, planTypes, kpis, compliance, byPlanType, people, byProgram, totalAll: all.length };
   }, [filters.program, filters.site, filters.search, filters.status, filters.planType]);
 }

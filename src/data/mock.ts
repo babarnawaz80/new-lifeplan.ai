@@ -784,3 +784,186 @@ export const accentColor: Record<Agent["accent"], string> = {
   red: "var(--red)",
   navy: "var(--navy)",
 };
+
+// ─────────────────────────────────────────────────────────────────────────
+// Demo roster seed — REAL individuals + plans across programs/sites so the
+// LifePlan org dashboard is populated with genuine, clickable records (every
+// person and plan deep-links to a working e-Chart / plan runtime). Plans live
+// in-memory; the real CareTracker/org rollup replaces this later.
+// ─────────────────────────────────────────────────────────────────────────
+(() => {
+  const PROGRAM_SITES: Record<string, string[]> = {
+    Residential: ["Columbia House", "Ellicott House", "Catonsville House"],
+    "Day Habilitation": ["Center 4", "Center 7"],
+    "In-Home Support": ["Baltimore East", "Howard County"],
+    Employment: ["Workforce Hub"],
+    "ICF/IID": ["Site 1", "Site 9"],
+  };
+  const PROGRAMS = Object.keys(PROGRAM_SITES);
+  const AGENTS = ["pcp", "bsp", "ncp", "med", "hrp"];
+  const FIRST = ["Maria", "Darnell", "Priya", "Ethan", "Kayla", "Tomas", "Aisha", "Liam", "Noor", "Devon", "Grace", "Hassan", "Ivy", "Jamal", "Owen", "Rosa", "Samuel", "Tara", "Victor", "Wren", "Yusuf"];
+  const LAST = ["Ramirez", "Johnson", "Shah", "Walker", "Brown", "Lee", "Mensah", "Rivera", "Khan", "Okafor", "Nguyen", "Patel", "Foster", "Reyes", "Adams", "Cole", "Diaz", "Ellis", "Flynn", "Greer", "Hayes"];
+
+  let s = 99;
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const DAY = 86400000;
+  const now = Date.now();
+  const iso = (offDays: number) => new Date(now + offDays * DAY).toISOString();
+
+  const GOAL_TEXT: Record<string, string> = {
+    person_centered: "Increase independent participation in chosen community activities",
+    behavior_support: "Use a coping strategy independently during transitions",
+    nursing_care: "Maintain stable vitals and medication adherence",
+    medication: "Take medications as prescribed with monitoring",
+    high_risk: "Follow the safety protocol to reduce identified risks",
+  };
+  const STRAT_TEXT: Record<string, string> = {
+    person_centered: "Weekly community outing with graduated prompting",
+    behavior_support: "Practice de-escalation steps with staff support",
+    nursing_care: "Daily vitals check and medication administration",
+    medication: "Medication administration with side-effect tracking",
+    high_risk: "Scheduled safety checks and environmental review",
+  };
+
+  function buildTree(planType: string, key: string): import("@/types/icmGoalOutcome").IcmPlanTree {
+    return {
+      plan_type: planType,
+      outcomes: [
+        {
+          id: `o_${key}`,
+          outcome_statement: "To live a healthy, self-directed life",
+          sort_order: 0,
+          goals: [
+            {
+              id: `g_${key}`,
+              goal_statement: GOAL_TEXT[planType] ?? "Make progress toward personal goals",
+              target_implementation_date: iso(14).slice(0, 10),
+              target_completion_date: iso(365).slice(0, 10),
+              who_will_help: "Direct Support Professionals",
+              frequency_worked_on: "Daily",
+              who_reviews_progress: "Program Coordinator",
+              review_frequency: "Quarterly",
+              family_or_responsible_person: null,
+              person_responsible: "Program Coordinator",
+              description: null,
+              progress: null,
+              status: "Active",
+              strategies: [
+                {
+                  id: `s_${key}`,
+                  title: STRAT_TEXT[planType] ?? "Support strategy",
+                  target_date: iso(365).slice(0, 10),
+                  person_responsible: "DSP",
+                  description: null,
+                  progress: null,
+                  service_delivery: {
+                    services_and_expected_outcomes: ["Completed", "Partially completed", "Refused", "Absent"],
+                    capture_readings: [{ label: "Minutes", units: "Simple Count" }],
+                    prompts: ["Offer a choice", "Encourage and reinforce"],
+                    protocol: "Follow the individual's support plan.",
+                    show_on_care_tracker: true,
+                    funding_stream: null,
+                    notify_when_documented: false,
+                    status: "Active",
+                  },
+                  schedule: [{ schedule_date: null, shift_time: "Day Shift", days: "Every Day" }],
+                  service_provided_by: ["DSP"],
+                  comments: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  // Normalize the 3 pre-existing individuals into the program set so the
+  // by-program donuts stay clean.
+  const fix = (id: string, program: string, site: string) => {
+    const ind = individuals.find((i) => i.id === id);
+    if (ind) { ind.program = program; ind.location = site; }
+  };
+  fix("esha", "Residential", "Columbia House");
+  fix("marcus", "Day Habilitation", "Center 7");
+  fix("lena", "In-Home Support", "Howard County");
+
+  // Build new individuals
+  for (let i = 0; i < FIRST.length; i++) {
+    const program = PROGRAMS[i % PROGRAMS.length];
+    const sites = PROGRAM_SITES[program];
+    const site = sites[Math.floor(rnd() * sites.length)];
+    const id = `ind_${1000 + i}`;
+    const fn = FIRST[i];
+    const ln = LAST[i % LAST.length];
+    individuals.push({
+      id,
+      name: `${fn} ${ln[0]}.`,
+      age: 19 + Math.floor(rnd() * 50),
+      date_of_birth: "1999-01-01",
+      gender: rnd() < 0.5 ? "Female" : "Male",
+      service_type: program === "Residential" || program === "ICF/IID" ? "Residential" : program,
+      program,
+      status: "active",
+      location: site,
+    });
+  }
+
+  // Build plans + attachments for every individual (incl. the 3 existing).
+  const roster = individuals.map((i) => i.id);
+  roster.forEach((indId, idx) => {
+    const ind = individuals.find((x) => x.id === indId)!;
+    const n = 2 + Math.floor(rnd() * 3); // 2–4 plans
+    const chosen = [...AGENTS].sort(() => rnd() - 0.5).slice(0, n);
+    // bucket: ~72% on track, ~18% off (one soon), ~10% out (overdue/missing)
+    const bucket = rnd();
+    chosen.forEach((agentId, j) => {
+      const ag = agents.find((a) => a.id === agentId);
+      if (!ag) return;
+      // attach (skip if already attached, e.g. esha's seeds)
+      if (!individualAgents.some((ia) => ia.individual_id === indId && ia.agent_id === agentId)) {
+        individualAgents.push({ id: `ia_seed_${indId}_${agentId}`, individual_id: indId, agent_id: agentId, status: "current", added_at: iso(-30) });
+      }
+      let status: Plan["status"];
+      let days = 45 + Math.floor(rnd() * 240);
+      let missing = false;
+      const roll = rnd();
+      status = roll < 0.45 ? "implemented" : roll < 0.7 ? "in_progress" : roll < 0.85 ? "implementing" : "draft";
+      if (j === 0 && bucket > 0.72 && bucket <= 0.9) {
+        days = 1 + Math.floor(rnd() * 28); // off track: due soon
+        if (status === "implemented") status = "in_progress";
+      } else if (j === 0 && bucket > 0.9) {
+        if (rnd() < 0.55) { days = -(2 + Math.floor(rnd() * 25)); status = "in_progress"; } // overdue
+        else { status = "draft"; missing = ag.content_origin === "source_plan"; days = 6 + Math.floor(rnd() * 18); }
+      }
+      const key = `${indId}_${agentId}`;
+      const implemented = status === "implemented";
+      const annual = iso(days);
+      const plan: Plan = {
+        id: `seed_plan_${key}`,
+        agent_id: agentId,
+        individual_id: indId,
+        individual_name: ind.name,
+        creation_mode: "ai",
+        plan_type_label: "Annual",
+        plan_mode: "annual",
+        status,
+        plan_content: implemented
+          ? { markdown: `${planTypeInfo(ag.plan_type).label} for ${ind.name}.`, implementation_date: iso(-20), implemented_by: "Babar Nawaz", structured_tree: buildTree(ag.plan_type, key) }
+          : {},
+        field_values: {},
+        source_document_name: missing ? undefined : ag.content_origin === "source_plan" ? "Source plan.pdf" : undefined,
+        source_document_text: missing ? undefined : ag.content_origin === "source_plan" ? "Seeded source document text." : undefined,
+        awaiting_source_document: missing,
+        structured_tree: implemented ? buildTree(ag.plan_type, key) : null,
+        auto_renew: false,
+        annual_plan_date: annual,
+        implementation_date: implemented ? iso(-20) : undefined,
+        created_at: iso(-40),
+        updated_at: iso(-5),
+      };
+      plans.push(plan);
+    });
+    void idx;
+  });
+})();

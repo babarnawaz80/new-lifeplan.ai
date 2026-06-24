@@ -11,7 +11,6 @@ import { BrandMark, aiBtn, AiSpark } from "@/components/lifeplan-dashboard/dashb
 import { ConsolidatedOverview } from "@/components/lifeplan-dashboard/ConsolidatedOverview";
 import { AgentsTab } from "@/components/lifeplan-dashboard/AgentsTab";
 import { useLifeplanPortfolio } from "@/lib/useLifeplanPortfolio";
-import { INDIVIDUALS } from "@/lib/lifeplan-org-seed";
 import "@/components/lifeplan-dashboard/dashboard.css";
 
 const TABS = [
@@ -41,7 +40,7 @@ function LifeplanDashboard() {
   const [analyzing, setAnalyzing] = useState(false);
   const [updated, setUpdated] = useState("2 minutes ago");
 
-  const { programs, sites } = useLifeplanPortfolio({});
+  const { programs, sites, people, kpis } = useLifeplanPortfolio({});
   const setTab = (t: Tab) => navigate({ to: "/lifeplan", search: t === "overview" ? {} : { tab: t } });
   const runIntelligence = () => {
     setAnalyzing(true);
@@ -59,7 +58,7 @@ function LifeplanDashboard() {
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <BrandMark size={24} />
               <div style={{ fontFamily: "var(--font-text)", fontSize: 12.5, color: "var(--fg3)" }}>
-                Richcroft, Inc. · {INDIVIDUALS.length} individuals on LifePlan
+                Richcroft, Inc. · {people.total} individuals · {kpis.totalActive} plans on LifePlan
               </div>
             </div>
             <span style={{ flex: 1 }} />
@@ -108,7 +107,7 @@ function LifeplanDashboard() {
             })}
           </div>
 
-          {active === "overview" && <ConsolidatedOverview updated={updated} />}
+          {active === "overview" && <ConsolidatedOverview updated={updated} program={program} site={site} search={search} />}
           {active === "agents" && <AgentsTab />}
         </div>
       </div>
