@@ -304,8 +304,22 @@ function PlanLogRow({
       </span>
 
       <div className="flex-1 min-w-0">
-        <div className="text-[14.5px] font-bold text-ink">
-          {plan.plan_type_label} {planTypeLabel}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[14.5px] font-bold text-ink">
+            {plan.plan_type_label} {planTypeLabel}
+          </span>
+          {plan.creation_mode === "ai" ? (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-white shrink-0"
+              style={{ background: "var(--ai-gradient)" }}
+            >
+              <Sparkles className="h-2.5 w-2.5" /> AI
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider text-ink2 bg-muted shrink-0">
+              <PencilLine className="h-2.5 w-2.5" /> Manual
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[12px] text-ink3">
           <span>

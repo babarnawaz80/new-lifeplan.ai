@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, Sparkles, Edit3 } from "lucide-react";
+import { ChevronRight, Sparkles, Edit3, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -43,6 +43,7 @@ import {
   type IcmPlanTree,
 } from "@/types/icmGoalOutcome";
 import { planTypeInfo, type Plan } from "@/data/mock";
+import { exportPlanPdf } from "@/lib/plan-pdf";
 
 // Read a plan's structured tree, preferring the top-level field but falling
 // back to plan_content (which persists in the existing jsonb column even when
@@ -398,6 +399,24 @@ function PlanRuntime() {
     toast.success("Draft saved.");
   };
 
+  // Export the implemented plan as a formatted PDF (print-to-PDF).
+  const exportPdf = () => {
+    const content = plan.plan_content as { implementation_date?: string; implemented_by?: string };
+    const ok = exportPlanPdf({
+      individualName: individual.name,
+      serviceType: individual.service_type,
+      planTypeLabel: planTypeInfo(agent.plan_type).label,
+      planTypeLabelLine: `${plan.plan_type_label} · ${plan.plan_mode === "annual" ? "Annual" : "On-the-Fly"}`,
+      annualDate: plan.annual_plan_date,
+      planDate: plan.created_at,
+      implementedDate: plan.implementation_date ?? content?.implementation_date,
+      implementedBy: content?.implemented_by,
+      tree: structuredTree ?? planTree(plan),
+      markdownFallback: planMarkdown,
+    });
+    if (!ok) toast.error("Allow pop-ups to export the PDF.");
+  };
+
   return (
     <AppShell>
       <div className="max-w-7xl mx-auto px-6 py-5">
@@ -425,6 +444,15 @@ function PlanRuntime() {
             <p className="text-[13px] text-ink2">For {individual.name}</p>
           </div>
           <div className="flex items-center gap-2">
+            {plan.status === "implemented" && (
+              <button
+                onClick={exportPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] border border-line bg-card text-[12px] font-semibold text-ink2 hover:text-ink hover:bg-muted"
+                title="Download the implemented plan as a PDF"
+              >
+                <FileDown className="h-3.5 w-3.5" /> Export PDF
+              </button>
+            )}
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted text-[11px] font-bold uppercase tracking-wider text-ink2">
               {plan.status === "implemented" ? (
                 <span className="text-green">Implemented</span>
