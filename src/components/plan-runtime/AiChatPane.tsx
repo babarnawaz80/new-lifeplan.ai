@@ -313,11 +313,9 @@ export function AiChatPane({
   const [viewMode, setViewMode] = useState<"structured" | "compare" | "text">("structured");
   const hasTree = !!structuredTree && !!planMeta;
   const hasCompare = hasTree && !!previousTree;
-  const effectiveMode = !hasTree
-    ? "text"
-    : viewMode === "compare" && !hasCompare
-      ? "structured"
-      : viewMode;
+  // Tabs always show after a draft. "Compare" needs a prior plan to compare
+  // against; if it's selected but unavailable, fall back to the Plan tab.
+  const effectiveMode = viewMode === "compare" && !hasCompare ? "structured" : viewMode;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -431,32 +429,36 @@ export function AiChatPane({
         {/* While streaming, always show the live markdown draft. */}
         {showPlan && planStreaming && <PlanPreview markdown={planMarkdown} streaming />}
 
-        {/* Once finished: tabbed structured view + comparison, or raw text. */}
+        {/* Once finished: tabbed view — Plan, Compare to current, Text. The
+            tab row always shows; Compare appears when a prior implemented plan
+            exists. The Plan tab uses the structured view when a tree was
+            parsed, otherwise the readable draft. */}
         {showPlan && !planStreaming && (
           <div className="space-y-3">
-            {hasTree && (
-              <div className="inline-flex items-center gap-1 rounded-[10px] bg-muted p-1">
-                <ViewTab active={effectiveMode === "structured"} onClick={() => setViewMode("structured")}>
-                  Plan
+            <div className="inline-flex items-center gap-1 rounded-[10px] bg-muted p-1">
+              <ViewTab active={effectiveMode === "structured"} onClick={() => setViewMode("structured")}>
+                Plan
+              </ViewTab>
+              {hasCompare && (
+                <ViewTab active={effectiveMode === "compare"} onClick={() => setViewMode("compare")}>
+                  Compare to current
                 </ViewTab>
-                {hasCompare && (
-                  <ViewTab active={effectiveMode === "compare"} onClick={() => setViewMode("compare")}>
-                    Compare to current
-                  </ViewTab>
-                )}
-                <ViewTab active={effectiveMode === "text"} onClick={() => setViewMode("text")}>
-                  Text
-                </ViewTab>
-              </div>
-            )}
+              )}
+              <ViewTab active={effectiveMode === "text"} onClick={() => setViewMode("text")}>
+                Text
+              </ViewTab>
+            </div>
 
-            {effectiveMode === "structured" && hasTree && (
-              <StructuredPlanView
-                tree={structuredTree!}
-                meta={planMeta!}
-                onEditText={() => setViewMode("text")}
-              />
-            )}
+            {effectiveMode === "structured" &&
+              (hasTree ? (
+                <StructuredPlanView
+                  tree={structuredTree!}
+                  meta={planMeta!}
+                  onEditText={() => setViewMode("text")}
+                />
+              ) : (
+                <PlanPreview markdown={planMarkdown} />
+              ))}
             {effectiveMode === "compare" && hasCompare && (
               <PlanComparison
                 previous={previousTree!}
