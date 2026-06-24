@@ -10,6 +10,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { BrandMark, aiBtn, AiSpark } from "@/components/lifeplan-dashboard/dashboard-ui";
 import { ConsolidatedOverview } from "@/components/lifeplan-dashboard/ConsolidatedOverview";
 import { AgentsTab } from "@/components/lifeplan-dashboard/AgentsTab";
+import { AskBar } from "@/components/lifeplan-dashboard/AskBar";
 import { useLifeplanPortfolio } from "@/lib/useLifeplanPortfolio";
 import "@/components/lifeplan-dashboard/dashboard.css";
 
@@ -83,6 +84,9 @@ function LifeplanDashboard() {
               {analyzing ? "Analyzing…" : "Run intelligence"}
             </button>
           </div>
+
+          {/* Full-width Ask bar — quick lookups across the portfolio */}
+          <AskBar />
 
           {/* Tab strip */}
           <div style={{ display: "flex", alignItems: "flex-end", gap: 4, borderBottom: "1px solid var(--border-soft)", marginBottom: 18 }}>

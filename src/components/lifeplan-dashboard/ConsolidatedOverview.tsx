@@ -3,7 +3,7 @@
 // behind it (deep-linking into the e-Chart and plan runtime). Compliance ring +
 // KPIs, by-program donuts, programs-ranked-by-risk, LifePlan Copilot rail, Ask.
 import { useMemo, useState, type CSSProperties } from "react";
-import { AI_GRAD, aiBtn, AiSpark, AiBadge, AiBorder, ComplianceRing, RingGauge } from "./dashboard-ui";
+import { AI_GRAD, aiBtn, AiSpark, ComplianceRing, RingGauge } from "./dashboard-ui";
 import { ProgressDrawer } from "./ProgressDrawer";
 import { useLifeplanPortfolio, type PortfolioRow, type ComplianceBucket } from "@/lib/useLifeplanPortfolio";
 
@@ -11,12 +11,6 @@ const vCard: CSSProperties = { background: "#fff", border: "1px solid var(--bord
 const vCardHead: CSSProperties = { padding: "13px 20px", borderBottom: "1px solid var(--border-soft)", display: "flex", justifyContent: "space-between", alignItems: "center" };
 const ghost: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "#fff", fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 13, color: "var(--fg2)", cursor: "pointer", width: "100%" };
 
-const CS_ASK = [
-  { q: "Who is at risk this week?", s: "These individuals have a plan overdue or blocked by a missing source document. Start with the ones at the top of the drill-down.", items: [["Overdue plans", "Open the Overdue tile to see who"], ["Missing source", "Blocked from drafting until a document is attached"]] },
-  { q: "Which program needs attention?", s: "The lowest-compliance program is at the bottom of the ranking. Click it to see each individual and plan.", items: [["Lowest program", "Open Programs ranked by risk"], ["Drill in", "Click the program to act"]] },
-  { q: "What is due in 30 days?", s: "Open the Due in 30 days tile to see every plan with a deadline inside a month, by individual.", items: [["Due soon", "Click the Due in 30 days KPI"]] },
-  { q: "Draft a leadership update", s: "Use the compliance ring and KPIs above for the headline numbers, then drill into any program for detail.", items: [["Headline", "On-track % from the ring"], ["Detail", "Drill into any meter"]] },
-];
 const CS_RECS = [
   { tone: "#DC2626", t: "Request source documents", d: "Some plans are blocked from drafting until a document is attached.", act: "Request", done: "Requested" },
   { tone: "#F5A524", t: "Escalate overdue plans", d: "Notify the managers of the programs carrying overdue plans.", act: "Notify managers", done: "Notified" },
@@ -169,56 +163,9 @@ export function ConsolidatedOverview({ updated, program, site, search }: { updat
               <button style={ghost}>View all insights</button>
             </div>
           </div>
-          <AskCard />
         </div>
       </div>
       {drill && <ProgressDrawer title={drill.title} rows={drill.rows} onClose={() => setDrill(null)} />}
     </>
-  );
-}
-
-function AskCard() {
-  const [answer, setAnswer] = useState<number | null>(null);
-  const [query, setQuery] = useState("");
-  const ans = answer != null ? CS_ASK[answer] : null;
-  const ask = (i: number) => { setAnswer(i); setQuery(CS_ASK[i].q); };
-  return (
-    <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--border-soft)", boxShadow: "var(--shadow-sm)", background: "#fff" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 16px", borderBottom: "1px solid var(--border-soft)" }}>
-        <AiBadge size={26} />
-        <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 14.5, color: "var(--fg1)" }}>Ask LifePlan</div>
-      </div>
-      <div style={{ padding: 14 }}>
-        <AiBorder radius={11}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 9px" }}>
-            <AiSpark size={16} color="#8B5CF6" />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Ask about your portfolio" style={{ flex: 1, minWidth: 0, border: "none", outline: "none", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--fg1)", background: "transparent" }} />
-            <button className="lp-act" onClick={() => setAnswer(answer == null ? 0 : answer)} style={{ ...aiBtn, padding: "7px 13px", fontSize: 12.5, boxShadow: "none" }}>Ask</button>
-          </div>
-        </AiBorder>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 11 }}>
-          {CS_ASK.map((a, i) => (
-            <span key={i} onClick={() => ask(i)} className="lp-chip" style={{ fontFamily: "var(--font-text)", fontSize: 11.5, fontWeight: 600, color: answer === i ? "#fff" : "var(--fg2)", background: answer === i ? "var(--icm-ink)" : "#fff", border: `1px solid ${answer === i ? "var(--icm-ink)" : "var(--border)"}`, borderRadius: 999, padding: "5px 11px", cursor: "pointer" }}>{a.q}</span>
-          ))}
-        </div>
-        {ans && (
-          <div className="lp-rise" style={{ marginTop: 13, paddingTop: 13, borderTop: "1px solid var(--border-soft)" }}>
-            <p style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--fg2)", margin: "0 0 11px", lineHeight: 1.5 }}>{ans.s}</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 12 }}>
-              {ans.items.map(([t, d], i) => (
-                <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 10px", background: "var(--icm-slate-50)", borderRadius: 9 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#DC2626", marginTop: 6, flex: "none" }} />
-                  <div>
-                    <div style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700, color: "var(--fg1)" }}>{t}</div>
-                    <div style={{ fontFamily: "var(--font-text)", fontSize: 11.5, color: "var(--fg3)", marginTop: 1 }}>{d}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button className="lp-act" style={{ ...aiBtn, padding: "8px 13px", fontSize: 12.5, width: "100%", justifyContent: "center" }}><AiSpark size={14} /> Draft outreach</button>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
