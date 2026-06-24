@@ -2,7 +2,7 @@
 // lookups over REAL data — type a name ("where is Johnny's plan") and it finds
 // the individual and lists their plans; click a plan to jump straight into its
 // runtime, or the name to open their e-Chart.
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AI_GRAD, AiSpark, AiBorder } from "./dashboard-ui";
 import { useLifeplanPortfolio, type PortfolioRow } from "@/lib/useLifeplanPortfolio";
@@ -13,7 +13,6 @@ const STATUS_DOT: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   draft: "Draft", in_progress: "In progress", implementing: "Implementing", implemented: "Implemented",
 };
-const chip: CSSProperties = { fontFamily: "var(--font-text)", fontSize: 11.5, fontWeight: 600, color: "var(--fg2)", background: "var(--icm-slate-100)", border: "1px solid var(--border-soft)", borderRadius: 999, padding: "5px 11px", cursor: "pointer" };
 
 export function AskBar() {
   const navigate = useNavigate();
@@ -33,45 +32,27 @@ export function AskBar() {
     return [...m.entries()].slice(0, 6);
   }, [q, rows]);
 
-  const sampleNames = useMemo(() => {
-    const seen = new Set<string>();
-    const names: string[] = [];
-    for (const r of rows) {
-      if (!seen.has(r.individualName)) { seen.add(r.individualName); names.push(r.individualName); }
-      if (names.length >= 4) break;
-    }
-    return names;
-  }, [rows]);
-
   return (
     <div style={{ position: "relative", marginBottom: 18 }}>
       <div style={{ background: "#fff", border: "1px solid var(--border-soft)", borderRadius: 14, boxShadow: "var(--shadow-sm)", padding: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ width: 30, height: 30, borderRadius: 9, background: AI_GRAD, display: "grid", placeItems: "center", flex: "none" }}><AiSpark size={16} /></span>
-          <AiBorder radius={11}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", minWidth: 0 }}>
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Ask LifePlan — e.g. where is Johnny's plan, who is overdue, find Maria…"
-                style={{ flex: 1, minWidth: 0, width: "100%", border: "none", outline: "none", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--fg1)", background: "transparent" }}
-              />
-            </div>
-          </AiBorder>
-          <button style={{ display: "inline-flex", alignItems: "center", gap: 7, background: AI_GRAD, color: "#fff", border: "none", padding: "10px 20px", borderRadius: 11, fontWeight: 700, fontSize: 13.5, cursor: "pointer", flex: "none" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <AiBorder radius={11}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", minWidth: 0 }}>
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Ask LifePlan — e.g. where is Johnny's plan"
+                  style={{ flex: 1, minWidth: 0, width: "100%", border: "none", outline: "none", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--fg1)", background: "transparent" }}
+                />
+              </div>
+            </AiBorder>
+          </div>
+          <button style={{ display: "inline-flex", alignItems: "center", gap: 7, background: AI_GRAD, color: "#fff", border: "none", padding: "11px 22px", borderRadius: 11, fontWeight: 700, fontSize: 13.5, cursor: "pointer", flex: "none" }}>
             <AiSpark size={15} /> Ask
           </button>
         </div>
-
-        {/* Suggestion chips when empty */}
-        {q.trim().length < 2 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 10, paddingLeft: 42 }}>
-            <span style={{ fontFamily: "var(--font-text)", fontSize: 11.5, color: "var(--fg4)", alignSelf: "center" }}>Try:</span>
-            {sampleNames.map((n) => (
-              <span key={n} className="lp-chip" style={chip} onClick={() => setQ(n.split(" ")[0])}>{n}</span>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Quick-answer results */}
