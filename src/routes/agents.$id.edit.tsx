@@ -8,6 +8,7 @@ import { BuilderCanvas } from "@/components/agents/builder/BuilderCanvas";
 import { ConfigPanel } from "@/components/agents/builder/ConfigPanel";
 import { AiAssist } from "@/components/agents/builder/AiAssist";
 import { SecondaryTabs } from "@/components/agents/builder/SecondaryTabs";
+import { AutonomyControl } from "@/components/agents/AutonomyControl";
 import { BuilderModeTabs, type BuilderMode } from "@/components/agents/builder/schema/BuilderModeTabs";
 import { SchemaCanvas, type SchemaSelection } from "@/components/agents/builder/schema/SchemaCanvas";
 import { FieldConfigPanel } from "@/components/agents/builder/schema/FieldConfigPanel";
@@ -222,6 +223,7 @@ function AgentEditor() {
               </span>
             </div>
           </div>
+          <AutonomyControl agent={agent} />
           <button
             onClick={onSave}
             disabled={busy}

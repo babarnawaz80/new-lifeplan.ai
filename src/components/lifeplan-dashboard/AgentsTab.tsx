@@ -4,7 +4,7 @@
 // via the top-right button. Create agent / Configure open the existing builder.
 import { useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { listAgents, listGuidelines, countIndividualsForAgent } from "@/integrations/icm";
+import { listAgents, listGuidelines, countIndividualsForAgent, listAgentActivity } from "@/integrations/icm";
 import { planTypeInfo, type Agent } from "@/data/mock";
 
 const APT: Record<string, { name: string; hue: string }> = {
@@ -31,7 +31,7 @@ function tint(hex: string, a: number) {
 type AgView = {
   id: string; name: string; abbr: string; hue: string; typeName: string;
   engine: string | null; b: { g: number; w: number; s: number; i: number };
-  using: number; draft: boolean; edited: string;
+  using: number; draft: boolean; edited: string; autonomous: boolean; recent: number;
 };
 
 function toView(a: Agent, engineName: (id: string) => string): AgView {
@@ -48,6 +48,7 @@ function toView(a: Agent, engineName: (id: string) => string): AgView {
     engine: a.guidelines_engine_ids[0] ? engineName(a.guidelines_engine_ids[0]) : null,
     b, using: countIndividualsForAgent(a.id), draft: a.status !== "active",
     edited: new Date(a.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    autonomous: !!a.autonomy_enabled, recent: listAgentActivity({ agentId: a.id }).length,
   };
 }
 
@@ -120,7 +121,15 @@ function AgentCard({ a, onClick }: { a: AgView; onClick: () => void }) {
           <div style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 700, color: "var(--fg1)", letterSpacing: "-0.01em", lineHeight: 1.25 }}>{a.name}</div>
           <div style={{ fontFamily: "var(--font-text)", fontSize: 11.5, color: "var(--fg4)", marginTop: 2 }}>{showType ? a.typeName : "Shared agent"}</div>
         </div>
-        <AgStatus draft={a.draft} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+          <AgStatus draft={a.draft} />
+          {a.autonomous && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999, color: "#fff", fontFamily: "var(--font-text)", fontWeight: 700, fontSize: 10.5, letterSpacing: "0.02em", textTransform: "uppercase", background: "linear-gradient(120deg,#16C0E8,#8B5CF6)" }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l1.7 5.1L19 9l-5.3 1.9L12 16l-1.7-5.1L5 9l5.3-1.9z" /></svg>
+              Autonomous
+            </span>
+          )}
+        </div>
       </div>
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 11 }}>
         <EngineChip engine={a.engine} />
