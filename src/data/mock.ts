@@ -37,6 +37,62 @@ export type Individual = {
 // requires uploading the individual's source document (from case management).
 export type ContentOrigin = "source_plan" | "assessment_data" | "ai_draft" | "manual";
 
+// Autonomy thresholds/switches. Sensible defaults so the toggle alone works.
+export type AutonomyConfig = {
+  cycle_opener: boolean;
+  input_chaser: boolean;
+  early_drafter: boolean;
+  implementation_watcher: boolean;
+  deadline_catcher: boolean;
+  guideline_drift: boolean;
+  no_progress_days: number; // off-track if a goal has no documentation in N days
+  notify_backoff_days: number; // re-notify cadence for missing inputs
+  review_cadence_days: number; // due-for-review window
+};
+
+export const DEFAULT_AUTONOMY_CONFIG: AutonomyConfig = {
+  cycle_opener: true,
+  input_chaser: true,
+  early_drafter: true,
+  implementation_watcher: true,
+  deadline_catcher: true,
+  guideline_drift: true,
+  no_progress_days: 14,
+  notify_backoff_days: 3,
+  review_cadence_days: 90,
+};
+
+// Which individuals/programs/sites an autonomous agent owns.
+export type AgentCoverage = {
+  id: string;
+  agent_id: string;
+  scope_type: "individual" | "program" | "site" | "all";
+  scope_id?: string; // individual id / program name / site name; empty for "all"
+  created_at: string;
+};
+
+// Activity log — every autonomous action writes one row.
+export type AgentActivity = {
+  id: string;
+  agent_id: string;
+  individual_id?: string;
+  plan_id?: string;
+  action_type:
+    | "heartbeat"
+    | "cycle_opened"
+    | "tasks_assigned"
+    | "input_missing"
+    | "input_present"
+    | "early_draft"
+    | "off_track"
+    | "deadline"
+    | "guideline_drift";
+  summary: string;
+  status: "info" | "action_taken" | "blocked" | "flagged";
+  payload?: Record<string, unknown>;
+  created_at: string;
+};
+
 export type Agent = {
   id: string;
   org_id: string;
@@ -60,6 +116,11 @@ export type Agent = {
   profile_fields: ToggleField[];
   output_fields: ToggleField[];
   plan_schema: PlanSchema;
+  // Autonomy (opt-in, off by default). When on, the agent runs the watch
+  // behaviors on a schedule for its coverage — but never implements,
+  // finalizes, or writes to CareTracker without a human.
+  autonomy_enabled?: boolean;
+  autonomy_config?: AutonomyConfig;
   created_from_template_id: string | null;
   created_at: string;
   updated_at: string;
@@ -713,6 +774,8 @@ export const individualAgents: IndividualAgent[] = [
 
 export const plans: Plan[] = [];
 export const taskAssignments: TaskAssignment[] = [];
+export const agentCoverage: AgentCoverage[] = [];
+export const agentActivity: AgentActivity[] = [];
 export const trainings: Training[] = [];
 export const careTrackerServices: CareTrackerService[] = [];
 

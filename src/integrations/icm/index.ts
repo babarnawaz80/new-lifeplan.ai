@@ -16,9 +16,12 @@ import {
   agentTemplates,
   guidelinesEngines,
   careTrackerServices,
+  agentCoverage,
+  agentActivity,
   ORG_ID,
   originForPlanType,
   planTypeInfo,
+  DEFAULT_AUTONOMY_CONFIG,
 } from "@/data/mock";
 import {
   persistPlan,
@@ -37,6 +40,9 @@ import type {
   AgentTemplate,
   GuidelinesEngine,
   CareTrackerService,
+  AgentCoverage,
+  AgentActivity,
+  AutonomyConfig,
 } from "@/data/mock";
 import {
   PROFILE_FIELD_NAMES,
@@ -422,6 +428,92 @@ export function getCareTrackerProgress(
     }
   }
   return out;
+}
+
+// ---- Autonomy: config, coverage, activity, CareTracker read-back ----
+
+export function setAgentAutonomy(agentId: string, enabled: boolean, config?: AutonomyConfig): Agent | undefined {
+  const a = agents.find((x) => x.id === agentId);
+  if (!a) return undefined;
+  a.autonomy_enabled = enabled;
+  if (config) a.autonomy_config = config;
+  else if (enabled && !a.autonomy_config) a.autonomy_config = { ...DEFAULT_AUTONOMY_CONFIG };
+  a.updated_at = new Date().toISOString();
+  persistAgent(a);
+  return a;
+}
+
+export function getAgentCoverage(agentId: string): AgentCoverage[] {
+  return agentCoverage.filter((c) => c.agent_id === agentId);
+}
+
+// Replace an agent's coverage with the given scopes.
+export function setAgentCoverage(
+  agentId: string,
+  scopes: { scope_type: AgentCoverage["scope_type"]; scope_id?: string }[],
+): void {
+  for (let i = agentCoverage.length - 1; i >= 0; i--) {
+    if (agentCoverage[i].agent_id === agentId) agentCoverage.splice(i, 1);
+  }
+  const now = new Date().toISOString();
+  scopes.forEach((s, i) => {
+    agentCoverage.push({ id: `cov_${agentId}_${i}_${Date.now()}`, agent_id: agentId, scope_type: s.scope_type, scope_id: s.scope_id, created_at: now });
+  });
+}
+
+// Expand an agent's coverage to a concrete list of individual ids.
+export function expandCoverage(agentId: string): string[] {
+  const cov = getAgentCoverage(agentId);
+  if (cov.length === 0) return [];
+  const ids = new Set<string>();
+  for (const c of cov) {
+    if (c.scope_type === "all") {
+      individuals.forEach((i) => ids.add(i.id));
+    } else if (c.scope_type === "individual" && c.scope_id) {
+      ids.add(c.scope_id);
+    } else if (c.scope_type === "program") {
+      individuals.filter((i) => getIndividualOrgContext(i.id).program === c.scope_id).forEach((i) => ids.add(i.id));
+    } else if (c.scope_type === "site") {
+      individuals.filter((i) => getIndividualOrgContext(i.id).site === c.scope_id).forEach((i) => ids.add(i.id));
+    }
+  }
+  return [...ids];
+}
+
+export function logAgentActivity(entry: Omit<AgentActivity, "id" | "created_at">): AgentActivity {
+  const row: AgentActivity = { ...entry, id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, created_at: new Date().toISOString() };
+  agentActivity.push(row);
+  return row;
+}
+
+export function listAgentActivity(filters: {
+  agentId?: string; individualId?: string; program?: string; site?: string; actionType?: string;
+} = {}): AgentActivity[] {
+  let rows = agentActivity.slice();
+  if (filters.agentId) rows = rows.filter((r) => r.agent_id === filters.agentId);
+  if (filters.individualId) rows = rows.filter((r) => r.individual_id === filters.individualId);
+  if (filters.actionType) rows = rows.filter((r) => r.action_type === filters.actionType);
+  if (filters.program) rows = rows.filter((r) => r.individual_id && getIndividualOrgContext(r.individual_id).program === filters.program);
+  if (filters.site) rows = rows.filter((r) => r.individual_id && getIndividualOrgContext(r.individual_id).site === filters.site);
+  return rows.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+}
+
+// Idempotency helper: was a matching action already logged within N days?
+export function hasRecentActivity(args: { agentId: string; planId?: string; individualId?: string; actionType: AgentActivity["action_type"]; withinDays: number }): boolean {
+  const cutoff = Date.now() - args.withinDays * 86400000;
+  return agentActivity.some((r) =>
+    r.agent_id === args.agentId &&
+    r.action_type === args.actionType &&
+    (args.planId ? r.plan_id === args.planId : true) &&
+    (args.individualId ? r.individual_id === args.individualId : true) &&
+    new Date(r.created_at).getTime() >= cutoff,
+  );
+}
+
+// CareTracker documentation read-back for the implementation watcher. Mock
+// returns sample documentation derived from the plan's structured tree.
+export function readCareTrackerProgress(individualId: string, planId: string): ServiceProgress[] {
+  return getCareTrackerProgress({ individualId, planId });
 }
 
 export function getProgressSummary(filters: CareTrackerProgressFilters = {}): {
