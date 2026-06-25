@@ -169,9 +169,10 @@ export function persistTraining(t: Training) {
       status: t.status,
       video_status: t.video_status,
       content: t.content ?? null,
+      published_at: t.published_at ?? null,
       created_at: t.created_at,
     },
-    ["content"],
+    ["content", "published_at"],
     "persistTraining",
   );
 }

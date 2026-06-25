@@ -13,7 +13,14 @@ import { BuilderModeTabs, type BuilderMode } from "@/components/agents/builder/s
 import { SchemaCanvas, type SchemaSelection } from "@/components/agents/builder/schema/SchemaCanvas";
 import { FieldConfigPanel } from "@/components/agents/builder/schema/FieldConfigPanel";
 import { getAgent, listGuidelines, listOptionSets, updateAgent, updateAgentSchema } from "@/integrations/icm";
-import { accentColor } from "@/data/mock";
+import {
+  accentColor,
+  resolveTrainingTemplate,
+  resolveTrainingConfig,
+  DEFAULT_TRAINING_TEMPLATE,
+  DEFAULT_TRAINING_CONFIG,
+  type TrainingConfig,
+} from "@/data/mock";
 import { buildAgent } from "@/lib/build-agent.functions";
 import { toast } from "sonner";
 import type { WorkflowPhase, ToggleField, PlanSchema } from "@/data/lifeplan-types";
@@ -72,6 +79,8 @@ function AgentEditor() {
   const [profileFields, setProfileFields] = useState<ToggleField[]>(agent.profile_fields);
   const [outputFields, setOutputFields] = useState<ToggleField[]>(agent.output_fields);
   const [instructions, setInstructions] = useState(agent.instructions);
+  const [trainingTemplate, setTrainingTemplate] = useState(resolveTrainingTemplate(agent));
+  const [trainingConfig, setTrainingConfig] = useState<TrainingConfig>(resolveTrainingConfig(agent));
   const [schema, setSchema] = useState<PlanSchema>(agent.plan_schema);
   const [mode, setMode] = useState<BuilderMode>("workflow");
   const [schemaSelection, setSchemaSelection] = useState<SchemaSelection>({ kind: null });
@@ -136,6 +145,8 @@ function AgentEditor() {
       profile_fields: profileFields,
       output_fields: outputFields,
       instructions,
+      training_prompt_template: trainingTemplate,
+      training_config: trainingConfig,
       status: "active",
     });
     updateAgentSchema(agent.id, schema);
@@ -281,6 +292,15 @@ function AgentEditor() {
                 )
               }
               onInstructionsChange={setInstructions}
+              trainingTemplate={trainingTemplate}
+              trainingConfig={trainingConfig}
+              onTrainingTemplateChange={setTrainingTemplate}
+              onTrainingConfigChange={(patch) => setTrainingConfig((c) => ({ ...c, ...patch }))}
+              onResetTraining={() => {
+                setTrainingTemplate(DEFAULT_TRAINING_TEMPLATE);
+                setTrainingConfig({ ...DEFAULT_TRAINING_CONFIG });
+                toast.success("Training recipe reset to default.");
+              }}
             />
           </div>
 

@@ -8,7 +8,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { AppShell } from "@/components/layout/AppShell";
 import { BrandMark, aiBtn, AiSpark } from "@/components/lifeplan-dashboard/dashboard-ui";
-import { ConsolidatedOverview } from "@/components/lifeplan-dashboard/ConsolidatedOverview";
+import { OverviewScale } from "@/components/lifeplan-dashboard/OverviewScale";
 import { AgentsTab } from "@/components/lifeplan-dashboard/AgentsTab";
 import { ActivityTab } from "@/components/lifeplan-dashboard/ActivityTab";
 import { AskBar } from "@/components/lifeplan-dashboard/AskBar";
@@ -87,8 +87,9 @@ function LifeplanDashboard() {
             </button>
           </div>
 
-          {/* Full-width Ask bar — quick lookups across the portfolio */}
-          <AskBar />
+          {/* Quick name-lookup Ask bar on the non-Overview tabs. The Overview
+              tab has its own grounded Ask (maps questions to real filters). */}
+          {active !== "overview" && <AskBar />}
 
           {/* Tab strip */}
           <div style={{ display: "flex", alignItems: "flex-end", gap: 4, borderBottom: "1px solid var(--border-soft)", marginBottom: 18 }}>
@@ -113,7 +114,7 @@ function LifeplanDashboard() {
             })}
           </div>
 
-          {active === "overview" && <ConsolidatedOverview updated={updated} program={program} site={site} search={search} />}
+          {active === "overview" && <OverviewScale program={program} site={site} search={search} onSetProgram={setProgram} />}
           {active === "activity" && <ActivityTab />}
           {active === "agents" && <AgentsTab />}
         </div>

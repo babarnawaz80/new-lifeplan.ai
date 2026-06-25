@@ -121,9 +121,27 @@ export type Agent = {
   // finalizes, or writes to CareTracker without a human.
   autonomy_enabled?: boolean;
   autonomy_config?: AutonomyConfig;
+  // Staff training video recipe. Editable per agent; seeded with
+  // DEFAULT_TRAINING_TEMPLATE / DEFAULT_TRAINING_CONFIG. The individual's first
+  // name and the plan content are injected at generation time. Resolve with
+  // resolveTrainingTemplate()/resolveTrainingConfig() so agents persisted
+  // before this existed still fall back to the seeded defaults.
+  training_prompt_template?: string;
+  training_config?: TrainingConfig;
   created_from_template_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+// Editable recipe controls for the per-individual training video + quiz.
+export type TrainingConfig = {
+  narrator_mode: "two_narrator_conversational" | "single_narrator";
+  video_length_target: string;
+  quiz_question_count: number;
+  quiz_min: number;
+  quiz_max: number;
+  first_name_only: boolean;
+  include_documentation_section: boolean;
 };
 
 export type AgentTemplate = {
@@ -241,8 +259,10 @@ export type TaskAssignment = {
 // video locally) plus the 12-question quiz with answer key and explanations.
 export type TrainingContent = {
   title: string;
+  subtitle?: string;
   slides: Array<{
     heading: string;
+    bullets?: string[]; // on-screen key points for the slide
     narration: Array<{ speaker: "Alex" | "Jamie"; text: string }>;
   }>;
   quiz: Array<{
@@ -260,8 +280,110 @@ export type Training = {
   status: "pending" | "ready" | "failed";
   video_status: "pending" | "ready" | "failed";
   content?: TrainingContent | null;
+  // Published to the training module for staff distribution (Section 4).
+  published_at?: string;
   created_at: string;
 };
+
+// ---- Training video recipe (seeded default, editable per agent) ----
+// Stored on the agent (training_prompt_template). Placeholders in double braces
+// are filled at generation time. An agent works great with zero edits.
+export const DEFAULT_TRAINING_TEMPLATE = `You are scripting a staff training video for direct support professionals and other team members who will carry out a support plan for a specific person. The goal is that anyone who watches comes away knowing exactly what this plan asks them to do, why it matters for this person, and how to document it. Warm, clear, practical. Never clinical jargon without plain-language explanation.
+
+PERSON AND PLAN
+- First name: {{individual_first_name}}
+- Plan type: {{plan_type_label}}
+- Plan content to teach from (authoritative, do not invent beyond it):
+{{plan_content}}
+
+FORMAT
+- Two narrators in natural conversation. Host A is warm and curious and asks the questions a new staff member would ask. Host B is knowledgeable and answers clearly and concretely. They alternate naturally, not rigidly.
+- Target length: {{video_length_target}} (aim for spoken-word pacing that fills this without padding).
+- Use {{individual_first_name}} throughout. First name only. Never state date of birth or full name.
+- Plain language. When a clinical or regulatory term appears, say it, then immediately explain it in everyday words.
+
+WHAT THE VIDEO MUST COVER, IN THIS ORDER
+1. Warm intro: who this training is for, and that it is about supporting {{individual_first_name}} specifically. Set a respectful, person-first tone.
+2. The big picture: what this plan is trying to achieve for {{individual_first_name}}, in one or two sentences a new staff member would remember.
+3. The outcomes and goals: walk through each outcome and its goals in plain language. For each, say what success looks like for {{individual_first_name}}.
+4. The strategies and activities staff actually do: for each key strategy, describe the concrete action staff take, any prompts to use, and the protocol or safety steps they must not skip. This is the heart of the video. Be specific and practical.
+5. Health, safety, and protocol must-knows: call out anything where getting it wrong could harm or distress {{individual_first_name}}. Make these memorable.
+6. How to document it: explain what staff record in CareTracker for these services, including any readings to capture, so the documentation actually reflects the support given.
+7. Short recap: the three or four things every staff member must remember about supporting {{individual_first_name}}.
+
+TONE AND VALUES
+- Person-centered and strengths-based. {{individual_first_name}} is a person, not a case. Lead with respect and dignity.
+- Practical over theoretical. A new staff member should be able to start their shift knowing what to do.
+- Honest about what matters most. Emphasize the few things that are easy to miss and important to get right.
+
+OUTPUT
+- Produce the full two-narrator script, ready to be voiced. Mark speaker turns clearly. Include brief on-screen slide cues in brackets where a visual would help, drawn only from the plan content.`;
+
+export const DEFAULT_TRAINING_CONFIG: TrainingConfig = {
+  narrator_mode: "two_narrator_conversational",
+  video_length_target: "5 to 8 minutes",
+  quiz_question_count: 12,
+  quiz_min: 10,
+  quiz_max: 15,
+  first_name_only: true,
+  include_documentation_section: true,
+};
+
+// Resolve the recipe for an agent, falling back to the seeded defaults so
+// agents created/persisted before training fields existed still generate well.
+export function resolveTrainingTemplate(agent: Pick<Agent, "training_prompt_template">): string {
+  const t = agent.training_prompt_template?.trim();
+  return t && t.length > 0 ? t : DEFAULT_TRAINING_TEMPLATE;
+}
+
+export function resolveTrainingConfig(agent: Pick<Agent, "training_config">): TrainingConfig {
+  return { ...DEFAULT_TRAINING_CONFIG, ...(agent.training_config ?? {}) };
+}
+
+// ---- Training module distribution (staff to-do list) ----
+// When a training is ready it is published to the training module, which fans
+// it out to staff who support the individual as a to-do item to watch + certify.
+export type StaffMember = { id: string; name: string; role: string };
+
+export type TrainingTodo = {
+  id: string;
+  staff_id: string;
+  staff_name: string;
+  staff_role: string;
+  individual_id: string;
+  plan_id: string;
+  training_id: string;
+  status: "not_started" | "in_progress" | "certified";
+  watched_pct: number;
+  score: number | null; // quiz %
+  assigned_at: string;
+  completed_at?: string;
+};
+
+export type TrainingPublication = {
+  id: string;
+  training_id: string;
+  individual_id: string;
+  plan_id: string;
+  published_at: string;
+  staff_count: number;
+};
+
+// Org staff roster (demo). The real roster comes from the host app.
+export const orgStaff: StaffMember[] = [
+  { id: "stf_1", name: "Maria Gomez", role: "DSP" },
+  { id: "stf_2", name: "James Carter", role: "DSP" },
+  { id: "stf_3", name: "Aisha Khan", role: "Nurse" },
+  { id: "stf_4", name: "Daniel Reed", role: "DSP" },
+  { id: "stf_5", name: "Sofia Martinez", role: "House Manager" },
+  { id: "stf_6", name: "Tom Becker", role: "DSP" },
+];
+
+// Staff who support a given individual. Demo: the whole roster. The real
+// mapping comes from the host app's scheduling/assignment data.
+export function staffSupporting(_individualId: string): StaffMember[] {
+  return orgStaff;
+}
 
 // CareTracker is the only real integration wire. LifePlan emits services in
 // the same shape the legacy modules already use, through one entry point.
@@ -734,6 +856,8 @@ function cloneTemplateAsAgent(t: AgentTemplate, id: string): Agent {
     profile_fields: JSON.parse(JSON.stringify(t.default_profile_fields)),
     output_fields: JSON.parse(JSON.stringify(t.default_output_fields)),
     plan_schema: JSON.parse(JSON.stringify(t.default_plan_schema)),
+    training_prompt_template: DEFAULT_TRAINING_TEMPLATE,
+    training_config: { ...DEFAULT_TRAINING_CONFIG },
     created_from_template_id: t.id,
     created_at: now,
     updated_at: now,
@@ -777,6 +901,8 @@ export const taskAssignments: TaskAssignment[] = [];
 export const agentCoverage: AgentCoverage[] = [];
 export const agentActivity: AgentActivity[] = [];
 export const trainings: Training[] = [];
+export const trainingTodos: TrainingTodo[] = [];
+export const trainingPublications: TrainingPublication[] = [];
 export const careTrackerServices: CareTrackerService[] = [];
 
 // ===== Org-level editable libraries (Prompt 8) =====

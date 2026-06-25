@@ -41,9 +41,9 @@ function planDocPct(r: PortfolioRow): number | null {
   return Math.round(svc.reduce((s, x) => s + x.pctComplete, 0) / svc.length);
 }
 
-export function ProgressDrawer({ title, rows, onClose }: { title: string; rows: PortfolioRow[]; onClose: () => void }) {
+export function ProgressDrawer({ title, rows, onClose, initialSelected }: { title: string; rows: PortfolioRow[]; onClose: () => void; initialSelected?: string | null }) {
   const navigate = useNavigate();
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialSelected ?? null);
 
   const byIndividual = useMemo(() => {
     const m = new Map<string, PortfolioRow[]>();

@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, Sparkles, Edit3, FileDown } from "lucide-react";
+import { ChevronRight, Sparkles, Edit3, FileDown, GraduationCap, Loader2, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -21,6 +22,8 @@ import {
   writeGoalOutcomeTree,
   createPendingTraining,
   updateTraining,
+  getTrainingForPlan,
+  publishTrainingToModule,
   mayHaveLegacyPlan,
 } from "@/integrations/icm";
 import { ChecklistPanel } from "@/components/plan-runtime/ChecklistPanel";
@@ -42,7 +45,13 @@ import {
   treeToPlainText,
   type IcmPlanTree,
 } from "@/types/icmGoalOutcome";
-import { planTypeInfo, type Plan } from "@/data/mock";
+import {
+  planTypeInfo,
+  resolveTrainingTemplate,
+  resolveTrainingConfig,
+  type Plan,
+} from "@/data/mock";
+import { TrainingPanel } from "@/components/training/TrainingPanel";
 import { exportPlanPdf } from "@/lib/plan-pdf";
 
 // Read a plan's structured tree, preferring the top-level field but falling
@@ -232,6 +241,65 @@ function PlanRuntime() {
   const [cutoverAcked, setCutoverAcked] = useState(false);
   const [trainingOpen, setTrainingOpen] = useState(false);
 
+  // ---- Per-individual training video + quiz (generated from the plan) ----
+  const [trainingTick, setTrainingTick] = useState(0);
+  const training = useMemo(() => getTrainingForPlan(planId), [planId, trainingTick]);
+  const trainingTriggeredRef = useRef(false);
+  const [trainingModalOpen, setTrainingModalOpen] = useState(false);
+
+  // Generate the training assets from the plan content + the agent's editable
+  // recipe. Runs in the background (pending -> ready); never blocks plan
+  // display. On ready, publishes to the training module for staff distribution.
+  const startTrainingGeneration = useCallback(
+    async (markdown: string, opts: { force?: boolean } = {}) => {
+      if (!markdown || markdown.length < 120) return;
+      const existing = getTrainingForPlan(planId);
+      if (!opts.force) {
+        if (trainingTriggeredRef.current) return;
+        // Don't regenerate a training that already exists (ready or in flight).
+        if (existing && existing.status !== "failed") {
+          trainingTriggeredRef.current = true;
+          return;
+        }
+      }
+      trainingTriggeredRef.current = true;
+      const rec = existing ?? createPendingTraining({ planId, individualId: id });
+      updateTraining(rec.id, { status: "pending", video_status: "pending" });
+      setTrainingTick((t) => t + 1);
+
+      const cfg = resolveTrainingConfig(agent);
+      const planDate = new Date(
+        plan.implementation_date ?? plan.annual_plan_date ?? plan.created_at,
+      ).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      try {
+        const content = await generateTrainingFn({
+          data: {
+            planContent: markdown,
+            individualName: individual.name,
+            individualFirstName: individual.name.split(/\s+/)[0] ?? individual.name,
+            planTypeLabel: planTypeInfo(agent.plan_type).label,
+            planDate,
+            trainingTemplate: resolveTrainingTemplate(agent),
+            quizQuestionCount: cfg.quiz_question_count,
+            videoLengthTarget: cfg.video_length_target,
+            firstNameOnly: cfg.first_name_only,
+            narratorMode: cfg.narrator_mode,
+          },
+        });
+        updateTraining(rec.id, { status: "ready", video_status: "ready", content });
+        const ready = getTrainingForPlan(planId);
+        if (ready) publishTrainingToModule({ individualId: id, planId, training: ready });
+        setTrainingTick((t) => t + 1);
+        toast.success("Staff training ready — published to the training module.");
+      } catch (err) {
+        updateTraining(rec.id, { status: "failed", video_status: "failed" });
+        setTrainingTick((t) => t + 1);
+        toast.error(err instanceof Error ? err.message : "Training generation failed.");
+      }
+    },
+    [planId, id, agent, individual, plan, generateTrainingFn],
+  );
+
   // Gate the implement flow with a cutover warning for plan types that may
   // already exist in the legacy module. No auto-detect in v1.
   const requestImplement = () => {
@@ -331,6 +399,13 @@ function PlanRuntime() {
       treeFromLegacyCaretracker(ct, agent.plan_type);
     if (tree) setStructuredTree(tree);
     persistContent(markdown, ct ?? caretrackerData, undefined, tree ?? undefined);
+
+    // Section 3: once a plan is generated, produce the staff training video +
+    // quiz in the background (non-blocking, once per plan). The plan displays
+    // immediately; the training panel shows a pending -> ready state.
+    if (markdown.length > 400 && !locked) {
+      void startTrainingGeneration(markdown);
+    }
 
     // Enrich tasks once we have substantial plan content
     if (markdown.length > 200 && Object.keys(taskInstructions).length === 0) {
@@ -448,6 +523,26 @@ function PlanRuntime() {
             <p className="text-[13px] text-ink2">For {individual.name}</p>
           </div>
           <div className="flex items-center gap-2">
+            {training && (
+              <button
+                onClick={() => setTrainingModalOpen(true)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-bold ${
+                  training.status === "ready"
+                    ? "text-white hover:opacity-95"
+                    : "border border-line bg-card text-ink2 hover:text-ink hover:bg-muted"
+                }`}
+                style={training.status === "ready" ? { background: "var(--ai-gradient)" } : undefined}
+                title="Staff training video & certification quiz for this plan"
+              >
+                {training.status === "pending" ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Training: preparing…</>
+                ) : training.status === "failed" ? (
+                  <><AlertTriangle className="h-3.5 w-3.5" /> Training: retry</>
+                ) : (
+                  <><GraduationCap className="h-3.5 w-3.5" /> Staff training</>
+                )}
+              </button>
+            )}
             {plan.status === "implemented" && (
               <button
                 onClick={exportPdf}
@@ -480,9 +575,11 @@ function PlanRuntime() {
           </div>
         </div>
 
-        {/* Two-pane layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5">
-          <aside className="min-w-0">
+        {/* Two-pane layout. On desktop the row is bounded to one screen and
+            each column scrolls internally — so a 30-50 page plan never grows
+            the page; you scroll within the plan pane. */}
+        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:h-[calc(100vh-200px)]">
+          <aside className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1">
             <ChecklistPanel
               phases={agent.workflow_data}
               annualDate={plan.annual_plan_date}
@@ -496,7 +593,7 @@ function PlanRuntime() {
             />
           </aside>
 
-          <section className="min-w-0 min-h-[calc(100vh-220px)] flex flex-col">
+          <section className="min-w-0 lg:h-full min-h-0 flex flex-col">
             {plan.creation_mode === "ai" ? (
               <AiChatPane
                 planId={planId}
@@ -546,49 +643,72 @@ function PlanRuntime() {
                 onImplement={requestImplement}
               />
             ) : planMarkdown ? (
-              <div className="space-y-3">
-                <PlanPreview
-                  markdown={planMarkdown}
-                  onSave={
-                    locked
-                      ? undefined
-                      : (next) => {
-                          setPlanMarkdown(next);
-                          persistContent(next, caretrackerData);
-                        }
-                  }
-                />
+              <div className="flex flex-col min-h-0 lg:h-full space-y-3">
+                <div className="flex-1 min-h-0 lg:overflow-y-auto lg:pr-1">
+                  <PlanPreview
+                    markdown={planMarkdown}
+                    onSave={
+                      locked
+                        ? undefined
+                        : (next) => {
+                            setPlanMarkdown(next);
+                            persistContent(next, caretrackerData);
+                          }
+                    }
+                  />
+                </div>
                 {locked ? (
-                  <div className="rounded-[12px] border border-line bg-muted/40 px-3.5 py-2.5 text-[12.5px] text-ink2">
+                  <div className="shrink-0 rounded-[12px] border border-line bg-muted/40 px-3.5 py-2.5 text-[12.5px] text-ink2">
                     <span className="font-semibold text-green">Implemented.</span> This plan is locked. Use Export PDF to download it, or start a new plan to make changes.
                   </div>
                 ) : (
-                  <ActionRow
-                    canImplement={canImplement}
-                    reviseInput=""
-                    onReviseInputChange={() => {}}
-                    onRegenerate={() => setPlanMarkdown("")}
-                    onAiRevise={() => {}}
-                    onSaveDraft={() => persistContent(planMarkdown, caretrackerData)}
-                    onImplement={requestImplement}
-                  />
+                  <div className="shrink-0">
+                    <ActionRow
+                      canImplement={canImplement}
+                      reviseInput=""
+                      onReviseInputChange={() => {}}
+                      onRegenerate={() => setPlanMarkdown("")}
+                      onAiRevise={() => {}}
+                      onSaveDraft={() => persistContent(planMarkdown, caretrackerData)}
+                      onImplement={requestImplement}
+                    />
+                  </div>
                 )}
               </div>
             ) : (
-              <ManualEditor
-                outputFields={agent.output_fields}
-                onSave={handleManualSave}
-                canImplement={canImplement}
-                onImplement={(md) => {
-                  setPlanMarkdown(md);
-                  persistContent(md, caretrackerData);
-                  requestImplement();
-                }}
-              />
+              <div className="flex-1 min-h-0 lg:overflow-y-auto">
+                <ManualEditor
+                  outputFields={agent.output_fields}
+                  onSave={handleManualSave}
+                  canImplement={canImplement}
+                  onImplement={(md) => {
+                    setPlanMarkdown(md);
+                    persistContent(md, caretrackerData);
+                    requestImplement();
+                  }}
+                />
+              </div>
             )}
           </section>
         </div>
+
       </div>
+
+      {/* Staff training lives in the top-corner launcher; the full video +
+          quiz opens here in a modal so it's one click away and never pushes
+          the (possibly 40-page) plan down. */}
+      {training && (
+        <Dialog open={trainingModalOpen} onOpenChange={setTrainingModalOpen}>
+          <DialogContent className="max-w-5xl w-[min(96vw,1100px)] max-h-[92vh] overflow-y-auto bg-card border-line p-5">
+            <DialogTitle className="sr-only">Staff training for {individual.name}</DialogTitle>
+            <TrainingPanel
+              training={training}
+              individualName={individual.name}
+              onRetry={() => void startTrainingGeneration(planMarkdown, { force: true })}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       <CutoverWarningDialog
         open={cutoverOpen}
@@ -610,31 +730,12 @@ function PlanRuntime() {
         open={trainingOpen}
         onOpenChange={setTrainingOpen}
         onGenerate={() => {
-          // Section 8: generate the narrated training AND the 12-question
-          // quiz from the implemented plan; both land on the training record
-          // in Individual Trainings when ready.
-          const training = createPendingTraining({ planId, individualId: id });
-          generateTrainingFn({
-            data: {
-              planContent: planMarkdown,
-              individualName: individual.name,
-              planTypeLabel: planTypeInfo(agent.plan_type).label,
-            },
-          })
-            .then((content) => {
-              updateTraining(training.id, {
-                status: "ready",
-                video_status: "ready",
-                content,
-              });
-              toast.success("Training ready — narrated video and 12-question quiz saved.");
-            })
-            .catch((err) => {
-              updateTraining(training.id, { status: "failed", video_status: "failed" });
-              toast.error(
-                err instanceof Error ? err.message : "Training generation failed.",
-              );
-            });
+          // Generate (or refresh) the narrated training + quiz from the
+          // implemented plan using the agent's recipe, then publish to the
+          // training module. Reuses the single generation path so the assets
+          // and publish stay consistent with the on-generation flow.
+          setTrainingOpen(false);
+          void startTrainingGeneration(planMarkdown, { force: true });
         }}
         onSkip={() => {
           setTrainingOpen(false);

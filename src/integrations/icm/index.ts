@@ -13,6 +13,9 @@ import {
   plans,
   taskAssignments,
   trainings,
+  trainingTodos,
+  trainingPublications,
+  staffSupporting,
   agentTemplates,
   guidelinesEngines,
   careTrackerServices,
@@ -22,6 +25,8 @@ import {
   originForPlanType,
   planTypeInfo,
   DEFAULT_AUTONOMY_CONFIG,
+  DEFAULT_TRAINING_TEMPLATE,
+  DEFAULT_TRAINING_CONFIG,
 } from "@/data/mock";
 import {
   persistPlan,
@@ -37,6 +42,8 @@ import type {
   Plan,
   TaskAssignment,
   Training,
+  TrainingTodo,
+  TrainingPublication,
   AgentTemplate,
   GuidelinesEngine,
   CareTrackerService,
@@ -134,7 +141,8 @@ export function createAgentFromTemplate(templateId: string): Agent {
     profile_fields: JSON.parse(JSON.stringify(t.default_profile_fields)),
     output_fields: JSON.parse(JSON.stringify(t.default_output_fields)),
     plan_schema: JSON.parse(JSON.stringify(t.default_plan_schema)),
-
+    training_prompt_template: DEFAULT_TRAINING_TEMPLATE,
+    training_config: { ...DEFAULT_TRAINING_CONFIG },
     created_from_template_id: t.id,
     created_at: now,
     updated_at: now,
@@ -164,6 +172,8 @@ export function createBlankAgent(): Agent {
     profile_fields: toToggleFields(PROFILE_FIELD_NAMES),
     output_fields: toToggleFields(OUTPUT_FIELD_NAMES),
     plan_schema: { sections: [] },
+    training_prompt_template: DEFAULT_TRAINING_TEMPLATE,
+    training_config: { ...DEFAULT_TRAINING_CONFIG },
     created_from_template_id: null,
 
     created_at: now,
@@ -288,6 +298,8 @@ export function createAgentFromConfig(args: {
       defaultSchemaFromOutputFields(args.output_fields),
       args.guidelineId,
     ),
+    training_prompt_template: DEFAULT_TRAINING_TEMPLATE,
+    training_config: { ...DEFAULT_TRAINING_CONFIG },
     created_from_template_id: null,
 
     created_at: now,
@@ -679,6 +691,103 @@ export function updateTraining(id: string, patch: Partial<Training>): Training |
   Object.assign(t, patch);
   persistTraining(t);
   return t;
+}
+
+// Latest training record for a plan (newest first).
+export function getTrainingForPlan(planId: string): Training | undefined {
+  return trainings
+    .filter((t) => t.plan_id === planId)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+}
+
+export function getTrainingForIndividual(individualId: string): Training | undefined {
+  return trainings
+    .filter((t) => t.individual_id === individualId && t.content)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+}
+
+// Publish a ready training to the existing training module. LifePlan does NOT
+// build its own staff distribution — it hands the finished video + quiz to the
+// module, which fans it out as a to-do item to staff who support the
+// individual. In this mock adapter we log the publish payload (the real module
+// API call goes here) and store the assignments locally so the flow is
+// verifiable end to end.
+export function publishTrainingToModule(args: {
+  individualId: string;
+  planId: string;
+  training: Training;
+}): TrainingPublication {
+  const now = new Date().toISOString();
+  updateTraining(args.training.id, { published_at: now });
+
+  // Demo seed so the certification queue reads realistically right away. The
+  // real module owns real watch/score state.
+  const seed: Array<{ status: TrainingTodo["status"]; watched: number; score: number | null }> = [
+    { status: "certified", watched: 100, score: 92 },
+    { status: "certified", watched: 100, score: 83 },
+    { status: "in_progress", watched: 60, score: null },
+    { status: "in_progress", watched: 25, score: null },
+    { status: "not_started", watched: 0, score: null },
+    { status: "not_started", watched: 0, score: null },
+  ];
+  const staff = staffSupporting(args.individualId);
+  staff.forEach((s, i) => {
+    const exists = trainingTodos.find(
+      (t) => t.training_id === args.training.id && t.staff_id === s.id,
+    );
+    if (exists) return;
+    const sd = seed[i] ?? { status: "not_started", watched: 0, score: null };
+    trainingTodos.push({
+      id: `todo_${args.training.id}_${s.id}`,
+      staff_id: s.id,
+      staff_name: s.name,
+      staff_role: s.role,
+      individual_id: args.individualId,
+      plan_id: args.planId,
+      training_id: args.training.id,
+      status: sd.status,
+      watched_pct: sd.watched,
+      score: sd.score,
+      assigned_at: now,
+      completed_at: sd.status === "certified" ? now : undefined,
+    });
+  });
+
+  const pub: TrainingPublication = {
+    id: `pub_${args.training.id}`,
+    training_id: args.training.id,
+    individual_id: args.individualId,
+    plan_id: args.planId,
+    published_at: now,
+    staff_count: staff.length,
+  };
+  const idx = trainingPublications.findIndex((p) => p.training_id === args.training.id);
+  if (idx >= 0) trainingPublications[idx] = pub;
+  else trainingPublications.push(pub);
+
+  // The real training-module API call goes here. Log the payload so the
+  // handoff is verifiable without a live module.
+  console.info("[icm.publishTrainingToModule]", {
+    individualId: args.individualId,
+    planId: args.planId,
+    trainingId: args.training.id,
+    video: { title: args.training.content?.title, slides: args.training.content?.slides.length ?? 0 },
+    quiz: args.training.content?.quiz.length ?? 0,
+    assignedStaff: staff.length,
+  });
+  return pub;
+}
+
+export function listTrainingTodos(filter: { individualId?: string; trainingId?: string } = {}): TrainingTodo[] {
+  return trainingTodos.filter(
+    (t) =>
+      (!filter.individualId || t.individual_id === filter.individualId) &&
+      (!filter.trainingId || t.training_id === filter.trainingId),
+  );
+}
+
+export function getTrainingPublication(trainingId: string): TrainingPublication | undefined {
+  return trainingPublications.find((p) => p.training_id === trainingId);
 }
 
 // ---- Profile data ----
