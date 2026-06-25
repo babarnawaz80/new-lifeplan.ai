@@ -3,20 +3,24 @@
 // the Gemini API for non-PHI dev. Returns null when no credentials are
 // configured so callers fall back to the browser Web Speech voice locally.
 //
-// To enable real AI voice, set EITHER:
-//   Vertex (production / PHI under BAA):
-//     GOOGLE_VERTEX_PROJECT, GOOGLE_VERTEX_LOCATION, GOOGLE_VERTEX_ACCESS_TOKEN
-//     (a short-lived OAuth token for the service account, e.g. from
-//      `gcloud auth print-access-token`, or minted by your token service)
-//   Gemini API (quick dev, NOT for PHI):
-//     GEMINI_TTS_API_KEY
+// Voice resolution order:
+//   1. Vertex (production / PHI under BAA):
+//        GOOGLE_VERTEX_PROJECT, GOOGLE_VERTEX_LOCATION, GOOGLE_VERTEX_ACCESS_TOKEN
+//   2. Gemini API key — GEMINI_TTS_API_KEY, or the existing GEMINI_API_KEY
+//      (so AI voice works out of the box wherever text generation already does;
+//       fine for demo/non-PHI data, NOT for real PHI — use Vertex for that).
+// When none are present we return null and the player uses the browser voice.
 //
 // The TTS model returns 16-bit PCM; we wrap it in a WAV container so the
-// browser can play it directly.
+// browser can play it directly. Override the model with GEMINI_TTS_MODEL.
 
 type Line = { speaker: string; text: string };
 
-const TTS_MODEL = "gemini-2.5-pro-preview-tts";
+const TTS_MODEL = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
+
+function geminiTtsKey(): string | undefined {
+  return process.env.GEMINI_TTS_API_KEY || process.env.GEMINI_API_KEY;
+}
 
 // Two distinct, natural prebuilt voices for the hosts (Gemini TTS voice names).
 const VOICE_BY_SPEAKER: Record<string, string> = {
@@ -31,7 +35,7 @@ export function isVertexTtsConfigured(): boolean {
       process.env.GOOGLE_VERTEX_LOCATION &&
       process.env.GOOGLE_VERTEX_ACCESS_TOKEN,
   );
-  return vertex || Boolean(process.env.GEMINI_TTS_API_KEY);
+  return vertex || Boolean(geminiTtsKey());
 }
 
 function ttsEndpoint(): { url: string; headers: Record<string, string> } | null {
@@ -44,7 +48,7 @@ function ttsEndpoint(): { url: string; headers: Record<string, string> } | null 
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     };
   }
-  const key = process.env.GEMINI_TTS_API_KEY;
+  const key = geminiTtsKey();
   if (key) {
     return {
       url: `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${key}`,
