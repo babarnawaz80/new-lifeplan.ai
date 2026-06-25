@@ -135,6 +135,9 @@ function PlanRuntime() {
   };
 
   const canImplement = allCompulsoryComplete(agent.workflow_data, isComplete);
+  // Once implemented, the plan is locked: no toggling tasks, no generate /
+  // regenerate / revise / edit, no re-implement. View + Export only.
+  const locked = plan.status === "implemented";
 
   // Structured iCM tree for the clean plan view + comparison.
   const [structuredTree, setStructuredTree] = useState<IcmPlanTree | null>(planTree(plan));
@@ -232,6 +235,7 @@ function PlanRuntime() {
   // Gate the implement flow with a cutover warning for plan types that may
   // already exist in the legacy module. No auto-detect in v1.
   const requestImplement = () => {
+    if (plan.status === "implemented") return; // already implemented; locked
     if (mayHaveLegacyPlan(agent.plan_type) && !cutoverAcked) {
       setCutoverOpen(true);
       return;
@@ -488,6 +492,7 @@ function PlanRuntime() {
               getOutcome={getOutcome}
               onSaveOutcome={onSaveOutcome}
               onAiDraft={handleAiDraftOutcome}
+              locked={locked}
             />
           </aside>
 
@@ -536,6 +541,7 @@ function PlanRuntime() {
                   todayDate: new Date().toISOString().slice(0, 10),
                   annualDate: plan.annual_plan_date,
                 }}
+                locked={locked}
                 onPlanContent={handlePlanContent}
                 onImplement={requestImplement}
               />
@@ -543,20 +549,30 @@ function PlanRuntime() {
               <div className="space-y-3">
                 <PlanPreview
                   markdown={planMarkdown}
-                  onSave={(next) => {
-                    setPlanMarkdown(next);
-                    persistContent(next, caretrackerData);
-                  }}
+                  onSave={
+                    locked
+                      ? undefined
+                      : (next) => {
+                          setPlanMarkdown(next);
+                          persistContent(next, caretrackerData);
+                        }
+                  }
                 />
-                <ActionRow
-                  canImplement={canImplement}
-                  reviseInput=""
-                  onReviseInputChange={() => {}}
-                  onRegenerate={() => setPlanMarkdown("")}
-                  onAiRevise={() => {}}
-                  onSaveDraft={() => persistContent(planMarkdown, caretrackerData)}
-                  onImplement={requestImplement}
-                />
+                {locked ? (
+                  <div className="rounded-[12px] border border-line bg-muted/40 px-3.5 py-2.5 text-[12.5px] text-ink2">
+                    <span className="font-semibold text-green">Implemented.</span> This plan is locked. Use Export PDF to download it, or start a new plan to make changes.
+                  </div>
+                ) : (
+                  <ActionRow
+                    canImplement={canImplement}
+                    reviseInput=""
+                    onReviseInputChange={() => {}}
+                    onRegenerate={() => setPlanMarkdown("")}
+                    onAiRevise={() => {}}
+                    onSaveDraft={() => persistContent(planMarkdown, caretrackerData)}
+                    onImplement={requestImplement}
+                  />
+                )}
               </div>
             ) : (
               <ManualEditor

@@ -62,6 +62,9 @@ export interface AiChatPaneProps {
   previousTree?: IcmPlanTree | null;
   previousLabel?: string;
   planMeta?: PlanMeta;
+  // When the plan is implemented, everything is read-only: no generate,
+  // regenerate, revise, attach, chat, or text editing. View + export only.
+  locked?: boolean;
   onPlanContent: (markdown: string, caretrackerData: unknown, treeRaw?: unknown) => void;
   onImplement: () => void;
 }
@@ -178,6 +181,7 @@ export function AiChatPane({
   previousTree,
   previousLabel,
   planMeta,
+  locked,
   onPlanContent,
   onImplement,
 }: AiChatPaneProps) {
@@ -276,9 +280,9 @@ export function AiChatPane({
   }, [messages, isLoading]);
 
   const startGeneration = (userPrompt: string) => {
-    // Draft gate: never call the model while generation is blocked (missing
-    // source document or incomplete pre-planning tasks).
-    if (draftBlockedReason) return;
+    // Implemented plans are locked; never call the model. Draft gate also
+    // blocks generation when a source/pre-planning isn't met.
+    if (locked || draftBlockedReason) return;
     const steps = buildProcessingSteps(enabledProfileFieldNames);
     setProcessingSteps(steps);
     setActiveStepIndex(0);
@@ -323,7 +327,7 @@ export function AiChatPane({
         ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto px-1 py-2 space-y-4"
       >
-        {messages.length === 0 && (
+        {messages.length === 0 && !locked && (
           <div className="rounded-2xl bg-card border border-line p-6 shadow-soft">
             <div className="flex items-center gap-2.5 mb-3">
               <div
@@ -454,7 +458,7 @@ export function AiChatPane({
                 <StructuredPlanView
                   tree={structuredTree!}
                   meta={planMeta!}
-                  onEditText={() => setViewMode("text")}
+                  onEditText={locked ? undefined : () => setViewMode("text")}
                 />
               ) : (
                 <PlanPreview markdown={planMarkdown} />
@@ -470,10 +474,14 @@ export function AiChatPane({
             {effectiveMode === "text" && (
               <PlanPreview
                 markdown={planMarkdown}
-                onSave={(next) => {
-                  setSavedMarkdown(next);
-                  onPlanContent(next, null);
-                }}
+                onSave={
+                  locked
+                    ? undefined
+                    : (next) => {
+                        setSavedMarkdown(next);
+                        onPlanContent(next, null);
+                      }
+                }
               />
             )}
           </div>
@@ -486,7 +494,7 @@ export function AiChatPane({
         )}
       </div>
 
-      {showPlan && !isLoading && (
+      {showPlan && !isLoading && !locked && (
         <div className="mt-3 shrink-0">
           <ActionRow
             canImplement={canImplement}
@@ -502,6 +510,17 @@ export function AiChatPane({
         </div>
       )}
 
+      {locked && (
+        <div className="mt-3 shrink-0 flex items-center gap-2 rounded-[12px] border border-line bg-muted/40 px-3.5 py-2.5 text-[12.5px] text-ink2">
+          <span className="inline-flex items-center gap-1.5 font-semibold text-green">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M20 6 9 17l-5-5" /></svg>
+            Implemented
+          </span>
+          <span>This plan is locked. Use Export PDF to download it, or start a new plan to make changes.</span>
+        </div>
+      )}
+
+      {!locked && (
       <div className="mt-3 shrink-0 flex items-center gap-2 rounded-[12px] border border-line bg-card px-3 py-2 shadow-soft">
         <input
           value={chatInput}
@@ -532,6 +551,7 @@ export function AiChatPane({
           <Send className="h-3.5 w-3.5" />
         </button>
       </div>
+      )}
     </div>
   );
 }

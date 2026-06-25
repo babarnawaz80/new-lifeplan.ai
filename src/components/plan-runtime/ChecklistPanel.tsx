@@ -24,6 +24,9 @@ export interface ChecklistPanelProps {
   // AI assist: drafts the note (or goals + summary for pivotal tasks) from the
   // individual's background and basis plan. Resolves to the suggested value.
   onAiDraft?: (task: WorkflowTask) => Promise<TaskOutcomeValue>;
+  // When the plan is implemented, the whole checklist is read-only: no task
+  // toggling, no outcome editing.
+  locked?: boolean;
 }
 
 export function ChecklistPanel({
@@ -35,6 +38,7 @@ export function ChecklistPanel({
   getOutcome,
   onSaveOutcome,
   onAiDraft,
+  locked,
 }: ChecklistPanelProps) {
   const counter = useMemo(() => countTasks(phases), [phases]);
   const { total, complete } = counter(isComplete);
@@ -57,12 +61,17 @@ export function ChecklistPanel({
             style={{ width: total === 0 ? "0%" : `${(complete / total) * 100}%` }}
           />
         </div>
-        {gated && (
+        {locked ? (
+          <div className="mt-3 flex items-start gap-2 text-[11.5px] text-green">
+            <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>This plan is implemented and locked. The workflow is read-only.</span>
+          </div>
+        ) : gated ? (
           <div className="mt-3 flex items-start gap-2 text-[11.5px] text-amber">
             <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>Compulsory tasks must be complete before Implement.</span>
           </div>
-        )}
+        ) : null}
       </div>
 
       {phases.map((phase, i) => (
@@ -103,8 +112,9 @@ export function ChecklistPanel({
                 isComplete={isComplete}
                 onToggle={onToggle}
                 outcome={getOutcome?.(task.id)}
-                onSaveOutcome={onSaveOutcome}
-                onAiDraft={onAiDraft}
+                onSaveOutcome={locked ? undefined : onSaveOutcome}
+                onAiDraft={locked ? undefined : onAiDraft}
+                locked={locked}
               />
             ))}
           </div>
@@ -123,6 +133,7 @@ function TaskRow({
   outcome,
   onSaveOutcome,
   onAiDraft,
+  locked,
 }: {
   task: WorkflowTask;
   annualDate: string;
@@ -132,6 +143,7 @@ function TaskRow({
   outcome?: TaskOutcomeValue;
   onSaveOutcome?: (taskId: string, value: TaskOutcomeValue) => void;
   onAiDraft?: (task: WorkflowTask) => Promise<TaskOutcomeValue>;
+  locked?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [outcomeOpen, setOutcomeOpen] = useState(false);
@@ -153,8 +165,9 @@ function TaskRow({
         {!everyoneMode && (
           <button
             type="button"
-            onClick={() => onToggle(task.id, null, !isComplete(task.id, null))}
-            className="mt-0.5 shrink-0"
+            onClick={() => { if (!locked) onToggle(task.id, null, !isComplete(task.id, null)); }}
+            disabled={locked}
+            className={`mt-0.5 shrink-0 ${locked ? "cursor-default" : ""}`}
             aria-label={allDone ? "Mark incomplete" : "Mark complete"}
           >
             {allDone ? (
@@ -211,13 +224,14 @@ function TaskRow({
               {task.assigned_roles.map((role) => (
                 <label
                   key={role}
-                  className="flex items-center gap-2 text-[12px] text-ink2 cursor-pointer"
+                  className={`flex items-center gap-2 text-[12px] text-ink2 ${locked ? "cursor-default" : "cursor-pointer"}`}
                 >
                   <Checkbox
                     checked={isComplete(task.id, role)}
-                    onCheckedChange={(v) =>
-                      onToggle(task.id, role, v === true)
-                    }
+                    disabled={locked}
+                    onCheckedChange={(v) => {
+                      if (!locked) onToggle(task.id, role, v === true);
+                    }}
                   />
                   <span>{role}</span>
                 </label>
