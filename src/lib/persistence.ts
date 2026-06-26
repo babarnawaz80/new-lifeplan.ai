@@ -170,9 +170,10 @@ export function persistTraining(t: Training) {
       video_status: t.video_status,
       content: t.content ?? null,
       published_at: t.published_at ?? null,
+      auto_trigger_reason: t.auto_trigger_reason ?? null,
       created_at: t.created_at,
     },
-    ["content", "published_at"],
+    ["content", "published_at", "auto_trigger_reason"],
     "persistTraining",
   );
 }

@@ -18,6 +18,7 @@ const ACTION_LABEL: Record<string, string> = {
   heartbeat: "Heartbeat", cycle_opened: "Cycle opened", tasks_assigned: "Tasks assigned",
   input_missing: "Missing source", input_present: "Source present", early_draft: "Early draft",
   off_track: "Off track", deadline: "Deadline", guideline_drift: "Guideline drift",
+  source_drift: "Source drift", auto_training: "Auto-training",
 };
 const sel: CSSProperties = { height: 36, padding: "0 12px", borderRadius: 10, border: "1px solid var(--border)", background: "#fff", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--fg1)", outline: "none" };
 

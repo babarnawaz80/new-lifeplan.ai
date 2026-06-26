@@ -10,9 +10,18 @@ import {
   getAgent,
   getIndividual,
   getIndividualOrgContext,
+  getGuidelinesForAgent,
+  getPlanCompliance,
+  getServiceAuthorization,
+  getUnitsDelivered,
+  getSourcePlanStatus,
+  getTrainingForPlan,
+  listTrainingTodos,
 } from "@/integrations/icm";
+import { requiredSignerRoles, signaturesSatisfied } from "@/lib/plan-runtime";
 import { planTypeInfo } from "@/data/mock";
-import type { Plan } from "@/data/mock";
+import type { Plan, Agent } from "@/data/mock";
+import type { IcmPlanTree } from "@/types/icmGoalOutcome";
 
 export type ComplianceBucket = "on_track" | "off_track" | "out_of_compliance";
 
@@ -35,6 +44,15 @@ export type PortfolioRow = {
   dueIn30: boolean;
   dueIn60: boolean;
   dueIn90: boolean;
+  // Provider-side compliance signals (Section 8). Derived from recorded
+  // compliance data where present, otherwise a deterministic seeded fallback so
+  // the portfolio reads realistically before any data is entered.
+  missingSignatures: boolean;
+  unitsOverAuth: boolean;
+  restrictionOverdue: boolean;
+  sourceDrift: boolean;
+  staffUntrained: boolean;
+  sourceIncomplete: boolean;
   compliance: ComplianceBucket;
 };
 
@@ -47,6 +65,112 @@ export type PortfolioFilters = {
 };
 
 const DAY = 24 * 60 * 60 * 1000;
+
+// Stable per-string hash for the seeded fallbacks (matches the adapter's style).
+function seedOf(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+// The six provider-side compliance signals for one plan. Recorded compliance
+// data always wins; where a seeded plan has none yet, a deterministic fallback
+// keyed off the plan id gives a believable, stable spread (same approach the
+// authorization adapter already uses). All reads go through the adapter seam.
+type ComplianceFlags = {
+  missingSignatures: boolean;
+  unitsOverAuth: boolean;
+  restrictionOverdue: boolean;
+  sourceDrift: boolean;
+  staffUntrained: boolean;
+  sourceIncomplete: boolean;
+};
+
+function complianceFlags(plan: Plan, agent: Agent, implemented: boolean, now: number): ComplianceFlags {
+  const comp = getPlanCompliance(plan.id);
+  const isSource = agent.content_origin === "source_plan";
+  const h = (suffix: string) => seedOf(`${plan.id}:${suffix}`) % 100;
+
+  // 1) Missing signatures — only a violation once a plan is live (the implement
+  // gate enforces them going forward; older/migrated plans may lack capture).
+  let missingSignatures = false;
+  if (implemented) {
+    const sigs = comp.signatures ?? [];
+    if (sigs.length) {
+      const roles = requiredSignerRoles(getGuidelinesForAgent(agent).map((g) => g.compliance_brief));
+      missingSignatures = !signaturesSatisfied(roles, sigs);
+    } else {
+      missingSignatures = h("sig") < 12;
+    }
+  }
+
+  // 2) Units over authorization / expired — billing-blocking on a live plan.
+  let unitsOverAuth = false;
+  if (implemented) {
+    const tree =
+      plan.structured_tree ??
+      (plan.plan_content as { structured_tree?: IcmPlanTree } | undefined)?.structured_tree ??
+      null;
+    const refs = (tree?.outcomes ?? []).flatMap((o) =>
+      o.goals.flatMap((g) => (g.strategies.length ? g.strategies.map((s) => s.id) : [g.id])),
+    );
+    if (refs.length) {
+      unitsOverAuth = refs.some((ref) => {
+        const auth = getServiceAuthorization(plan.individual_id, ref);
+        const delivered = getUnitsDelivered(plan.individual_id, ref);
+        const daysLeft = (new Date(auth.period_end).getTime() - now) / DAY;
+        return delivered > auth.authorized_units || daysLeft < 0;
+      });
+    } else {
+      unitsOverAuth = h("units") < 15;
+    }
+  }
+
+  // 3) Restriction past review — recorded restrictions only (explicit by design).
+  const restrictionOverdue = (comp.restrictions ?? []).some(
+    (r) => !!r.next_review_date && new Date(r.next_review_date).getTime() < now,
+  );
+
+  // 4) Source drift — provider plan out of sync with the care-manager source.
+  let sourceDrift = false;
+  if (isSource && implemented) {
+    const status = getSourcePlanStatus(plan.individual_id);
+    const builtOn = comp.built_on_source_version ?? comp.intake?.source_plan_version;
+    const reviewDays = (new Date(status.source_review_date).getTime() - now) / DAY;
+    const assessmentAgeDays = (now - new Date(status.assessment_date).getTime()) / DAY;
+    sourceDrift =
+      (!!builtOn && builtOn !== status.current_version) ||
+      reviewDays < 0 ||
+      assessmentAgeDays > 365;
+  }
+
+  // 5) Staff untrained on a live plan — any assigned staff not yet certified.
+  let staffUntrained = false;
+  if (implemented) {
+    const training = getTrainingForPlan(plan.id);
+    if (training) {
+      const todos = listTrainingTodos({ individualId: plan.individual_id, trainingId: training.id });
+      staffUntrained = todos.length > 0 && todos.some((t) => t.status !== "certified");
+    } else {
+      staffUntrained = h("train") < 20;
+    }
+  }
+
+  // 6) Source intake incomplete — functional assessment or consent not on file.
+  let sourceIncomplete = false;
+  if (isSource) {
+    if (comp.intake) {
+      sourceIncomplete = !comp.intake.functional_assessment_present || !comp.intake.consent_present;
+    } else {
+      sourceIncomplete = h("intake") < 15;
+    }
+  }
+
+  return { missingSignatures, unitsOverAuth, restrictionOverdue, sourceDrift, staffUntrained, sourceIncomplete };
+}
 
 export function buildRow(plan: Plan): PortfolioRow | null {
   const agent = getAgent(plan.agent_id);
@@ -70,13 +194,19 @@ export function buildRow(plan: Plan): PortfolioRow | null {
   const dueIn60 = !implemented && daysUntil > 30 && daysUntil <= 60;
   const dueIn90 = !implemented && daysUntil > 60 && daysUntil <= 90;
 
-  const compliance: ComplianceBucket = implemented
-    ? "on_track"
-    : overdue
-      ? "out_of_compliance"
-      : dueIn30 || missingSource
-        ? "off_track"
-        : "on_track";
+  const flags = complianceFlags(plan, agent, implemented, now);
+
+  // A live plan is no longer automatically "on track": a hard provider-side gap
+  // (missing signatures, billing-blocked units, source intake incomplete) puts
+  // it out of compliance; a softer gap (restriction review, source drift,
+  // untrained staff) puts it off track.
+  const hardGap = flags.missingSignatures || flags.unitsOverAuth || flags.sourceIncomplete;
+  const softGap = flags.restrictionOverdue || flags.sourceDrift || flags.staffUntrained;
+  const compliance: ComplianceBucket = overdue || (implemented && hardGap)
+    ? "out_of_compliance"
+    : dueIn30 || missingSource || (implemented && softGap)
+      ? "off_track"
+      : "on_track";
 
   return {
     planId: plan.id,
@@ -97,6 +227,12 @@ export function buildRow(plan: Plan): PortfolioRow | null {
     dueIn30,
     dueIn60,
     dueIn90,
+    missingSignatures: flags.missingSignatures,
+    unitsOverAuth: flags.unitsOverAuth,
+    restrictionOverdue: flags.restrictionOverdue,
+    sourceDrift: flags.sourceDrift,
+    staffUntrained: flags.staffUntrained,
+    sourceIncomplete: flags.sourceIncomplete,
     compliance,
   };
 }
@@ -131,6 +267,13 @@ export const EXCEPTION_CATEGORIES = [
   "due_30",
   "due_60_90",
   "awaiting_implementation",
+  // Provider-side compliance (Section 8)
+  "missing_signatures",
+  "units_over_auth",
+  "restriction_review",
+  "source_drift",
+  "staff_untrained",
+  "source_incomplete",
 ] as const;
 export type ExceptionCategory = (typeof EXCEPTION_CATEGORIES)[number];
 
@@ -153,6 +296,12 @@ export const CATEGORY_META: Record<
   due_30: { label: "Due in 30 days", descriptor: "act soon", severity: "amber" },
   due_60_90: { label: "Due in 60 to 90", descriptor: "upcoming", severity: "muted" },
   awaiting_implementation: { label: "Awaiting implementation", descriptor: "drafted, not live", severity: "blue" },
+  missing_signatures: { label: "Missing signatures", descriptor: "live plan unsigned", severity: "red" },
+  units_over_auth: { label: "Units over authorization", descriptor: "billing blocked", severity: "red" },
+  restriction_review: { label: "Restriction review due", descriptor: "past review date", severity: "amber" },
+  source_drift: { label: "Source plan drift", descriptor: "out of sync upstream", severity: "amber" },
+  staff_untrained: { label: "Staff not certified", descriptor: "untrained on live plan", severity: "amber" },
+  source_incomplete: { label: "Source intake incomplete", descriptor: "assessment or consent", severity: "red" },
 };
 
 export const CATEGORY_PREDICATE: Record<ExceptionCategory, (r: PortfolioRow) => boolean> = {
@@ -163,6 +312,12 @@ export const CATEGORY_PREDICATE: Record<ExceptionCategory, (r: PortfolioRow) => 
   due_30: (r) => r.dueIn30,
   due_60_90: (r) => r.dueIn60 || r.dueIn90,
   awaiting_implementation: (r) => r.awaitingImplementation,
+  missing_signatures: (r) => r.missingSignatures,
+  units_over_auth: (r) => r.unitsOverAuth,
+  restriction_review: (r) => r.restrictionOverdue,
+  source_drift: (r) => r.sourceDrift,
+  staff_untrained: (r) => r.staffUntrained,
+  source_incomplete: (r) => r.sourceIncomplete,
 };
 
 // ---- Summary -----------------------------------------------------------------

@@ -5,9 +5,10 @@
 // name and the plan date. If no training exists yet, a director can generate
 // one on demand here. The staff certification queue is demo data; wiring to
 // real assignments/auth comes later.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import {
   ChevronRight,
   GraduationCap,
@@ -27,16 +28,17 @@ import { TrainingQuiz } from "@/components/training/TrainingQuiz";
 import {
   getIndividual,
   getAgent,
+  getPlan,
   listAllPlans,
   createPendingTraining,
   updateTraining,
   getTrainingForPlan,
+  listTrainingsForPlan,
   publishTrainingToModule,
   listTrainingTodos,
 } from "@/integrations/icm";
 import { generateTraining } from "@/lib/generate-training.functions";
 import {
-  trainings as allTrainings,
   planTypeInfo,
   resolveTrainingTemplate,
   resolveTrainingConfig,
@@ -45,6 +47,9 @@ import {
 
 export const Route = createFileRoute("/individuals/$id/trainings")({
   head: () => ({ meta: [{ title: "Individual Trainings — LifePlan" }] }),
+  // Training is per-plan: ?plan=<planId> scopes to that specific plan's
+  // training. Without it, fall back to the latest implemented plan.
+  validateSearch: z.object({ plan: z.string().optional() }),
   component: IndividualTrainingsPage,
   notFoundComponent: () => (
     <AppShell>
@@ -111,27 +116,48 @@ function IndividualTrainingsPage() {
   if (!individual) throw notFound();
 
   const generateFn = useServerFn(generateTraining);
+  const { plan: planParam } = Route.useSearch();
 
-  // Latest implemented plan for this individual — the source the training is
-  // generated from (and where the plan date comes from).
+  // The plan this training is for. With ?plan=<id> it's that exact plan (so each
+  // plan has its OWN training — distinct title, video, and quiz). Without it,
+  // fall back to the individual's latest implemented plan.
   const sourcePlan = useMemo(() => {
+    if (planParam) {
+      const p = getPlan(planParam);
+      if (p && p.individual_id === id) return p;
+    }
     const implemented = listAllPlans()
       .filter((p) => p.individual_id === id && p.status === "implemented")
       .sort((a, b) =>
         (b.implementation_date ?? b.created_at).localeCompare(a.implementation_date ?? a.created_at),
       );
     return implemented[0];
-  }, [id]);
+  }, [id, planParam]);
 
-  // A ready, generated training for this individual (if one already exists).
+  // The training for THIS specific plan (not just any training the individual has).
   const existing = useMemo(
-    () => allTrainings.find((t) => t.individual_id === id && t.content),
-    [id],
+    () => (sourcePlan ? getTrainingForPlan(sourcePlan.id) : undefined),
+    [sourcePlan],
   );
 
   const [content, setContent] = useState<TrainingContent | null>(existing?.content ?? null);
   const [generating, setGenerating] = useState(false);
   const [watched, setWatched] = useState(false);
+
+  // Per-plan training history (initial + every advocate-triggered refresh).
+  const [historyTick, setHistoryTick] = useState(0);
+  const history = useMemo(
+    () => (sourcePlan ? listTrainingsForPlan(sourcePlan.id) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sourcePlan?.id, historyTick, generating],
+  );
+
+  // Switching to a different plan (?plan=) re-scopes to that plan's training.
+  useEffect(() => {
+    setContent(existing?.content ?? null);
+    setWatched(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourcePlan?.id]);
 
   const planDate =
     sourcePlan && fmtDate(sourcePlan.implementation_date ?? sourcePlan.annual_plan_date ?? sourcePlan.created_at);
@@ -154,7 +180,9 @@ function IndividualTrainingsPage() {
         planContent: markdown,
         individualName: individual.name,
         individualFirstName: individual.name.split(/\s+/)[0] ?? individual.name,
-        planTypeLabel: sourcePlan.plan_type_label,
+        // The PLAN TYPE (e.g. "Person-Centered Plan" / "Medication Monitoring"),
+        // not the cycle label — so each plan's training is titled for what it is.
+        planTypeLabel: planTypeInfo(agent?.plan_type ?? "").label,
         planDate: planDate || "",
         trainingTemplate: resolveTrainingTemplate(agent ?? {}),
         quizQuestionCount: cfg.quiz_question_count,
@@ -169,6 +197,7 @@ function IndividualTrainingsPage() {
         const ready = getTrainingForPlan(sourcePlan.id);
         if (ready) publishTrainingToModule({ individualId: id, planId: sourcePlan.id, training: ready });
         setStaffTick((t) => t + 1);
+        setHistoryTick((t) => t + 1);
         toast.success("Training ready — published to the training module.");
       })
       .catch((err) => {
@@ -199,6 +228,7 @@ function IndividualTrainingsPage() {
   const [showQueue, setShowQueue] = useState(false);
 
   const agentShort = sourcePlan ? planTypeInfo(getAgent(sourcePlan.agent_id)?.plan_type ?? "").short : "";
+  const planTypeName = sourcePlan ? planTypeInfo(getAgent(sourcePlan.agent_id)?.plan_type ?? "").label : "";
 
   return (
     <AppShell>
@@ -268,22 +298,51 @@ function IndividualTrainingsPage() {
                 {sourcePlan && (
                   <div className="flex items-center gap-2 text-[12.5px] text-ink3">
                     <FileText className="h-3.5 w-3.5" />
-                    From: {sourcePlan.plan_type_label} plan · implemented {fmtDate(sourcePlan.implementation_date)}
+                    From: {planTypeName} ({sourcePlan.plan_type_label}) · implemented {fmtDate(sourcePlan.implementation_date)}
+                  </div>
+                )}
+
+                {/* Training history — initial + every agent-triggered refresh */}
+                {history.length > 1 && (
+                  <div className="rounded-xl border border-line bg-card p-3 mt-1">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-ink3 mb-2">
+                      Training history · {history.length}
+                    </div>
+                    <div className="space-y-1.5">
+                      {history.map((h) => {
+                        const active = content && h.content === content;
+                        const isAdvocate = h.trigger === "advocate";
+                        return (
+                          <button
+                            key={h.id}
+                            type="button"
+                            onClick={() => h.content && setContent(h.content)}
+                            disabled={!h.content}
+                            className={`w-full flex items-center gap-2.5 text-left px-3 py-2 rounded-lg border transition-colors ${active ? "border-transparent ring-2 ring-violet-500 bg-violet-50" : "border-line hover:bg-muted"} disabled:opacity-60`}
+                          >
+                            <span
+                              className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0"
+                              style={isAdvocate
+                                ? { color: "var(--indigo)", background: "color-mix(in oklab, var(--indigo) 12%, transparent)" }
+                                : { color: "var(--ink2)", background: "var(--muted)" }}
+                            >
+                              {isAdvocate ? "Auto-refresh" : "Initial"}
+                            </span>
+                            <span className="flex-1 min-w-0 text-[12px] text-ink2 truncate">
+                              {isAdvocate && h.trigger_reason ? h.trigger_reason : "Plan training"}
+                              {!h.content && <span className="text-amber"> · preparing…</span>}
+                            </span>
+                            <span className="text-[11px] text-ink3 shrink-0">{fmtDate(h.created_at)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
-              {/* Quiz */}
+              {/* Quiz — locked until the full training is watched */}
               <div>
-                <div className="mb-4">
-                  <div className="text-[22px] font-extrabold text-ink tracking-tight">Certification quiz</div>
-                  <div className="text-[13.5px] text-ink3 mt-0.5">{content.quiz.length} questions · pass at 80%</div>
-                </div>
-                {!watched && (
-                  <p className="text-[12.5px] text-amber mb-3">
-                    Watch the full training to unlock certification (you can still answer below).
-                  </p>
-                )}
-                <TrainingQuiz training={content} />
+                <TrainingQuiz training={content} locked={!watched} />
               </div>
             </div>
 
@@ -348,7 +407,7 @@ function IndividualTrainingsPage() {
             <h2 className="text-[18px] font-extrabold text-ink">Generate {individual.name}'s training</h2>
             <p className="text-[13.5px] text-ink2 mt-2">
               {sourcePlan
-                ? `A 5–10 minute narrated video and a certification quiz, built from the ${sourcePlan.plan_type_label} plan${planDate ? ` (effective ${planDate})` : ""}.`
+                ? `A 5–10 minute narrated video and a certification quiz, built from ${individual.name}'s ${planTypeName}${planDate ? ` (effective ${planDate})` : ""}.`
                 : "Once a plan is implemented for this individual, you can generate a narrated training and quiz here."}
             </p>
             <button

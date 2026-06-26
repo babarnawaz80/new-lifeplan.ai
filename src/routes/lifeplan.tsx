@@ -5,7 +5,9 @@
 // real org/CareTracker rollup later).
 import { useState, type CSSProperties } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { BrandMark, aiBtn, AiSpark } from "@/components/lifeplan-dashboard/dashboard-ui";
 import { OverviewScale } from "@/components/lifeplan-dashboard/OverviewScale";
@@ -13,6 +15,10 @@ import { AgentsTab } from "@/components/lifeplan-dashboard/AgentsTab";
 import { ActivityTab } from "@/components/lifeplan-dashboard/ActivityTab";
 import { AskBar } from "@/components/lifeplan-dashboard/AskBar";
 import { useLifeplanPortfolio } from "@/lib/useLifeplanPortfolio";
+import { runAutonomyTick, processAutoTrainingQueue } from "@/lib/autonomy";
+import { generateTraining } from "@/lib/generate-training.functions";
+import { researchSupport } from "@/lib/research-support.functions";
+import type { TrainingContent } from "@/data/mock";
 import "@/components/lifeplan-dashboard/dashboard.css";
 
 const TABS = [
@@ -44,10 +50,36 @@ function LifeplanDashboard() {
   const [updated, setUpdated] = useState("2 minutes ago");
 
   const { programs, sites, people, kpis } = useLifeplanPortfolio({});
+  const generateTrainingFn = useServerFn(generateTraining);
+  const researchSupportFn = useServerFn(researchSupport);
   const setTab = (t: Tab) => navigate({ to: "/lifeplan", search: t === "overview" ? {} : { tab: t } });
-  const runIntelligence = () => {
+
+  // Run the autonomous agents now: the deterministic tick (cycle/notify/watch/
+  // advocate detection), then regenerate any trainings the advocate flagged and
+  // re-drop them into the staff queue.
+  const runIntelligence = async () => {
+    if (analyzing) return;
     setAnalyzing(true);
-    setTimeout(() => { setAnalyzing(false); setUpdated("just now"); }, 1100);
+    try {
+      const tick = runAutonomyTick();
+      const { regenerated } = await processAutoTrainingQueue(
+        generateTrainingFn as unknown as (args: { data: Record<string, unknown> }) => Promise<TrainingContent>,
+        {
+          max: 3,
+          research: researchSupportFn as unknown as (args: { data: Record<string, unknown> }) => Promise<{ research: string; sources: { title: string; url: string }[] }>,
+        },
+      );
+      setUpdated("just now");
+      const bits: string[] = [];
+      if (tick.actions) bits.push(`${tick.actions} action${tick.actions === 1 ? "" : "s"} taken`);
+      if (tick.flags) bits.push(`${tick.flags} flag${tick.flags === 1 ? "" : "s"}`);
+      if (regenerated) bits.push(`${regenerated} staff training${regenerated === 1 ? "" : "s"} refreshed`);
+      toast.success(bits.length ? `Intelligence run — ${bits.join(", ")}.` : "Intelligence run — everything on track.");
+    } catch {
+      toast.error("Intelligence run hit an error. Please try again.");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const showFilters = active === "overview";

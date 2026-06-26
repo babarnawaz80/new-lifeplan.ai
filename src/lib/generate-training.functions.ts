@@ -26,6 +26,11 @@ const InputSchema = z.object({
   videoLengthTarget: z.string().default("5 to 8 minutes"),
   firstNameOnly: z.boolean().default(true),
   narratorMode: z.string().default("two_narrator_conversational"),
+  // Set by the autonomous Training Advocate: the trend it noticed and the
+  // researched, evidence-based strategies to teach. When present, the script
+  // addresses what's slipping and how to do better.
+  trendContext: z.string().default(""),
+  researchNotes: z.string().default(""),
 });
 
 const SlideSchema = z.object({
@@ -136,7 +141,16 @@ export const generateTraining = createServerFn({ method: "POST" })
               ? `Render the two narrators as speakers named "Jamie" (warm, curious — asks the questions a new staff member would ask) and "Alex" (knowledgeable — answers clearly and concretely). Alternate them naturally. The FIRST slide opens by greeting the team and naming ${firstName}${data.planDate ? ` and the plan date (${data.planDate})` : ""}.`
               : `Use a single narrator; set every narration line's speaker to "Alex". The first slide opens by greeting the team and naming ${firstName}${data.planDate ? ` and the plan date (${data.planDate})` : ""}.`,
             ``,
-            `Also produce a quiz of EXACTLY ${quizCount} multiple-choice questions that check the practical things a team member must know from THIS plan (frequencies, prompts, protocols, what to document, who is responsible). Each has exactly 4 options, one correct (correct_index 0-3), and a one-sentence explanation.`,
+            // Advocate context: this is a TREND-TRIGGERED refresh, so name what's
+            // slipping and teach the researched, evidence-based ways to do better.
+            data.trendContext
+              ? `=== WHY THIS REFRESH (address it head-on, supportively) ===\nThis training was triggered because the agent is monitoring ${firstName}'s plan and noticed: ${data.trendContext}\nAdd an early slide titled "What we're noticing" that names this honestly and without blame, and frames the goal as getting back on track for ${firstName}.`
+              : "",
+            data.researchNotes
+              ? `=== EVIDENCE-BASED WAYS TO DO BETTER (researched) ===\nAdd a slide titled "How we can support ${firstName} better" that turns these researched strategies into concrete staff actions for THIS plan:\n${data.researchNotes.slice(0, 3000)}\nAttribute them as current best practice (not invented). Weave 1-2 of these into the quiz.`
+              : "",
+            ``,
+            `Also produce a quiz of EXACTLY ${quizCount} multiple-choice questions that check the practical things a team member must know from THIS plan (frequencies, prompts, protocols, what to document, who is responsible)${data.trendContext ? ", including what to change based on what we're noticing" : ""}. Each has exactly 4 options, one correct (correct_index 0-3), and a one-sentence explanation.`,
             `Use only facts from the plan content. ${data.firstNameOnly ? `Use ${firstName}'s FIRST NAME ONLY throughout — never a full name or date of birth.` : ""} Person-centered language; avoid the bare word "care" (use "support"). No invented clinical facts.`,
           ].join("\n"),
           prompt: `Individual first name: ${firstName}. Plan type: ${data.planTypeLabel}. Plan date: ${data.planDate || "current cycle"}.\n\nPlan content:\n\n${data.planContent.slice(0, 16000)}`,

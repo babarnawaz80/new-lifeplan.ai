@@ -5,7 +5,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight, X, ExternalLink } from "lucide-react";
-import { ComplianceRing, RingGauge } from "./dashboard-ui";
+import { ComplianceRing } from "./dashboard-ui";
 import { ProgressDrawer } from "./ProgressDrawer";
 import { OverviewAsk } from "./OverviewAsk";
 import { OverviewTrends } from "./OverviewTrends";
@@ -146,33 +146,46 @@ function NeedsAttention({ summary, onPick }: { summary: ReturnType<typeof useLif
         <span style={{ fontSize: 14, fontWeight: 700, color: "var(--fg1)" }}>Needs attention</span>
         <span style={{ fontFamily: "var(--font-text)", fontSize: 12, color: "var(--fg4)" }}>{summary.needsAttention} flags to act on</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12, padding: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 10, padding: 16 }}>
         {EXCEPTION_CATEGORIES.map((cat) => {
           const count = summary.categories[cat];
           const meta = CATEGORY_META[cat];
           const allClear = count === 0;
           const color = allClear ? "#3CB54A" : SEVERITY_COLOR[meta.severity];
-          const share = allClear ? 100 : Math.round((count / flagged) * 100);
+          const share = allClear ? 0 : Math.round((count / flagged) * 100);
           return (
             <button
               key={cat}
               onClick={() => !allClear && onPick(cat)}
               disabled={allClear}
               className="lp-prog"
-              style={{ border: "1px solid var(--border-soft)", borderRadius: 12, padding: "14px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center", background: "#fff", cursor: allClear ? "default" : "pointer" }}
+              style={{ position: "relative", border: "1px solid var(--border-soft)", borderRadius: 12, padding: "13px 15px 13px 16px", display: "flex", flexDirection: "column", gap: 6, textAlign: "left", background: "#fff", cursor: allClear ? "default" : "pointer", overflow: "hidden" }}
               title={allClear ? "All clear" : `${count} ${meta.label.toLowerCase()} — ${share}% of flagged plans`}
             >
-              <RingGauge value={share} size={78} stroke={9} color={color} label={String(count)} />
-              <div>
-                <div style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700, color: "var(--fg1)" }}>{meta.label}</div>
-                <div style={{ fontFamily: "var(--font-text)", fontSize: 10.5, color: allClear ? "#1a6d26" : "var(--fg4)", marginTop: 2 }}>{allClear ? "all clear" : meta.descriptor}</div>
+              <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: color }} />
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", color: allClear ? "#1a6d26" : "var(--fg1)", lineHeight: 1 }}>{count}</span>
+                {allClear ? (
+                  <span style={{ fontFamily: "var(--font-text)", fontSize: 11, fontWeight: 700, color: "#1a6d26" }}>all clear</span>
+                ) : (
+                  <span style={{ fontFamily: "var(--font-text)", fontSize: 11, color: "var(--fg4)" }}>{share}%</span>
+                )}
               </div>
+              <div>
+                <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700, color: "var(--fg1)" }}>{meta.label}</div>
+                <div style={{ fontFamily: "var(--font-text)", fontSize: 11, color: "var(--fg4)", marginTop: 1 }}>{meta.descriptor}</div>
+              </div>
+              {!allClear && (
+                <div style={{ height: 4, borderRadius: 999, background: "var(--icm-slate-200)", overflow: "hidden", marginTop: 2 }}>
+                  <div style={{ width: `${share}%`, height: "100%", background: color, borderRadius: 999 }} />
+                </div>
+              )}
             </button>
           );
         })}
       </div>
       <div style={{ padding: "0 16px 14px", fontFamily: "var(--font-text)", fontSize: 11, color: "var(--fg4)" }}>
-        Ring shows each category's share of all flagged plans. Numbers are the count to act on.
+        Each number is the count to act on; the bar is its share of all flagged plans.
       </div>
     </div>
   );

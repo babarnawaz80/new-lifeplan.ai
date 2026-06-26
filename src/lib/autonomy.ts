@@ -3,8 +3,9 @@
 // it runs in-process over the mock store and can be invoked from the dashboard.
 //
 // HARD LIMIT (enforced here): autonomy may open shells, assign tasks, notify,
-// prepare drafts, watch, and flag. It NEVER implements, finalizes, or writes to
-// CareTracker. Those stay human-approved — this module imports no implement /
+// prepare drafts, watch, flag, and distribute STAFF TRAINING (refresh + drop to
+// the staff queue). It NEVER implements, finalizes, or writes to CareTracker.
+// Those stay human-approved — this module imports no implement /
 // writeGoalOutcomeTree / pushToCareTracker function.
 import {
   listAgents,
@@ -17,9 +18,27 @@ import {
   hasRecentActivity,
   readCareTrackerProgress,
   getGuideline,
+  getPlanCompliance,
+  getSourcePlanStatus,
+  createPendingTraining,
+  updateTraining,
+  publishTrainingToModule,
+  listTrainings,
+  getPlan,
+  getIndividual,
+  getAgent,
 } from "@/integrations/icm";
 import { prePlanningPhases } from "@/lib/plan-runtime";
-import { planTypeInfo, DEFAULT_AUTONOMY_CONFIG, type Agent, type Plan, type AutonomyConfig } from "@/data/mock";
+import {
+  planTypeInfo,
+  resolveTrainingTemplate,
+  resolveTrainingConfig,
+  DEFAULT_AUTONOMY_CONFIG,
+  type Agent,
+  type Plan,
+  type AutonomyConfig,
+  type TrainingContent,
+} from "@/data/mock";
 
 const DAY = 86400000;
 const daysUntil = (iso?: string) => (iso ? Math.round((new Date(iso).getTime() - Date.now()) / DAY) : 0);
@@ -59,7 +78,9 @@ export function runAutonomyTick(opts: { maxPairs?: number } = {}): TickResult {
         if (cfg.early_drafter) earlyDrafter(agent, p, cfg, bump);
         if (cfg.deadline_catcher) deadlineCatcher(agent, p, cfg, bump);
         if (cfg.implementation_watcher) implementationWatcher(agent, p, cfg, bump);
+        if (cfg.training_advocate) trainingAdvocate(agent, p, cfg, bump);
         if (cfg.guideline_drift) guidelineDrift(agent, p, bump);
+        if (cfg.source_drift) sourceDrift(agent, p, bump);
       }
     }
   }
@@ -68,6 +89,88 @@ export function runAutonomyTick(opts: { maxPairs?: number } = {}): TickResult {
 
 function planComplete(plan: Plan): boolean {
   return plan.status === "implemented";
+}
+
+// Regenerate the video + quiz for every training the advocate flagged
+// (auto_trigger_reason set), then re-publish to the staff queue. This is the
+// async half of the advocate — it needs the AI, so the caller passes the bound
+// generateTraining server fn. Bounded by `max` per run.
+export async function processAutoTrainingQueue(
+  generate: (args: { data: Record<string, unknown> }) => Promise<TrainingContent>,
+  opts: {
+    max?: number;
+    // Optional AI web-research fn (researchSupport). When provided, the new
+    // training teaches researched, evidence-based ways to better support.
+    research?: (args: { data: Record<string, unknown> }) => Promise<{ research: string; sources: { title: string; url: string }[] }>;
+  } = {},
+): Promise<{ regenerated: number }> {
+  const max = opts.max ?? 3;
+  const queue = listTrainings().filter((t) => t.auto_trigger_reason).slice(0, max);
+  let regenerated = 0;
+  for (const t of queue) {
+    const plan = getPlan(t.plan_id);
+    const individual = getIndividual(t.individual_id);
+    if (!plan || !individual) {
+      updateTraining(t.id, { auto_trigger_reason: undefined });
+      continue;
+    }
+    const agent = getAgent(plan.agent_id);
+    const cfg = resolveTrainingConfig(agent ?? {});
+    const typeLabel = planTypeInfo(agent?.plan_type ?? "").label;
+    const firstName = individual.name.split(/\s+/)[0] ?? individual.name;
+    const trendSummary = t.auto_trigger_reason ?? t.trigger_reason ?? "";
+    const markdown = (plan.plan_content as { markdown?: string })?.markdown ?? `${typeLabel} for ${individual.name}.`;
+    const planDate = new Date(
+      plan.implementation_date ?? plan.annual_plan_date ?? plan.created_at,
+    ).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    try {
+      // 1) Research current best practice for this trend (grounded if available).
+      let researchNotes = "";
+      let grounded = false;
+      if (opts.research) {
+        try {
+          const r = await opts.research({
+            data: { serviceType: individual.service_type, planTypeLabel: typeLabel, firstName, trendSummary },
+          });
+          researchNotes = r.research;
+          grounded = (r.sources?.length ?? 0) > 0;
+        } catch {
+          /* research is best-effort */
+        }
+      }
+      // 2) Generate a NEW training that addresses the trend + the research.
+      const content = await generate({
+        data: {
+          planContent: markdown,
+          individualName: individual.name,
+          individualFirstName: firstName,
+          planTypeLabel: typeLabel,
+          planDate,
+          trainingTemplate: resolveTrainingTemplate(agent ?? {}),
+          quizQuestionCount: cfg.quiz_question_count,
+          videoLengthTarget: cfg.video_length_target,
+          firstNameOnly: cfg.first_name_only,
+          narratorMode: cfg.narrator_mode,
+          trendContext: trendSummary,
+          researchNotes,
+        },
+      });
+      updateTraining(t.id, { content, status: "ready", video_status: "ready", auto_trigger_reason: undefined });
+      publishTrainingToModule({ individualId: t.individual_id, planId: t.plan_id, training: { ...t, content } });
+      logAgentActivity({
+        agent_id: plan.agent_id,
+        individual_id: t.individual_id,
+        plan_id: t.plan_id,
+        action_type: "auto_training",
+        status: "action_taken",
+        summary: `Generated a fresh ${typeLabel} training addressing the trend (${trendSummary})${grounded ? ", with researched best-practice strategies," : ""} and dropped it into the staff queue.`,
+      });
+      regenerated++;
+    } catch {
+      // Leave the flag set so it retries on the next run.
+    }
+  }
+  return { regenerated };
 }
 
 // 1) Cycle opener — open the next draft shell + assign pre-planning tasks.
@@ -161,6 +264,47 @@ function implementationWatcher(agent: Agent, plan: Plan, cfg: AutonomyConfig, bu
   bump("flagged");
 }
 
+// 4b) Training advocate — the agent acts as the individual's advocate. When
+// staff are slipping on a live plan (declining engagement / missed
+// documentation), it flags the plan's training for a refresh, drops it back
+// into the staff queue, and logs the action. Idempotent (backoff). The actual
+// video/quiz regeneration is done by processAutoTrainingQueue() (needs the AI).
+function trainingAdvocate(agent: Agent, plan: Plan, cfg: AutonomyConfig, bump: (s: string) => void) {
+  if (!planComplete(plan)) return;
+  const svc = readCareTrackerProgress(plan.individual_id, plan.id);
+  if (!svc.length) return;
+  const slipping = svc.filter((s) => {
+    const lastDays = s.lastDocumented ? Math.round((Date.now() - new Date(s.lastDocumented).getTime()) / DAY) : 999;
+    return s.trend === "down" || lastDays > cfg.no_progress_days || s.pctComplete < 40;
+  });
+  // Need a real pattern, not a one-off — staff are dropping the ball.
+  if (slipping.length < 2) return;
+  if (hasRecentActivity({ agentId: agent.id, planId: plan.id, actionType: "auto_training", withinDays: cfg.no_progress_days })) return;
+
+  const reason = `${slipping.length} services slipping — declining engagement / missed documentation`;
+  // Create a NEW training (a fresh version in the plan's history), flag it for
+  // regeneration with the trend context, and drop it into the staff queue now.
+  const training = createPendingTraining({
+    planId: plan.id,
+    individualId: plan.individual_id,
+    trigger: "advocate",
+    triggerReason: reason,
+  });
+  updateTraining(training.id, { auto_trigger_reason: reason });
+  publishTrainingToModule({ individualId: plan.individual_id, planId: plan.id, training });
+
+  logAgentActivity({
+    agent_id: agent.id,
+    individual_id: plan.individual_id,
+    plan_id: plan.id,
+    action_type: "auto_training",
+    status: "action_taken",
+    summary: `Staff engagement on this ${planTypeInfo(agent.plan_type).label} is slipping (${slipping.length} services) — refreshed the staff training and dropped it into the staff queue.`,
+    payload: { services: slipping.map((s) => s.serviceTitle), reason },
+  });
+  bump("action_taken");
+}
+
 // 5) Deadline catcher — overdue / due soon / due for review.
 function deadlineCatcher(agent: Agent, plan: Plan, cfg: AutonomyConfig, bump: (s: string) => void) {
   const d = daysUntil(plan.annual_plan_date);
@@ -191,5 +335,45 @@ function guidelineDrift(agent: Agent, plan: Plan, bump: (s: string) => void) {
   if (engine.version <= planVersion) return;
   if (hasRecentActivity({ agentId: agent.id, planId: plan.id, actionType: "guideline_drift", withinDays: 30 })) return;
   logAgentActivity({ agent_id: agent.id, individual_id: plan.individual_id, plan_id: plan.id, action_type: "guideline_drift", status: "flagged", summary: `Built on ${engine.name} v${planVersion}; current is v${engine.version}. Refresh recommended.` });
+  bump("flagged");
+}
+
+// 7) Source-plan drift — for provider plans that implement a care-manager
+// source plan (Life Plan / ISP). The source has its OWN clocks, separate from
+// the provider plan's annual date: an upstream version, a review/annual date,
+// and a functional-assessment date. This flags when the provider plan is built
+// on a stale source version, the source review date has passed, or the source
+// assessment is older than a year (a non-calendar trigger to re-sync).
+function sourceDrift(agent: Agent, plan: Plan, bump: (s: string) => void) {
+  if (agent.content_origin !== "source_plan") return;
+  if (!planComplete(plan)) return;
+  const status = getSourcePlanStatus(plan.individual_id);
+  const builtOn = getPlanCompliance(plan.id).built_on_source_version
+    ?? getPlanCompliance(plan.id).intake?.source_plan_version;
+  const reviewDays = daysUntil(status.source_review_date);
+  const assessmentAgeDays = Math.round((Date.now() - new Date(status.assessment_date).getTime()) / DAY);
+
+  const reasons: string[] = [];
+  if (builtOn && builtOn !== status.current_version) {
+    reasons.push(`source plan revised to ${status.current_version} (this plan implements ${builtOn})`);
+  }
+  if (reviewDays < 0) {
+    reasons.push(`source review date passed ${Math.abs(reviewDays)} days ago`);
+  }
+  if (assessmentAgeDays > 365) {
+    reasons.push(`functional assessment is ${Math.round(assessmentAgeDays / 30)} months old`);
+  }
+  if (!reasons.length) return;
+  if (hasRecentActivity({ agentId: agent.id, planId: plan.id, actionType: "source_drift", withinDays: 30 })) return;
+
+  logAgentActivity({
+    agent_id: agent.id,
+    individual_id: plan.individual_id,
+    plan_id: plan.id,
+    action_type: "source_drift",
+    status: "flagged",
+    summary: `Out of sync with the source plan: ${reasons.join("; ")}. Re-sync recommended.`,
+    payload: { built_on: builtOn, current_version: status.current_version, source_review_date: status.source_review_date, assessment_date: status.assessment_date },
+  });
   bump("flagged");
 }

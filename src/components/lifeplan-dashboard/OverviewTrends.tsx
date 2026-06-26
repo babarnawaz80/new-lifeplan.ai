@@ -8,7 +8,6 @@
 import { useState, type CSSProperties } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2, Sparkles, TrendingDown, ChevronRight, RotateCcw } from "lucide-react";
-import { RingGauge } from "./dashboard-ui";
 import { getCareTrackerProgress } from "@/integrations/icm";
 import type { ServiceProgress } from "@/lib/caretracker-progress";
 
@@ -98,13 +97,13 @@ export function OverviewTrends() {
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, padding: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10, padding: 16 }}>
             {TREND_ORDER.map((k) => {
               const m = TREND_META[k];
               const count = data.counts[k];
               const allClear = count === 0;
               const color = allClear ? "#3CB54A" : m.color;
-              const share = allClear ? 100 : Math.round((count / flagged) * 100);
+              const share = allClear ? 0 : Math.round((count / flagged) * 100);
               const active = open === k;
               return (
                 <button
@@ -112,14 +111,27 @@ export function OverviewTrends() {
                   onClick={() => !allClear && setOpen(active ? null : k)}
                   disabled={allClear}
                   className="lp-prog"
-                  style={{ border: active ? "1px solid var(--icm-navy)" : "1px solid var(--border-soft)", borderRadius: 12, padding: "14px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center", background: active ? "var(--icm-slate-50)" : "#fff", cursor: allClear ? "default" : "pointer" }}
+                  style={{ position: "relative", border: active ? "1px solid var(--icm-navy)" : "1px solid var(--border-soft)", borderRadius: 12, padding: "13px 15px 13px 16px", display: "flex", flexDirection: "column", gap: 6, textAlign: "left", background: active ? "var(--icm-slate-50)" : "#fff", cursor: allClear ? "default" : "pointer", overflow: "hidden" }}
                   title={allClear ? "All clear" : `${count} — ${m.descriptor}`}
                 >
-                  <RingGauge value={share} size={78} stroke={9} color={color} label={String(count)} />
-                  <div>
-                    <div style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700, color: "var(--fg1)" }}>{m.label}</div>
-                    <div style={{ fontFamily: "var(--font-text)", fontSize: 10.5, color: allClear ? "#1a6d26" : "var(--fg4)", marginTop: 2 }}>{allClear ? "all clear" : m.descriptor}</div>
+                  <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: color }} />
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", color: allClear ? "#1a6d26" : "var(--fg1)", lineHeight: 1 }}>{count}</span>
+                    {allClear ? (
+                      <span style={{ fontFamily: "var(--font-text)", fontSize: 11, fontWeight: 700, color: "#1a6d26" }}>all clear</span>
+                    ) : (
+                      <span style={{ fontFamily: "var(--font-text)", fontSize: 11, color: "var(--fg4)" }}>{share}%</span>
+                    )}
                   </div>
+                  <div>
+                    <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700, color: "var(--fg1)" }}>{m.label}</div>
+                    <div style={{ fontFamily: "var(--font-text)", fontSize: 11, color: "var(--fg4)", marginTop: 1 }}>{m.descriptor}</div>
+                  </div>
+                  {!allClear && (
+                    <div style={{ height: 4, borderRadius: 999, background: "var(--icm-slate-200)", overflow: "hidden", marginTop: 2 }}>
+                      <div style={{ width: `${share}%`, height: "100%", background: color, borderRadius: 999 }} />
+                    </div>
+                  )}
                 </button>
               );
             })}

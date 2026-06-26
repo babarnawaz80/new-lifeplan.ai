@@ -2,7 +2,7 @@
 // answers each question, submits, and sees their score, per-question
 // correctness, and explanations. Passing is >= 80%. Retake resets.
 import { useMemo, useState } from "react";
-import { Check, X, RotateCcw, Award } from "lucide-react";
+import { Check, X, RotateCcw, Award, Lock } from "lucide-react";
 import type { TrainingContent } from "@/data/mock";
 
 const PASS = 0.8;
@@ -10,10 +10,14 @@ const PASS = 0.8;
 export function TrainingQuiz({
   training,
   staffName,
+  locked = false,
   onPass,
 }: {
   training: TrainingContent;
   staffName?: string;
+  // Certification is gated on watching the full training. While locked, the
+  // questions are visible but can't be answered or submitted.
+  locked?: boolean;
   onPass?: (score: number) => void;
 }) {
   const quiz = training.quiz;
@@ -44,12 +48,19 @@ export function TrainingQuiz({
           <h3 className="text-[17px] font-bold text-ink">Certification quiz</h3>
           <p className="text-[12.5px] text-ink3">{quiz.length} questions · pass at {Math.round(PASS * 100)}%</p>
         </div>
-        {!submitted && (
+        {!submitted && !locked && (
           <span className="text-[12.5px] text-ink3 font-medium">
             {Object.keys(answers).length}/{quiz.length} answered
           </span>
         )}
       </div>
+
+      {locked && !submitted && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-amber/40 bg-amber/10 px-4 py-3 text-[13px] font-semibold text-amber">
+          <Lock className="h-4 w-4 shrink-0" />
+          Watch the full training to unlock the certification quiz.
+        </div>
+      )}
 
       {submitted && (
         <div
@@ -103,9 +114,9 @@ export function TrainingQuiz({
                     <button
                       key={oi}
                       type="button"
-                      disabled={submitted}
+                      disabled={submitted || locked}
                       onClick={() => setAnswers((a) => ({ ...a, [qi]: oi }))}
-                      className={`flex items-center gap-2.5 text-left px-3 py-2 rounded-lg border text-[13.5px] transition-colors ${cls}`}
+                      className={`flex items-center gap-2.5 text-left px-3 py-2 rounded-lg border text-[13.5px] transition-colors disabled:cursor-not-allowed ${locked && !submitted ? "opacity-60" : ""} ${cls}`}
                     >
                       <span className="h-5 w-5 rounded-full border border-current/30 flex items-center justify-center text-[11px] font-bold shrink-0">
                         {submitted && isCorrect ? <Check className="h-3.5 w-3.5" /> : submitted && isChosen ? <X className="h-3.5 w-3.5" /> : String.fromCharCode(65 + oi)}
@@ -128,11 +139,15 @@ export function TrainingQuiz({
       {!submitted && (
         <button
           onClick={submit}
-          disabled={!answeredAll}
+          disabled={!answeredAll || locked}
           className="w-full py-3 rounded-xl text-white font-bold text-[14px] disabled:opacity-50"
           style={{ background: "var(--ai-gradient)" }}
         >
-          {answeredAll ? "Submit & score" : `Answer all ${quiz.length} questions to submit`}
+          {locked
+            ? "Watch the training to unlock the quiz"
+            : answeredAll
+              ? "Submit & score"
+              : `Answer all ${quiz.length} questions to submit`}
         </button>
       )}
     </div>

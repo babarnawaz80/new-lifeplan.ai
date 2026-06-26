@@ -23,6 +23,10 @@ import {
   updateTraining,
   getTrainingForPlan,
   publishTrainingToModule,
+  getPlanCompliance,
+  updatePlanCompliance,
+  staffSupporting,
+  listTrainingTodos,
   mayHaveLegacyPlan,
 } from "@/integrations/icm";
 import { ChecklistPanel } from "@/components/plan-runtime/ChecklistPanel";
@@ -30,6 +34,12 @@ import { AiChatPane } from "@/components/plan-runtime/AiChatPane";
 import { ManualEditor } from "@/components/plan-runtime/ManualEditor";
 import { ImplementDialog } from "@/components/plan-runtime/ImplementDialog";
 import { TrainingDialog } from "@/components/plan-runtime/TrainingDialog";
+import { SourceIntakePanel } from "@/components/plan-runtime/SourceIntakePanel";
+import { SignaturesPanel } from "@/components/plan-runtime/SignaturesPanel";
+import { AuthorizationPanel } from "@/components/plan-runtime/AuthorizationPanel";
+import { RestrictionPanel, restrictionComplete } from "@/components/plan-runtime/RestrictionPanel";
+import { ProviderFieldsPanel } from "@/components/plan-runtime/ProviderFieldsPanel";
+import { AuditTrailPanel } from "@/components/plan-runtime/AuditTrailPanel";
 import { CutoverWarningDialog } from "@/components/plan-runtime/CutoverWarningDialog";
 import { ActionRow } from "@/components/plan-runtime/ActionRow";
 import { PlanPreview } from "@/components/plan-runtime/PlanPreview";
@@ -37,7 +47,7 @@ import { enrichImplementationTasks } from "@/lib/enrich-tasks.functions";
 import { generateTraining } from "@/lib/generate-training.functions";
 import { suggestTaskOutcome } from "@/lib/suggest-outcome.functions";
 import type { WorkflowTask } from "@/data/lifeplan-types";
-import { allCompulsoryComplete, prePlanningCompulsoryComplete } from "@/lib/plan-runtime";
+import { allCompulsoryComplete, prePlanningCompulsoryComplete, requiredSignerRoles, signaturesSatisfied } from "@/lib/plan-runtime";
 import {
   parseIcmPlanTree,
   treeFromLegacyCaretracker,
@@ -141,7 +151,43 @@ function PlanRuntime() {
     toast.success("Outcome saved.");
   };
 
-  const canImplement = allCompulsoryComplete(agent.workflow_data, isComplete);
+  // Provider signature duty (Section 2): required signer roles come from the
+  // agent's guideline briefs (per state / plan type), with a universal baseline.
+  const [compTick, setCompTick] = useState(0);
+  const requiredSignerRolesList = useMemo(
+    () => requiredSignerRoles(getGuidelinesForAgent(agent).map((g) => g.compliance_brief)),
+    [agent],
+  );
+  const signaturesOk = useMemo(
+    () => signaturesSatisfied(requiredSignerRolesList, getPlanCompliance(planId).signatures ?? []),
+    [requiredSignerRolesList, planId, compTick],
+  );
+
+  // Restrictive interventions (Section 4): when this plan type requires the
+  // 8-part justification, every restriction present must be complete.
+  const restrictionReviewRequired = useMemo(
+    () =>
+      getGuidelinesForAgent(agent).some((g) => g.compliance_brief.restriction_review_required) ||
+      agent.category === "behavioral" ||
+      agent.category === "risk",
+    [agent],
+  );
+  const restrictionsOk = useMemo(() => {
+    const items = getPlanCompliance(planId).restrictions ?? [];
+    return items.every((r) => restrictionComplete(r, restrictionReviewRequired));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planId, compTick, restrictionReviewRequired]);
+
+  // Provider-owned required fields (Section 5) — from the brief, surfaced/flagged.
+  const providerRequiredFields = useMemo(
+    () => Array.from(new Set(getGuidelinesForAgent(agent).flatMap((g) => g.compliance_brief.provider_required_fields ?? []))),
+    [agent],
+  );
+
+  // Implement is gated on compulsory tasks, required signatures, and complete
+  // restriction documentation.
+  const canImplement =
+    allCompulsoryComplete(agent.workflow_data, isComplete) && signaturesOk && restrictionsOk;
   // Once implemented, the plan is locked: no toggling tasks, no generate /
   // regenerate / revise / edit, no re-implement. View + Export only.
   const locked = plan.status === "implemented";
@@ -243,6 +289,18 @@ function PlanRuntime() {
   const [trainingTick, setTrainingTick] = useState(0);
   const training = useMemo(() => getTrainingForPlan(planId), [planId, trainingTick]);
   const trainingTriggeredRef = useRef(false);
+
+  // Staff competency on a live plan (Section 6): once implemented, every staff
+  // member who supports this individual should be certified on the training.
+  // Anyone still uncertified is "untrained on a live plan" — flagged in the
+  // header and rolled up on the dashboard.
+  const untrainedOnLive = useMemo(() => {
+    if (plan.status !== "implemented") return [] as string[];
+    return listTrainingTodos({ individualId: id, trainingId: training?.id })
+      .filter((t) => t.status !== "certified")
+      .map((t) => t.staff_name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.status, id, training?.id, trainingTick, compTick]);
 
   // Generate the training assets from the plan content + the agent's editable
   // recipe. Runs in the background (pending -> ready); never blocks plan
@@ -465,6 +523,22 @@ function PlanRuntime() {
     } else {
       toast.success("Plan implemented.");
     }
+    // Section 6: record that the implementation plan was distributed to the
+    // staff who support this individual, and pin the source plan version it was
+    // built on (drift watcher in Section 7 compares against this). Training tie-
+    // in (who watched / passed) is already published to the module; competency
+    // is read back from the training to-dos.
+    const supportStaff = staffSupporting(id);
+    updatePlanCompliance(
+      planId,
+      {
+        distributed_at: date.toISOString(),
+        distributed_to: supportStaff.map((s) => s.name),
+        built_on_source_version: getPlanCompliance(planId).intake?.source_plan_version,
+      },
+      { what: `Distributed implementation plan to ${supportStaff.length} support staff` },
+    );
+    setCompTick((t) => t + 1);
     setImplementOpen(false);
     setTrainingOpen(true);
   };
@@ -510,18 +584,31 @@ function PlanRuntime() {
         </nav>
 
         <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-ink3">
-              {plan.plan_type_label} · {plan.plan_mode === "annual" ? "Annual" : "On-the-Fly"}
+          <div className="flex items-center gap-4 min-w-0">
+            {individual.avatar ? (
+              <img
+                src={individual.avatar}
+                alt={individual.name}
+                className="h-14 w-14 rounded-full object-cover ring-2 ring-line shrink-0"
+              />
+            ) : (
+              <div className="h-14 w-14 rounded-full bg-navy text-white text-[16px] font-extrabold flex items-center justify-center shrink-0">
+                {individual.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-ink3">
+                {plan.plan_type_label} · {plan.plan_mode === "annual" ? "Annual" : "On-the-Fly"}
+              </div>
+              <h1 className="text-[30px] font-extrabold text-ink leading-tight tracking-tight">
+                {planTypeInfo(agent.plan_type).label}
+              </h1>
+              <p className="text-[14px] text-ink2 mt-0.5">For {individual.name}</p>
             </div>
-            <h1 className="text-[30px] font-extrabold text-ink leading-tight tracking-tight">
-              {planTypeInfo(agent.plan_type).label}
-            </h1>
-            <p className="text-[14px] text-ink2 mt-0.5">For {individual.name}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate({ to: "/individuals/$id/trainings", params: { id } })}
+              onClick={() => navigate({ to: "/individuals/$id/trainings", params: { id }, search: { plan: planId } })}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-white text-[12.5px] font-bold hover:opacity-95 shadow-soft"
               style={{ background: "var(--ai-gradient)" }}
               title="Staff training video & certification quiz for this plan"
@@ -532,6 +619,15 @@ function PlanRuntime() {
                 <><GraduationCap className="h-3.5 w-3.5" /> Staff training</>
               )}
             </button>
+            {untrainedOnLive.length > 0 && (
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
+                style={{ color: "var(--amber)", background: "color-mix(in oklab, var(--amber) 14%, transparent)" }}
+                title={`Untrained on a live plan: ${untrainedOnLive.join(", ")}`}
+              >
+                {untrainedOnLive.length} staff not yet certified
+              </span>
+            )}
             {plan.status === "implemented" && (
               <button
                 onClick={exportPdf}
@@ -568,7 +664,34 @@ function PlanRuntime() {
             each column scrolls internally — so a 30-50 page plan never grows
             the page; you scroll within the plan pane. */}
         <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:h-[calc(100vh-200px)]">
-          <aside className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1">
+          <aside className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1 space-y-4">
+            {agent.content_origin === "source_plan" && (
+              <SourceIntakePanel planId={planId} locked={locked} />
+            )}
+            <SignaturesPanel
+              planId={planId}
+              requiredRoles={requiredSignerRolesList}
+              locked={locked}
+              onChange={() => setCompTick((t) => t + 1)}
+            />
+            {structuredTree && (
+              <AuthorizationPanel individualId={id} tree={structuredTree} effective={locked} />
+            )}
+            {restrictionReviewRequired && (
+              <RestrictionPanel
+                planId={planId}
+                committeeRequired={restrictionReviewRequired}
+                locked={locked}
+                onChange={() => setCompTick((t) => t + 1)}
+              />
+            )}
+            <ProviderFieldsPanel
+              planId={planId}
+              requiredFields={providerRequiredFields}
+              locked={locked}
+              onChange={() => setCompTick((t) => t + 1)}
+            />
+            <AuditTrailPanel planId={planId} tick={compTick} />
             <ChecklistPanel
               phases={agent.workflow_data}
               annualDate={plan.annual_plan_date}

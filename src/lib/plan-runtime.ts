@@ -19,6 +19,31 @@ export function isCompulsoryTask(t: WorkflowTask) {
   return t.is_compulsory;
 }
 
+// Provider signature duty: which signer roles must be present before Implement.
+// Driven by the linked guidelines' compliance briefs (per state / plan type).
+// Falls back to the provider's universal baseline when no brief specifies any
+// (staff sign-off + individual/guardian acknowledgment) — not a state rule.
+export function requiredSignerRoles(briefs: { required_signatures?: string[] }[]): string[] {
+  const set = new Set<string>();
+  for (const b of briefs) for (const r of b.required_signatures ?? []) set.add(r);
+  if (set.size === 0) {
+    set.add("Implementing staff");
+    set.add("Individual / Guardian");
+  }
+  return [...set];
+}
+
+// A required role is satisfied by a "signed" signature OR a documented
+// "unable to obtain" (reason + attempts) — plans sometimes proceed with that.
+export function signaturesSatisfied(
+  requiredRoles: string[],
+  signatures: { role: string; status: string }[],
+): boolean {
+  return requiredRoles.every((role) =>
+    signatures.some((s) => s.role === role && (s.status === "signed" || s.status === "unable")),
+  );
+}
+
 export function allCompulsoryComplete(
   phases: WorkflowPhase[],
   isComplete: (taskId: string, role: string | null) => boolean,

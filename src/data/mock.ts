@@ -45,6 +45,15 @@ export type AutonomyConfig = {
   implementation_watcher: boolean;
   deadline_catcher: boolean;
   guideline_drift: boolean;
+  // Source drift: the implementation plan references a care-manager-authored
+  // source plan (Life Plan / ISP). When the source is revised, its review/annual
+  // date passes, or a new functional assessment lands, the provider plan is out
+  // of sync. Watches the source clocks separately from the provider's own.
+  source_drift: boolean;
+  // Advocate: when staff are slipping on a live plan (declining engagement /
+  // missed documentation), auto-refresh the training and drop it in the staff
+  // queue. Acts as a monitor/advocate for the individual.
+  training_advocate: boolean;
   no_progress_days: number; // off-track if a goal has no documentation in N days
   notify_backoff_days: number; // re-notify cadence for missing inputs
   review_cadence_days: number; // due-for-review window
@@ -57,6 +66,8 @@ export const DEFAULT_AUTONOMY_CONFIG: AutonomyConfig = {
   implementation_watcher: true,
   deadline_catcher: true,
   guideline_drift: true,
+  source_drift: true,
+  training_advocate: true,
   no_progress_days: 14,
   notify_backoff_days: 3,
   review_cadence_days: 90,
@@ -86,7 +97,9 @@ export type AgentActivity = {
     | "early_draft"
     | "off_track"
     | "deadline"
-    | "guideline_drift";
+    | "guideline_drift"
+    | "source_drift"
+    | "auto_training";
   summary: string;
   status: "info" | "action_taken" | "blocked" | "flagged";
   payload?: Record<string, unknown>;
@@ -167,6 +180,12 @@ export type ComplianceBrief = {
   required_phases?: string[];
   required_tasks?: string[];
   required_fields?: string[];
+  // Provider-side compliance requirements the guidelines engine extracts per
+  // state document. All optional so existing briefs are unaffected.
+  required_signatures?: string[]; // signer roles required before Implement
+  authorization_required?: boolean; // services must carry an active authorization
+  restriction_review_required?: boolean; // restrictions need the 8-part form + review
+  provider_required_fields?: string[]; // e.g. Backup plan, Natural supports, Risk factors
   notes?: string;
 };
 
@@ -219,8 +238,90 @@ export type Plan = {
   auto_renew: boolean;
   annual_plan_date: string;
   implementation_date?: string;
+  // Provider-side compliance (intake, signatures, authorizations, restrictions,
+  // distribution, audit). Mirrored into plan_content.compliance so it persists.
+  compliance?: PlanCompliance;
   created_at: string;
   updated_at: string;
+};
+
+// ===== Provider-side compliance (implementer point of view) =====
+// All additive; driven by the guidelines compliance brief + per-plan-type config.
+
+// Source plan intake — the provider receives, dates, versions, and acknowledges
+// the plan it implements, and VERIFIES (cites, does not author) the care-manager
+// owned items.
+export type SourceIntake = {
+  source_plan_label?: string; // state-agnostic: Life Plan / ISP / PCSP / IP
+  source_plan_date?: string;
+  source_plan_version?: string;
+  received_date?: string;
+  acknowledged_by?: string;
+  // Verify-and-reference: citations against the received source plan.
+  functional_assessment_present?: boolean;
+  functional_assessment_date?: string;
+  setting_choice_addressed?: boolean;
+  alternative_settings_addressed?: boolean;
+  consent_present?: boolean;
+};
+
+// One signature/approval on the provider's implementation plan.
+export type ComplianceSignature = {
+  id: string;
+  role: string; // e.g. "Implementing staff", "Individual / Guardian", "Nurse", "Behavior committee"
+  name: string;
+  date?: string;
+  status: "signed" | "declined" | "unable";
+  note?: string; // reason + attempts when status is "unable"
+};
+
+// Per-service authorization the provider bills against.
+export type ServiceAuthorization = {
+  service_ref: string; // strategy id or service title
+  authorization_ref?: string;
+  payer?: string; // payer / waiver
+  authorized_units?: number;
+  unit_type?: string; // e.g. "15-min", "day", "visit"
+  period_start?: string;
+  period_end?: string;
+};
+
+// 8-part restrictive-intervention justification, captured by the implementer.
+export type Restriction = {
+  id: string;
+  strategy_ref: string;
+  assessed_need?: string; // 1
+  positive_supports_tried?: string; // 2
+  less_intrusive_tried?: string; // 3
+  description?: string; // 4
+  data_and_review?: string; // 5
+  time_limit?: string; // 6
+  next_review_date?: string; // 6
+  informed_consent?: boolean; // 7
+  no_harm_assurance?: boolean; // 8
+  committee_approved?: boolean;
+  committee_note?: string;
+};
+
+export type AuditEntry = { at: string; who: string; what: string };
+
+export type PlanCompliance = {
+  intake?: SourceIntake;
+  signatures?: ComplianceSignature[];
+  authorizations?: ServiceAuthorization[];
+  restrictions?: Restriction[];
+  // Provider-owned required fields (Section 5).
+  named_monitor?: string;
+  backup_plan?: string;
+  natural_supports?: string;
+  risk_mitigation?: string;
+  plain_language_summary?: string;
+  // Staff distribution + competency (ties to the training module).
+  distributed_at?: string;
+  distributed_to?: string[];
+  // Source-plan-version this implementation plan was built on (drift detection).
+  built_on_source_version?: string;
+  audit?: AuditEntry[];
 };
 
 
@@ -282,6 +383,13 @@ export type Training = {
   content?: TrainingContent | null;
   // Published to the training module for staff distribution (Section 4).
   published_at?: string;
+  // Set by the autonomous Training Advocate when staff are slipping and the
+  // training should be regenerated; cleared once the content is refreshed.
+  auto_trigger_reason?: string;
+  // How this training came to exist (for the per-plan training history).
+  trigger?: "implement" | "manual" | "advocate";
+  // Human-readable reason for an advocate-triggered training (the trend).
+  trigger_reason?: string;
   created_at: string;
 };
 
@@ -477,6 +585,10 @@ export const guidelinesEngines: GuidelinesEngine[] = [
         "Finalize goals and services",
       ],
       required_fields: ["Goals", "Services / Expected Outcomes", "Person Responsible"],
+      required_signatures: ["Implementing staff", "Individual / Guardian", "Nurse"],
+      authorization_required: true,
+      restriction_review_required: true,
+      provider_required_fields: ["Backup plan", "Natural supports", "Risk factors", "Named monitor"],
     },
   },
   {

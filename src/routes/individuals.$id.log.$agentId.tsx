@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
-import { ChevronRight, Plus, Settings, FileText, Sparkles, CheckCircle2, Clock, PencilLine, Trash2, Play, GraduationCap } from "lucide-react";
+import { ChevronRight, Plus, Settings, FileText, Sparkles, CheckCircle2, Clock, PencilLine, Trash2, Play, GraduationCap, Printer } from "lucide-react";
 import { toast } from "sonner";
+import { exportPlanPdf } from "@/lib/plan-pdf";
+import type { IcmPlanTree } from "@/types/icmGoalOutcome";
 import { AppShell } from "@/components/layout/AppShell";
 import { ManualOrAIDialog, type PlanStartSource } from "@/components/lifeplan/ManualOrAIDialog";
 import {
@@ -16,10 +18,11 @@ import {
   getAgent,
   listPlansForIndividualAndAgent,
   getTrainingForPlan,
+  listTrainingsForPlan,
   createPlan,
   deletePlan,
 } from "@/integrations/icm";
-import { accentColor, planTypeInfo, type Plan } from "@/data/mock";
+import { planTypeInfo, type Plan } from "@/data/mock";
 
 export const Route = createFileRoute("/individuals/$id/log/$agentId")({
   head: () => ({ meta: [{ title: "Plan log — LifePlan" }] }),
@@ -69,6 +72,30 @@ function PlanLogPage() {
     });
   };
 
+  // Print any plan straight to PDF (print-to-PDF), same format as the runtime.
+  const printPlan = (plan: Plan) => {
+    const content = plan.plan_content as {
+      markdown?: string;
+      structured_tree?: IcmPlanTree | null;
+      implementation_date?: string;
+      implemented_by?: string;
+    };
+    const tree = plan.structured_tree ?? content?.structured_tree ?? null;
+    const ok = exportPlanPdf({
+      individualName: individual.name,
+      serviceType: individual.service_type,
+      planTypeLabel,
+      planTypeLabelLine: `${plan.plan_type_label} · ${plan.plan_mode === "annual" ? "Annual" : "On-the-Fly"}`,
+      annualDate: plan.annual_plan_date,
+      planDate: plan.created_at,
+      implementedDate: plan.implementation_date ?? content?.implementation_date,
+      implementedBy: content?.implemented_by,
+      tree,
+      markdownFallback: content?.markdown,
+    });
+    if (!ok) toast.error("Allow pop-ups to print the plan.");
+  };
+
   const firstName = individual.name.split(/\s+/)[0] ?? individual.name;
   const inProgressCount = plans.filter((p) => p.status === "in_progress" || p.status === "draft").length;
   const implementedCount = plans.filter((p) => p.status === "implemented").length;
@@ -94,14 +121,19 @@ function PlanLogPage() {
           <span className="text-ink font-semibold">{planTypeShort} log</span>
         </nav>
 
-        {/* Header: identity on the left, actions on the right */}
+        {/* Header: individual photo on the left, actions on the right */}
         <div className="flex items-start gap-5">
-          <div
-            className="h-16 w-16 rounded-[18px] flex items-center justify-center text-white text-[18px] font-extrabold shrink-0"
-            style={{ background: accentColor[agent.accent], boxShadow: `0 6px 16px color-mix(in oklab, ${accentColor[agent.accent]} 34%, transparent)` }}
-          >
-            {planTypeShort.slice(0, 3)}
-          </div>
+          {individual.avatar ? (
+            <img
+              src={individual.avatar}
+              alt={individual.name}
+              className="h-16 w-16 rounded-full object-cover ring-2 ring-line shrink-0"
+            />
+          ) : (
+            <div className="h-16 w-16 rounded-full bg-navy text-white text-[18px] font-extrabold flex items-center justify-center shrink-0">
+              {individual.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <h1 className="text-[30px] font-extrabold text-ink tracking-tight leading-tight">
               {planTypeShort} for {individual.name}
@@ -176,7 +208,9 @@ function PlanLogPage() {
                 planTypeLabel={planTypeLabel}
                 firstName={firstName}
                 hasTraining={!!getTrainingForPlan(p.id)?.content}
+                trainings={listTrainingsForPlan(p.id)}
                 id={id}
+                onPrint={() => printPlan(p)}
                 onDelete={p.status !== "implemented" ? () => setToDelete(p) : undefined}
               />
             ))}
@@ -308,7 +342,7 @@ function fmt(iso?: string) {
 
 // Mini training-video thumbnail with play affordance. "Watch training" links to
 // the full Staff Training page when a training has been generated for the plan.
-function TrainingThumb({ firstName, published, id }: { firstName: string; published: boolean; id: string }) {
+function TrainingThumb({ firstName, published, id, planId }: { firstName: string; published: boolean; id: string; planId: string }) {
   const navigate = useNavigate();
   return (
     <div
@@ -319,7 +353,7 @@ function TrainingThumb({ firstName, published, id }: { firstName: string; publis
           ? (e) => {
               e.preventDefault();
               e.stopPropagation();
-              navigate({ to: "/individuals/$id/trainings", params: { id } });
+              navigate({ to: "/individuals/$id/trainings", params: { id }, search: { plan: planId } });
             }
           : undefined
       }
@@ -339,12 +373,18 @@ function TrainingThumb({ firstName, published, id }: { firstName: string; publis
             ))}
           </div>
         </div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-10 w-10 rounded-full bg-white/95 flex items-center justify-center shadow-lg transition-transform group-hover/thumb:scale-110">
-            <Play className="h-4 w-4 text-navy ml-0.5" fill="currentColor" />
-          </div>
-        </div>
-        <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/40 text-white text-[10px] font-bold backdrop-blur-sm">1:48</span>
+        {/* Only show the play affordance when a training actually exists —
+            otherwise the play button is deceiving (nothing to watch). */}
+        {published && (
+          <>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-full bg-white/95 flex items-center justify-center shadow-lg transition-transform group-hover/thumb:scale-110">
+                <Play className="h-4 w-4 text-navy ml-0.5" fill="currentColor" />
+              </div>
+            </div>
+            <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/40 text-white text-[10px] font-bold backdrop-blur-sm">1:48</span>
+          </>
+        )}
       </div>
       <div
         className={`flex items-center justify-center gap-1.5 mt-2 text-[13px] font-bold ${published ? "text-navy" : "text-ink3"}`}
@@ -361,16 +401,21 @@ function PlanLogRow({
   planTypeLabel,
   firstName,
   hasTraining,
+  trainings,
   id,
+  onPrint,
   onDelete,
 }: {
   plan: Plan;
   planTypeLabel: string;
   firstName: string;
   hasTraining: boolean;
+  trainings: import("@/data/mock").Training[];
   id: string;
+  onPrint: () => void;
   onDelete?: () => void;
 }) {
+  const advocateCount = trainings.filter((t) => t.trigger === "advocate").length;
   const s = STATUS_META[plan.status];
   const content = plan.plan_content as { implementation_date?: string; implemented_by?: string };
   const implDate = fmt(plan.implementation_date ?? content?.implementation_date);
@@ -385,7 +430,7 @@ function PlanLogRow({
     >
       <span className="absolute left-0 top-0 bottom-0 w-[5px]" style={{ background: accent }} />
 
-      <TrainingThumb firstName={firstName} published={hasTraining} id={id} />
+      <TrainingThumb firstName={firstName} published={hasTraining} id={id} planId={plan.id} />
 
       <div className="flex-1 min-w-0">
         <span
@@ -433,8 +478,30 @@ function PlanLogRow({
             </span>
           )}
         </div>
+        {trainings.length > 0 && (
+          <div className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-ink3">
+            <GraduationCap className="h-3.5 w-3.5" />
+            {trainings.length} training{trainings.length === 1 ? "" : "s"}
+            {advocateCount > 0 && (
+              <span className="text-indigo font-semibold">· {advocateCount} auto-refreshed by the agent</span>
+            )}
+          </div>
+        )}
       </div>
 
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onPrint();
+        }}
+        className="p-2 rounded-lg text-ink3 hover:text-ink hover:bg-muted shrink-0"
+        title="Print this plan (PDF)"
+        aria-label="Print this plan"
+      >
+        <Printer className="h-4 w-4" />
+      </button>
       {onDelete && (
         <button
           type="button"

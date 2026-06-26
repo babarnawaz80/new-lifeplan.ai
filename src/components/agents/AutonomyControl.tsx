@@ -12,8 +12,10 @@ const INFO = [
   "Check for the source plan and required assessments, and remind the responsible person if anything is missing.",
   "Prepare an early draft once the source plan is in and pre-planning is done.",
   "Watch live plans through CareTracker and flag goals that are off track or not being documented.",
+  "Act as the individual's advocate: when staff are slipping on a live plan, automatically refresh the staff training and drop it into their queue.",
   "Catch plans that are overdue or due for review and surface them on the dashboard.",
   "Flag plans built on an older guideline version when guidelines are updated.",
+  "Flag plans that have drifted from the source plan: a revised source version, a passed source review date, or an out-of-date assessment.",
   "Log everything it does so every action is visible.",
 ];
 

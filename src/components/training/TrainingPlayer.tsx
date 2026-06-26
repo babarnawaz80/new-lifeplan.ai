@@ -8,7 +8,7 @@
 // browser's Web Speech voice, and the player labels which voice is in use.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Play, Pause, SkipForward, SkipBack, RotateCcw, Volume2, VolumeX, Sparkles, Loader2 } from "lucide-react";
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, Loader2 } from "lucide-react";
 import type { TrainingContent } from "@/data/mock";
 import { synthesizeTrainingAudio } from "@/lib/generate-training-audio.functions";
 
@@ -45,6 +45,7 @@ export function TrainingPlayer({
   const [aiUnavailable, setAiUnavailable] = useState(false);
   const [voiceSource, setVoiceSource] = useState<"ai" | "browser" | null>(null);
   const [buffering, setBuffering] = useState(false);
+  const [captions, setCaptions] = useState(false); // closed captions off by default; CC toggles
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
 
@@ -180,6 +181,11 @@ export function TrainingPlayer({
     if (slide === 0) void getSlideAudio(1);
   }, [playing, slide, aiUnavailable, getSlideAudio]);
 
+  // The speaker button mutes the currently-playing AI audio immediately.
+  useEffect(() => {
+    if (audioElRef.current) audioElRef.current.muted = muted;
+  }, [muted]);
+
   // Stop everything on unmount.
   useEffect(() => () => stopAudio(), [stopAudio]);
 
@@ -191,11 +197,6 @@ export function TrainingPlayer({
   const restart = () => {
     stopAudio();
     setSlide(0); setLine(0); setDone(false); setPlaying(true);
-  };
-  const goSlide = (i: number) => {
-    stopAudio();
-    setSlide(Math.max(0, Math.min(slides.length - 1, i)));
-    setLine(0); setDone(false);
   };
 
   const s = slides[slide];
@@ -239,8 +240,8 @@ export function TrainingPlayer({
           )}
         </div>
 
-        {/* Caption */}
-        {!done && (aiMode ? allLines.length > 0 : !!caption) && (
+        {/* Caption — closed captions, shown only when toggled on (CC button) */}
+        {captions && !done && (aiMode ? allLines.length > 0 : !!caption) && (
           <div className="relative px-6 pb-5">
             <div className="mx-auto max-w-3xl rounded-xl bg-black/45 backdrop-blur px-4 py-2.5 text-white space-y-1">
               {aiMode ? (
@@ -286,12 +287,10 @@ export function TrainingPlayer({
           <div className="h-full rounded-full transition-all" style={{ width: `${done ? 100 : progress}%`, background: "var(--ai-gradient)" }} />
         </div>
         <div className="flex items-center gap-1.5">
-          <button onClick={() => goSlide(slide - 1)} disabled={slide === 0} className="h-9 w-9 rounded-lg hover:bg-muted flex items-center justify-center text-ink2 disabled:opacity-40" aria-label="Previous slide"><SkipBack className="h-4 w-4" /></button>
           <button onClick={togglePlay} className="h-10 w-10 rounded-full text-white flex items-center justify-center" style={{ background: "var(--ai-gradient)" }} aria-label={playing ? "Pause" : "Play"}>
             {done ? <RotateCcw className="h-4.5 w-4.5" /> : playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" fill="currentColor" />}
           </button>
-          <button onClick={() => goSlide(slide + 1)} disabled={slide >= slides.length - 1} className="h-9 w-9 rounded-lg hover:bg-muted flex items-center justify-center text-ink2 disabled:opacity-40" aria-label="Next slide"><SkipForward className="h-4 w-4" /></button>
-          <button onClick={restart} className="h-9 w-9 rounded-lg hover:bg-muted flex items-center justify-center text-ink2" aria-label="Restart"><RotateCcw className="h-4 w-4" /></button>
+          <button onClick={restart} className="h-9 w-9 rounded-lg hover:bg-muted flex items-center justify-center text-ink2" aria-label="Restart from beginning" title="Restart from the beginning"><RotateCcw className="h-4 w-4" /></button>
           <div className="flex-1" />
           {voiceSource === "ai" ? (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo" title="Voiced with Vertex AI multi-speaker TTS">
@@ -302,6 +301,15 @@ export function TrainingPlayer({
               Browser preview voice
             </span>
           ) : null}
+          <button
+            onClick={() => setCaptions((c) => !c)}
+            className={`h-9 px-2.5 rounded-lg flex items-center justify-center text-[11px] font-bold tracking-wide border ${captions ? "text-indigo border-indigo/40 bg-indigo/10" : "text-ink3 border-line hover:bg-muted"}`}
+            aria-label={captions ? "Hide captions" : "Show captions"}
+            aria-pressed={captions}
+            title={captions ? "Hide captions" : "Show captions"}
+          >
+            CC
+          </button>
           <button onClick={() => setMuted((m) => !m)} className="h-9 w-9 rounded-lg hover:bg-muted flex items-center justify-center text-ink2" aria-label={muted ? "Unmute" : "Mute"}>
             {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>

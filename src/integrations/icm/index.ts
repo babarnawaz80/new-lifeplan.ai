@@ -28,6 +28,9 @@ import {
   DEFAULT_TRAINING_TEMPLATE,
   DEFAULT_TRAINING_CONFIG,
 } from "@/data/mock";
+// staffSupporting is a host-bridge read; re-export it from the source so all UI
+// reaches it through the adapter seam rather than importing the mock directly.
+export { staffSupporting } from "@/data/mock";
 import {
   persistPlan,
   persistTaskAssignment,
@@ -555,6 +558,117 @@ export function updatePlan(id: string, patch: Partial<Plan>): Plan | undefined {
   return p;
 }
 
+// ---- Service authorization + units (Section 3) ----
+// The provider bills, so it tracks authorization and delivered units. In
+// production these read the payer/waiver authorization system and CareTracker/
+// EVV; here a deterministic mock returns realistic sample data keyed to the ref.
+export type ServiceAuthDetail = {
+  authorization_ref: string;
+  payer: string;
+  authorized_units: number;
+  unit_type: string;
+  period_start: string;
+  period_end: string;
+};
+
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+const DAY_MS = 86400000;
+
+export function getServiceAuthorization(individualId: string, serviceRef: string): ServiceAuthDetail {
+  const seed = hashStr(`${individualId}:${serviceRef}`);
+  const payers = ["OPWDD HCBS Waiver", "Medicaid State Plan", "Self-Direction Budget"];
+  const unitTypes = ["15-min unit", "day", "visit"];
+  // Authorization period: started ~6 months ago, ends in -10..+80 days (some expiring).
+  const start = new Date(Date.now() - (150 + (seed % 60)) * DAY_MS);
+  const end = new Date(Date.now() + (((seed >> 4) % 90) - 10) * DAY_MS);
+  return {
+    authorization_ref: `AUTH-${(seed % 900000) + 100000}`,
+    payer: payers[seed % payers.length],
+    authorized_units: 200 + (seed % 12) * 25, // 200..475
+    unit_type: unitTypes[(seed >> 3) % unitTypes.length],
+    period_start: start.toISOString(),
+    period_end: end.toISOString(),
+  };
+}
+
+export function getUnitsDelivered(individualId: string, serviceRef: string, _period?: { start?: string; end?: string }): number {
+  const auth = getServiceAuthorization(individualId, serviceRef);
+  const seed = hashStr(`${individualId}:${serviceRef}:delivered`);
+  // 60%..110% of authorized — some services are over the limit.
+  const pct = 60 + (seed % 55);
+  return Math.round((auth.authorized_units * pct) / 100);
+}
+
+// Source plan status (Section 7) — the care-manager-authored source plan
+// (Life Plan / ISP) lives upstream in iCM. The provider plan references a
+// specific version + carries its own review/annual clock and assessment date.
+// This read surfaces the CURRENT upstream version + the source review/annual
+// date + the latest functional-assessment date, so the drift watcher can
+// compare against what the provider plan was built on. Deterministic per
+// individual so the same individual reads consistently across the app.
+export type SourcePlanStatus = {
+  current_version: string;
+  source_review_date: string; // source plan's own annual/review date (separate clock)
+  assessment_date: string; // latest functional assessment on the source
+  revised_at: string;
+};
+
+export function getSourcePlanStatus(individualId: string): SourcePlanStatus {
+  const seed = hashStr(`${individualId}:source`);
+  // Current upstream version: v1..v4 (some individuals have a revised source).
+  const major = 1 + (seed % 4);
+  // Source review/annual date: -40..+140 days (some already overdue).
+  const review = new Date(Date.now() + (((seed >> 5) % 180) - 40) * DAY_MS);
+  // Latest functional assessment: 200..560 days ago (some past a 1-year cadence).
+  const assessment = new Date(Date.now() - (200 + (seed % 360)) * DAY_MS);
+  const revised = new Date(Date.now() - (seed % 120) * DAY_MS);
+  return {
+    current_version: `v${major}`,
+    source_review_date: review.toISOString(),
+    assessment_date: assessment.toISOString(),
+    revised_at: revised.toISOString(),
+  };
+}
+
+// ---- Provider-side compliance (Section 9 audit-friendly read/update) ----
+// Compliance lives on plan.compliance and is mirrored into plan_content jsonb so
+// it survives reloads (same pattern as structured_tree).
+export function getPlanCompliance(planId: string): import("@/data/mock").PlanCompliance {
+  const p = plans.find((x) => x.id === planId);
+  if (!p) return {};
+  return p.compliance ?? ((p.plan_content as { compliance?: import("@/data/mock").PlanCompliance })?.compliance ?? {});
+}
+
+export function updatePlanCompliance(
+  planId: string,
+  patch: Partial<import("@/data/mock").PlanCompliance>,
+  audit?: { what: string },
+): import("@/data/mock").PlanCompliance {
+  const p = plans.find((x) => x.id === planId);
+  if (!p) return {};
+  const current = getPlanCompliance(planId);
+  const next: import("@/data/mock").PlanCompliance = { ...current, ...patch };
+  if (audit?.what) {
+    next.audit = [
+      ...(current.audit ?? []),
+      { at: new Date().toISOString(), who: getCurrentSession().userName, what: audit.what },
+    ];
+  }
+  p.compliance = next;
+  p.plan_content = { ...(p.plan_content as Record<string, unknown>), compliance: next };
+  p.updated_at = new Date().toISOString();
+  persistPlan(p);
+  return next;
+}
+
 // Delete a plan and its task assignments. Caller must enforce that only
 // non-implemented plans are deletable — an implemented plan is a committed
 // record and is replaced by starting + implementing a new plan, never deleted.
@@ -669,13 +783,17 @@ export function getTaskOutcomes(planId: string): {
 export function createPendingTraining(args: {
   planId: string;
   individualId: string;
+  trigger?: Training["trigger"];
+  triggerReason?: string;
 }): Training {
   const t: Training = {
-    id: `tr_${Date.now()}`,
+    id: `tr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     plan_id: args.planId,
     individual_id: args.individualId,
     status: "pending",
     video_status: "pending",
+    trigger: args.trigger ?? "manual",
+    trigger_reason: args.triggerReason,
     created_at: new Date().toISOString(),
   };
   trainings.push(t);
@@ -689,6 +807,18 @@ export function updateTraining(id: string, patch: Partial<Training>): Training |
   Object.assign(t, patch);
   persistTraining(t);
   return t;
+}
+
+export function listTrainings(): Training[] {
+  return trainings;
+}
+
+// All trainings generated for a plan, newest first — the per-plan training
+// history (initial + every advocate-triggered refresh).
+export function listTrainingsForPlan(planId: string): Training[] {
+  return trainings
+    .filter((t) => t.plan_id === planId)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 // Latest training record for a plan (newest first).
