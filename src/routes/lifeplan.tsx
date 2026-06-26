@@ -107,7 +107,7 @@ function LifeplanDashboard() {
                     position: "relative", top: 1,
                   }}
                 >
-                  {t.k === "overview" && <span style={{ width: 7, height: 7, borderRadius: 999, background: "linear-gradient(100deg,#16C0E8,#8B5CF6)" }} />}
+                  {t.k === "overview" && <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--ai-gradient)" }} />}
                   {t.label}
                 </button>
               );

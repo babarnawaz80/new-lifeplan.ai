@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, Sparkles, Edit3, FileDown, GraduationCap, Loader2, AlertTriangle } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { ChevronRight, Sparkles, Edit3, FileDown, GraduationCap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -51,7 +50,6 @@ import {
   resolveTrainingConfig,
   type Plan,
 } from "@/data/mock";
-import { TrainingPanel } from "@/components/training/TrainingPanel";
 import { exportPlanPdf } from "@/lib/plan-pdf";
 
 // Read a plan's structured tree, preferring the top-level field but falling
@@ -245,7 +243,6 @@ function PlanRuntime() {
   const [trainingTick, setTrainingTick] = useState(0);
   const training = useMemo(() => getTrainingForPlan(planId), [planId, trainingTick]);
   const trainingTriggeredRef = useRef(false);
-  const [trainingModalOpen, setTrainingModalOpen] = useState(false);
 
   // Generate the training assets from the plan content + the agent's editable
   // recipe. Runs in the background (pending -> ready); never blocks plan
@@ -517,32 +514,24 @@ function PlanRuntime() {
             <div className="text-[11px] font-bold uppercase tracking-wider text-ink3">
               {plan.plan_type_label} · {plan.plan_mode === "annual" ? "Annual" : "On-the-Fly"}
             </div>
-            <h1 className="text-[24px] font-extrabold text-ink leading-tight">
+            <h1 className="text-[30px] font-extrabold text-ink leading-tight tracking-tight">
               {planTypeInfo(agent.plan_type).label}
             </h1>
-            <p className="text-[13px] text-ink2">For {individual.name}</p>
+            <p className="text-[14px] text-ink2 mt-0.5">For {individual.name}</p>
           </div>
           <div className="flex items-center gap-2">
-            {training && (
-              <button
-                onClick={() => setTrainingModalOpen(true)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-[12px] font-bold ${
-                  training.status === "ready"
-                    ? "text-white hover:opacity-95"
-                    : "border border-line bg-card text-ink2 hover:text-ink hover:bg-muted"
-                }`}
-                style={training.status === "ready" ? { background: "var(--ai-gradient)" } : undefined}
-                title="Staff training video & certification quiz for this plan"
-              >
-                {training.status === "pending" ? (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Training: preparing…</>
-                ) : training.status === "failed" ? (
-                  <><AlertTriangle className="h-3.5 w-3.5" /> Training: retry</>
-                ) : (
-                  <><GraduationCap className="h-3.5 w-3.5" /> Staff training</>
-                )}
-              </button>
-            )}
+            <button
+              onClick={() => navigate({ to: "/individuals/$id/trainings", params: { id } })}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-white text-[12.5px] font-bold hover:opacity-95 shadow-soft"
+              style={{ background: "var(--ai-gradient)" }}
+              title="Staff training video & certification quiz for this plan"
+            >
+              {training?.status === "pending" ? (
+                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Training: preparing…</>
+              ) : (
+                <><GraduationCap className="h-3.5 w-3.5" /> Staff training</>
+              )}
+            </button>
             {plan.status === "implemented" && (
               <button
                 onClick={exportPdf}
@@ -693,22 +682,6 @@ function PlanRuntime() {
         </div>
 
       </div>
-
-      {/* Staff training lives in the top-corner launcher; the full video +
-          quiz opens here in a modal so it's one click away and never pushes
-          the (possibly 40-page) plan down. */}
-      {training && (
-        <Dialog open={trainingModalOpen} onOpenChange={setTrainingModalOpen}>
-          <DialogContent className="max-w-5xl w-[min(96vw,1100px)] max-h-[92vh] overflow-y-auto bg-card border-line p-5">
-            <DialogTitle className="sr-only">Staff training for {individual.name}</DialogTitle>
-            <TrainingPanel
-              training={training}
-              individualName={individual.name}
-              onRetry={() => void startTrainingGeneration(planMarkdown, { force: true })}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
 
       <CutoverWarningDialog
         open={cutoverOpen}

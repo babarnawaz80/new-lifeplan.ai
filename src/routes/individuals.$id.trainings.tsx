@@ -18,6 +18,7 @@ import {
   FileText,
   Loader2,
   Wand2,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
@@ -36,6 +37,7 @@ import {
 import { generateTraining } from "@/lib/generate-training.functions";
 import {
   trainings as allTrainings,
+  planTypeInfo,
   resolveTrainingTemplate,
   resolveTrainingConfig,
   type TrainingContent,
@@ -193,171 +195,173 @@ function IndividualTrainingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, staffTick, content]);
   const certified = staff.filter((s) => s.status === "certified").length;
+  const published = !!content && listTrainingTodos({ individualId: id }).length > 0;
+  const [showQueue, setShowQueue] = useState(false);
+
+  const agentShort = sourcePlan ? planTypeInfo(getAgent(sourcePlan.agent_id)?.plan_type ?? "").short : "";
 
   return (
     <AppShell>
-      <div className="max-w-5xl mx-auto px-6 py-6">
-        <nav className="flex items-center gap-1.5 text-[12px] text-ink3 mb-4">
-          <Link to="/individuals" className="hover:text-ink">Individuals</Link>
-          <ChevronRight className="h-3 w-3" />
-          <Link to="/individuals/$id" params={{ id }} className="hover:text-ink">
-            {individual.name}
-          </Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-ink font-semibold">Individual Trainings</span>
-        </nav>
+      {/* Gradient hero */}
+      <div className="relative overflow-hidden" style={{ background: "var(--ai-gradient)" }}>
+        <div className="absolute -top-20 -right-10 h-80 w-80 rounded-full bg-white/10" />
+        <div className="absolute -bottom-28 left-28 h-72 w-72 rounded-full bg-white/[0.06]" />
+        <div className="relative max-w-6xl mx-auto px-6 py-7">
+          <nav className="flex items-center gap-2 text-[13px] font-semibold text-white/80">
+            <Link to="/individuals" className="hover:text-white">Individuals</Link>
+            <ChevronRight className="h-3.5 w-3.5 text-white/60" />
+            <Link to="/individuals/$id" params={{ id }} className="hover:text-white">{individual.name}</Link>
+            {agentShort && <><ChevronRight className="h-3.5 w-3.5 text-white/60" /><span>{agentShort}</span></>}
+            <ChevronRight className="h-3.5 w-3.5 text-white/60" />
+            <span className="text-white">Staff training</span>
+          </nav>
 
-        <div className="flex items-start gap-4 mb-6">
-          <div
-            className="h-12 w-12 rounded-xl flex items-center justify-center text-white shrink-0"
-            style={{ background: "var(--ai-gradient)" }}
-          >
-            <GraduationCap className="h-6 w-6" />
+          <div className="flex flex-wrap items-end justify-between gap-4 mt-5">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-2xl flex items-center justify-center bg-white/15 border border-white/25 backdrop-blur-sm">
+                <GraduationCap className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-[30px] font-extrabold text-white tracking-tight leading-tight">Staff training &amp; certification</h1>
+                <p className="text-[15px] text-white/85 mt-1">AI-generated for everyone who supports {individual.name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              {published && (
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/15 border border-white/25 text-white text-[12px] font-bold uppercase tracking-wider backdrop-blur-sm">
+                  <CheckCircle2 className="h-4 w-4" /> Published · {staff.length} staff
+                </span>
+              )}
+              {content && sourcePlan && (
+                <button
+                  type="button"
+                  onClick={generate}
+                  disabled={generating}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/15 border border-white/25 text-white text-[13px] font-semibold hover:bg-white/25 disabled:opacity-60 backdrop-blur-sm"
+                >
+                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                  Regenerate
+                </button>
+              )}
+              {content && (
+                <button
+                  type="button"
+                  onClick={() => setShowQueue((q) => !q)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-navy text-[13px] font-bold hover:opacity-95"
+                >
+                  <Users className="h-4 w-4" /> Certification queue
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[24px] font-extrabold text-ink">Individual Trainings</h1>
-            <p className="text-[13px] text-ink2 mt-0.5">
-              An AI-narrated training, generated from {individual.name}'s implemented plan. Every staff
-              member who supports {individual.name} watches it and passes the quiz to be certified.
-            </p>
-          </div>
-          {content && sourcePlan && (
-            <button
-              type="button"
-              onClick={generate}
-              disabled={generating}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-line text-[12.5px] font-semibold text-ink2 hover:bg-muted disabled:opacity-50 shrink-0"
-            >
-              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-              Regenerate
-            </button>
-          )}
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-5">
-          {/* Training content */}
-          <div className="space-y-4">
-            {content ? (
-              <>
-                <div className="space-y-1">
-                  <h2 className="text-[16px] font-bold text-ink">{content.title}</h2>
-                  {(content.subtitle || planDate) && (
-                    <p className="text-[12.5px] text-ink3 flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5 text-indigo" />
-                      {content.subtitle || `Effective ${planDate}`} · Narrated by Alex & Jamie
-                    </p>
-                  )}
-                </div>
-
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        {content ? (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+              {/* Video */}
+              <div className="space-y-3">
+                <h2 className="text-[20px] font-extrabold text-ink tracking-tight">{content.title}</h2>
                 <TrainingPlayer training={content} onFinish={() => setWatched(true)} />
-
                 {sourcePlan && (
-                  <div className="flex items-center gap-2 px-1 text-[12px] text-ink3">
+                  <div className="flex items-center gap-2 text-[12.5px] text-ink3">
                     <FileText className="h-3.5 w-3.5" />
                     From: {sourcePlan.plan_type_label} plan · implemented {fmtDate(sourcePlan.implementation_date)}
                   </div>
                 )}
+              </div>
+              {/* Quiz */}
+              <div>
+                <div className="mb-4">
+                  <div className="text-[22px] font-extrabold text-ink tracking-tight">Certification quiz</div>
+                  <div className="text-[13.5px] text-ink3 mt-0.5">{content.quiz.length} questions · pass at 80%</div>
+                </div>
+                {!watched && (
+                  <p className="text-[12.5px] text-amber mb-3">
+                    Watch the full training to unlock certification (you can still answer below).
+                  </p>
+                )}
+                <TrainingQuiz training={content} />
+              </div>
+            </div>
 
-                <div className="rounded-2xl border border-line bg-card p-5 shadow-soft">
-                  {!watched && (
-                    <p className="text-[12.5px] text-amber mb-3">
-                      Watch the full training to unlock certification (you can still preview below).
-                    </p>
-                  )}
-                  <TrainingQuiz training={content} />
+            {/* Certification queue (toggled from the hero) */}
+            {showQueue && (
+              <div className="mt-8 rounded-2xl border border-line bg-card p-5 shadow-soft">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[12px] font-bold uppercase tracking-wider text-ink3">Staff certification</span>
+                  <span className="text-[12px] font-semibold text-ink">{certified} of {staff.length} certified</span>
                 </div>
-              </>
-            ) : (
-              // No training yet — generate one from the implemented plan.
-              <div className="rounded-2xl border border-line bg-card p-8 shadow-soft text-center">
-                <div className="mx-auto h-14 w-14 rounded-2xl flex items-center justify-center text-white mb-4" style={{ background: "var(--ai-gradient)" }}>
-                  <Sparkles className="h-7 w-7" />
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-4">
+                  <div className="h-full rounded-full" style={{ width: `${(certified / staff.length) * 100}%`, background: "var(--green)" }} />
                 </div>
-                <h2 className="text-[17px] font-bold text-ink">
-                  Generate {individual.name}'s training
-                </h2>
-                <p className="text-[13px] text-ink2 mt-1.5 max-w-md mx-auto">
-                  {sourcePlan
-                    ? `A 5–10 minute narrated video and a 12-question certification quiz, built from the ${sourcePlan.plan_type_label} plan${planDate ? ` (effective ${planDate})` : ""}.`
-                    : "Once a plan is implemented for this individual, you can generate a narrated training and quiz here."}
-                </p>
-                <button
-                  type="button"
-                  onClick={generate}
-                  disabled={!sourcePlan || generating}
-                  className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-[13.5px] disabled:opacity-50"
-                  style={{ background: "var(--ai-gradient)" }}
-                >
-                  {generating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Generating training…
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="h-4 w-4" /> Generate training
-                    </>
-                  )}
-                </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {staff.map((s) => {
+                    const m = STATUS_META[s.status];
+                    return (
+                      <div key={s.name} className="flex items-center gap-3 rounded-xl border border-line p-3">
+                        <div className="h-9 w-9 rounded-full bg-navy text-white text-[12px] font-bold flex items-center justify-center shrink-0">
+                          {s.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] font-semibold text-ink truncate">{s.name}</div>
+                          <div className="text-[11.5px] text-ink3">
+                            {s.role}
+                            {s.status === "certified" && s.score != null
+                              ? ` · scored ${s.score}% · ${s.date}`
+                              : s.status === "in_progress"
+                                ? ` · watched ${s.watchedPct}%`
+                                : " · not started"}
+                          </div>
+                        </div>
+                        <span
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold uppercase tracking-wider shrink-0"
+                          style={{ color: m.fg, background: m.bg }}
+                        >
+                          <m.Icon className="h-3 w-3" />
+                          {m.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
-          </div>
 
-          {/* Staff certification queue */}
-          <div className="rounded-2xl border border-line bg-card p-5 shadow-soft h-fit">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-ink3">
-                Staff certification
-              </span>
-              <span className="text-[12px] font-semibold text-ink">
-                {certified} of {staff.length} certified
-              </span>
+            {/* Footer */}
+            {published && (
+              <div className="flex items-center gap-2.5 mt-8 pt-6 border-t border-line text-[14px]">
+                <Users className="h-4.5 w-4.5 text-ink3" />
+                <span className="text-ink2">Dropped into the to-do list of {staff.length} staff who support {individual.name}.</span>
+                <button onClick={() => setShowQueue(true)} className="font-bold text-navy hover:underline">View certification queue</button>
+              </div>
+            )}
+          </>
+        ) : (
+          // No training yet — generate one from the implemented plan.
+          <div className="max-w-xl mx-auto rounded-2xl border border-line bg-card p-10 shadow-soft text-center">
+            <div className="mx-auto h-14 w-14 rounded-2xl flex items-center justify-center text-white mb-4" style={{ background: "var(--ai-gradient)" }}>
+              <Sparkles className="h-7 w-7" />
             </div>
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-4">
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${(certified / staff.length) * 100}%`, background: "var(--green)" }}
-              />
-            </div>
-
-            <div className="space-y-2">
-              {staff.map((s) => {
-                const m = STATUS_META[s.status];
-                return (
-                  <div key={s.name} className="flex items-center gap-3 rounded-xl border border-line p-3">
-                    <div className="h-9 w-9 rounded-full bg-navy text-white text-[12px] font-bold flex items-center justify-center shrink-0">
-                      {s.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold text-ink truncate">{s.name}</div>
-                      <div className="text-[11.5px] text-ink3">
-                        {s.role}
-                        {s.status === "certified" && s.score != null
-                          ? ` · scored ${s.score}% · ${s.date}`
-                          : s.status === "in_progress"
-                            ? ` · watched ${s.watchedPct}%`
-                            : " · not started"}
-                      </div>
-                    </div>
-                    <span
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold uppercase tracking-wider shrink-0"
-                      style={{ color: m.fg, background: m.bg }}
-                    >
-                      <m.Icon className="h-3 w-3" />
-                      {m.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
+            <h2 className="text-[18px] font-extrabold text-ink">Generate {individual.name}'s training</h2>
+            <p className="text-[13.5px] text-ink2 mt-2">
+              {sourcePlan
+                ? `A 5–10 minute narrated video and a certification quiz, built from the ${sourcePlan.plan_type_label} plan${planDate ? ` (effective ${planDate})` : ""}.`
+                : "Once a plan is implemented for this individual, you can generate a narrated training and quiz here."}
+            </p>
             <button
               type="button"
-              className="mt-4 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-[9px] border border-line text-[12.5px] font-semibold text-ink2 hover:bg-muted"
+              onClick={generate}
+              disabled={!sourcePlan || generating}
+              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-[14px] disabled:opacity-50"
+              style={{ background: "var(--ai-gradient)" }}
             >
-              Send reminder to pending staff
+              {generating ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating training…</> : <><Wand2 className="h-4 w-4" /> Generate training</>}
             </button>
           </div>
-        </div>
+        )}
       </div>
     </AppShell>
   );

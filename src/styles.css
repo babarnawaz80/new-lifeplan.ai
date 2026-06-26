@@ -99,7 +99,7 @@
   --amber: oklch(0.61 0.12 75);                  /* #b9802a */
   --red: oklch(0.525 0.16 28);                   /* #bb4631 */
 
-  --ai-gradient: linear-gradient(95deg, #7b3ff2, #d8447f);
+  --ai-gradient: linear-gradient(118deg, #7C3AED 0%, #A855F7 42%, #E0398B 100%);
   --shadow-soft: 0 14px 40px -28px rgba(26, 35, 64, 0.5);
   --shadow-card-hover: 0 12px 40px -12px rgba(31, 42, 94, 0.18), 0 4px 16px -4px rgba(31, 42, 94, 0.10);
 }

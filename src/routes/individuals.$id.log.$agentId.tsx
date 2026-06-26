@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
-import { ChevronRight, Plus, Settings, FileText, Sparkles, CheckCircle2, Clock, PencilLine, Trash2 } from "lucide-react";
+import { ChevronRight, Plus, Settings, FileText, Sparkles, CheckCircle2, Clock, PencilLine, Trash2, Play, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { ManualOrAIDialog, type PlanStartSource } from "@/components/lifeplan/ManualOrAIDialog";
@@ -15,6 +15,7 @@ import {
   getIndividual,
   getAgent,
   listPlansForIndividualAndAgent,
+  getTrainingForPlan,
   createPlan,
   deletePlan,
 } from "@/integrations/icm";
@@ -68,10 +69,22 @@ function PlanLogPage() {
     });
   };
 
+  const firstName = individual.name.split(/\s+/)[0] ?? individual.name;
+  const inProgressCount = plans.filter((p) => p.status === "in_progress" || p.status === "draft").length;
+  const implementedCount = plans.filter((p) => p.status === "implemented").length;
+  const trainingCount = plans.filter((p) => getTrainingForPlan(p.id)?.content).length;
+
+  const summary: Array<{ n: number; label: string; fg: string; bg: string }> = [
+    { n: plans.length, label: "plans on file", fg: "var(--navy)", bg: "var(--muted)" },
+    { n: inProgressCount, label: "in progress", fg: "var(--indigo)", bg: "color-mix(in oklab, var(--indigo) 12%, transparent)" },
+    { n: implementedCount, label: "implemented", fg: "var(--green)", bg: "color-mix(in oklab, var(--green) 14%, transparent)" },
+    { n: trainingCount, label: "training videos", fg: "#C026A6", bg: "color-mix(in oklab, #C026A6 12%, transparent)" },
+  ];
+
   return (
     <AppShell>
-      <div className="max-w-4xl mx-auto px-6 py-6">
-        <nav className="flex items-center gap-1.5 text-[12px] text-ink3 mb-4">
+      <div className="max-w-5xl mx-auto px-6 py-7">
+        <nav className="flex items-center gap-1.5 text-[12px] text-ink3 mb-5">
           <Link to="/individuals" className="hover:text-ink">Individuals</Link>
           <ChevronRight className="h-3 w-3" />
           <Link to="/individuals/$id" params={{ id }} className="hover:text-ink">
@@ -81,55 +94,72 @@ function PlanLogPage() {
           <span className="text-ink font-semibold">{planTypeShort} log</span>
         </nav>
 
-        {/* Header: identity on the left, compact actions on the right */}
-        <div className="flex items-start gap-4 mb-7">
+        {/* Header: identity on the left, actions on the right */}
+        <div className="flex items-start gap-5">
           <div
-            className="h-12 w-12 rounded-xl flex items-center justify-center text-white text-[13px] font-extrabold shrink-0"
-            style={{ background: accentColor[agent.accent] }}
+            className="h-16 w-16 rounded-[18px] flex items-center justify-center text-white text-[18px] font-extrabold shrink-0"
+            style={{ background: accentColor[agent.accent], boxShadow: `0 6px 16px color-mix(in oklab, ${accentColor[agent.accent]} 34%, transparent)` }}
           >
             {planTypeShort.slice(0, 3)}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-[24px] font-extrabold text-ink">
+            <h1 className="text-[30px] font-extrabold text-ink tracking-tight leading-tight">
               {planTypeShort} for {individual.name}
             </h1>
-            <p className="text-[13px] text-ink2 mt-0.5">
+            <p className="text-[15px] text-ink2 mt-1">
               {planTypeLabel} · {plans.length} plan{plans.length === 1 ? "" : "s"} on file
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <Link
               to="/agents/$id/edit"
               params={{ id: agent.id }}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[9px] border border-line text-[12px] font-semibold text-ink2 hover:text-ink hover:bg-muted"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] border border-line bg-card text-[13px] font-semibold text-ink2 hover:text-ink hover:bg-muted"
               title="Configure the shared agent"
             >
-              <Settings className="h-3.5 w-3.5" />
+              <Settings className="h-4 w-4" />
               Configure
             </Link>
             <button
               onClick={() => setOpenModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[9px] border border-line text-[12.5px] font-semibold text-ink hover:bg-muted"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] border border-line bg-card text-[13px] font-semibold text-ink hover:bg-muted"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               New plan
             </button>
             <button
               onClick={() => setOpenModal(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[9px] text-white text-[12.5px] font-bold hover:opacity-95 shadow-soft"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] text-white text-[13px] font-bold hover:opacity-95 shadow-soft"
               style={{ background: "var(--ai-gradient)" }}
               title="Start a new plan and draft it with AI"
             >
-              <Sparkles className="h-3.5 w-3.5" />
+              <Sparkles className="h-4 w-4" />
               Start with AI
             </button>
           </div>
         </div>
 
-        <h2 className="text-[12px] font-bold uppercase tracking-wider text-ink3 mb-3">
-          History
-        </h2>
+        {/* Summary strip */}
+        <div className="flex flex-wrap gap-2.5 mt-6">
+          {summary.map((s) => (
+            <div key={s.label} className="flex items-center gap-3 px-4 py-3 rounded-[14px] border border-line bg-card flex-1 min-w-[160px]">
+              <span
+                className="h-9 w-9 rounded-[10px] flex items-center justify-center text-[16px] font-extrabold"
+                style={{ color: s.fg, background: s.bg }}
+              >
+                {s.n}
+              </span>
+              <span className="text-[13.5px] font-semibold text-ink2">{s.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* History */}
+        <div className="flex items-center gap-3 mt-9 mb-4">
+          <span className="text-[12px] font-bold uppercase tracking-[0.1em] text-ink3">History</span>
+          <span className="flex-1 h-px bg-line" />
+        </div>
         {plans.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line p-10 text-center">
             <FileText className="h-7 w-7 text-ink3 mx-auto mb-2" />
@@ -138,12 +168,14 @@ function PlanLogPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-3.5">
             {plans.map((p) => (
               <PlanLogRow
                 key={p.id}
                 plan={p}
                 planTypeLabel={planTypeLabel}
+                firstName={firstName}
+                hasTraining={!!getTrainingForPlan(p.id)?.content}
                 id={id}
                 onDelete={p.status !== "implemented" ? () => setToDelete(p) : undefined}
               />
@@ -274,14 +306,68 @@ function fmt(iso?: string) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+// Mini training-video thumbnail with play affordance. "Watch training" links to
+// the full Staff Training page when a training has been generated for the plan.
+function TrainingThumb({ firstName, published, id }: { firstName: string; published: boolean; id: string }) {
+  const navigate = useNavigate();
+  return (
+    <div
+      className="w-[188px] shrink-0 group/thumb"
+      role={published ? "button" : undefined}
+      onClick={
+        published
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              navigate({ to: "/individuals/$id/trainings", params: { id } });
+            }
+          : undefined
+      }
+      style={{ cursor: published ? "pointer" : "default" }}
+    >
+      <div
+        className="relative w-[188px] h-[106px] rounded-xl overflow-hidden transition-transform group-hover/thumb:scale-[1.015]"
+        style={{ background: "var(--ai-gradient)", boxShadow: "0 6px 16px color-mix(in oklab, #7C3AED 22%, transparent)" }}
+      >
+        <div className="absolute inset-0 p-3">
+          <div className="text-white font-extrabold text-[15px] leading-tight tracking-tight">
+            Welcome!<br />Supporting {firstName}
+          </div>
+          <div className="absolute left-3 bottom-3 flex gap-1">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className="h-[3px] w-3.5 rounded-sm" style={{ background: i === 0 ? "#fff" : "rgba(255,255,255,.4)" }} />
+            ))}
+          </div>
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="h-10 w-10 rounded-full bg-white/95 flex items-center justify-center shadow-lg transition-transform group-hover/thumb:scale-110">
+            <Play className="h-4 w-4 text-navy ml-0.5" fill="currentColor" />
+          </div>
+        </div>
+        <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/40 text-white text-[10px] font-bold backdrop-blur-sm">1:48</span>
+      </div>
+      <div
+        className={`flex items-center justify-center gap-1.5 mt-2 text-[13px] font-bold ${published ? "text-navy" : "text-ink3"}`}
+      >
+        <GraduationCap className="h-3.5 w-3.5" />
+        {published ? "Watch training" : "Training not built"}
+      </div>
+    </div>
+  );
+}
+
 function PlanLogRow({
   plan,
   planTypeLabel,
+  firstName,
+  hasTraining,
   id,
   onDelete,
 }: {
   plan: Plan;
   planTypeLabel: string;
+  firstName: string;
+  hasTraining: boolean;
   id: string;
   onDelete?: () => void;
 }) {
@@ -289,23 +375,27 @@ function PlanLogRow({
   const content = plan.plan_content as { implementation_date?: string; implemented_by?: string };
   const implDate = fmt(plan.implementation_date ?? content?.implementation_date);
   const implBy = content?.implemented_by;
+  const accent = plan.status === "implemented" ? "var(--green)" : plan.status === "in_progress" ? "var(--indigo)" : "var(--amber)";
 
   return (
     <Link
       to="/individuals/$id/plan/$planId"
       params={{ id, planId: plan.id }}
-      className="flex items-center gap-4 rounded-2xl border border-line bg-card p-4 hover:-translate-y-0.5 hover:shadow-soft transition-all"
+      className="relative flex items-center gap-5 rounded-[18px] border border-line bg-card p-5 pl-6 overflow-hidden hover:shadow-soft hover:border-[color:var(--border)] transition-all"
     >
-      <span
-        className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0"
-        style={{ color: s.fg, background: s.bg }}
-      >
-        {s.label}
-      </span>
+      <span className="absolute left-0 top-0 bottom-0 w-[5px]" style={{ background: accent }} />
+
+      <TrainingThumb firstName={firstName} published={hasTraining} id={id} />
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[14.5px] font-bold text-ink">
+        <span
+          className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
+          style={{ color: s.fg, background: s.bg }}
+        >
+          {s.label}
+        </span>
+        <div className="flex items-center gap-2.5 flex-wrap mt-2">
+          <span className="text-[19px] font-extrabold text-ink tracking-tight">
             {plan.plan_type_label} {planTypeLabel}
           </span>
           {plan.creation_mode === "ai" ? (
@@ -321,28 +411,24 @@ function PlanLogRow({
             </span>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[12px] text-ink3">
-          <span>
-            Created {fmt(plan.created_at)} · {plan.creation_mode === "ai" ? "AI-drafted" : "Manual"}
-          </span>
+        <div className="text-[13px] text-ink3 mt-1.5">
+          Created {fmt(plan.created_at)} · {plan.creation_mode === "ai" ? "AI-drafted" : "Manual"}
         </div>
-
-        {/* Status-specific audit line */}
-        <div className="mt-1.5">
+        <div className="mt-2">
           {plan.status === "implemented" ? (
-            <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-green">
-              <CheckCircle2 className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-green">
+              <CheckCircle2 className="h-4 w-4" />
               Implemented {implDate}
               {implBy ? <span className="text-ink3 font-normal">· by {implBy}</span> : null}
             </span>
           ) : plan.status === "in_progress" ? (
-            <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-indigo">
-              <Clock className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-indigo">
+              <Clock className="h-4 w-4" />
               In progress — not yet implemented
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-amber">
-              <PencilLine className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-amber">
+              <PencilLine className="h-4 w-4" />
               Draft — not yet implemented
             </span>
           )}
@@ -364,7 +450,7 @@ function PlanLogRow({
           <Trash2 className="h-4 w-4" />
         </button>
       )}
-      <ChevronRight className="h-4 w-4 text-ink3 shrink-0" />
+      <ChevronRight className="h-5 w-5 text-ink3 shrink-0" />
     </Link>
   );
 }

@@ -3,7 +3,7 @@
 // Inline styles use the .lp-dash-scoped CSS variables from dashboard.css.
 import type { CSSProperties, ReactNode } from "react";
 
-export const AI_GRAD = "linear-gradient(120deg, #16C0E8 0%, #8B5CF6 100%)";
+export const AI_GRAD = "linear-gradient(118deg, #7C3AED 0%, #A855F7 42%, #E0398B 100%)";
 
 export const aiBtn: CSSProperties = {
   display: "inline-flex",

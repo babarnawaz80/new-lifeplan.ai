@@ -54,7 +54,7 @@ function toView(a: Agent, engineName: (id: string) => string): AgView {
 
 const card: CSSProperties = { background: "#fff", border: "1px solid var(--border-soft)", borderRadius: 16, boxShadow: "var(--shadow-xs)" };
 const ghostBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "#fff", fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 13, color: "var(--fg2)", cursor: "pointer" };
-const gradBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: 10, border: "none", background: "linear-gradient(120deg,#16C0E8,#8B5CF6)", color: "#fff", fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 6px 16px rgba(139,92,246,0.26)" };
+const gradBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: 10, border: "none", background: "var(--ai-gradient)", color: "#fff", fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 6px 16px rgba(139,92,246,0.26)" };
 const navyBtn: CSSProperties = { ...gradBtn, background: "var(--icm-ink)", boxShadow: "none" };
 
 function AgIcon({ abbr, hue, size = 42 }: { abbr: string; hue: string; size?: number }) {
@@ -124,7 +124,7 @@ function AgentCard({ a, onClick }: { a: AgView; onClick: () => void }) {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
           <AgStatus draft={a.draft} />
           {a.autonomous && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999, color: "#fff", fontFamily: "var(--font-text)", fontWeight: 700, fontSize: 10.5, letterSpacing: "0.02em", textTransform: "uppercase", background: "linear-gradient(120deg,#16C0E8,#8B5CF6)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 999, color: "#fff", fontFamily: "var(--font-text)", fontWeight: 700, fontSize: 10.5, letterSpacing: "0.02em", textTransform: "uppercase", background: "var(--ai-gradient)" }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l1.7 5.1L19 9l-5.3 1.9L12 16l-1.7-5.1L5 9l5.3-1.9z" /></svg>
               Autonomous
             </span>

@@ -64,7 +64,7 @@ export function ActivityTab() {
             Everything autonomous agents do. {needsAttention > 0 ? `${needsAttention} item${needsAttention === 1 ? "" : "s"} need attention.` : "Agents never implement or push to CareTracker on their own."}
           </p>
         </div>
-        <button onClick={run} disabled={running} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "linear-gradient(120deg,#16C0E8,#8B5CF6)", color: "#fff", border: "none", padding: "10px 16px", borderRadius: 10, fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 6px 16px rgba(139,92,246,0.26)", opacity: running ? 0.7 : 1 }}>
+        <button onClick={run} disabled={running} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--ai-gradient)", color: "#fff", border: "none", padding: "10px 16px", borderRadius: 10, fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 6px 16px rgba(139,92,246,0.26)", opacity: running ? 0.7 : 1 }}>
           <Sparkles className="h-4 w-4" /> {running ? "Running…" : "Run autonomy now"}
         </button>
       </div>
