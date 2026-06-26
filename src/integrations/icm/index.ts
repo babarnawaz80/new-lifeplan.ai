@@ -62,10 +62,14 @@ import {
 import type { PlanSchema, OptionSet } from "@/data/lifeplan-types";
 import { generateProgressForTree } from "@/lib/caretracker-progress";
 import type { ServiceProgress } from "@/lib/caretracker-progress";
+import type { IcmHostBridge, GoalOutcomeWrite, CareTrackerProgressFilters } from "./contract";
+import { getHostContext } from "./contract";
 
 
 export function getCurrentSession() {
-  return { userId: "user_mock_1", userName: "Babar Nawaz", orgId: ORG_ID };
+  // iCM injects the authenticated session at mount via setHostContext(). Until
+  // then (local/demo), fall back to a mock session.
+  return getHostContext()?.session ?? { userId: "user_mock_1", userName: "Babar Nawaz", orgId: ORG_ID };
 }
 
 // ---- Individuals ----
@@ -395,13 +399,7 @@ function planStructuredTree(p: Plan): import("@/types/icmGoalOutcome").IcmPlanTr
   );
 }
 
-export type CareTrackerProgressFilters = {
-  individualId?: string;
-  planId?: string;
-  goalId?: string;
-  program?: string;
-  site?: string;
-};
+export type { CareTrackerProgressFilters } from "./contract";
 
 export function getCareTrackerProgress(
   filters: CareTrackerProgressFilters = {},
@@ -876,14 +874,7 @@ export function discontinueCareTrackerSource(args: {
 // the mapping can be verified end-to-end without a live iCM. Strategies
 // flagged show_on_care_tracker also surface as CareTracker services
 // (single-active-source rule preserved, source='lifeplan').
-export type GoalOutcomeWrite = {
-  id: string;
-  individual_id: string;
-  plan_id: string | null;
-  plan_type: string;
-  written_at: string;
-  tree: import("@/types/icmGoalOutcome").IcmPlanTree;
-};
+export type { GoalOutcomeWrite } from "./contract";
 
 export const goalOutcomeWrites: GoalOutcomeWrite[] = [];
 
@@ -1105,3 +1096,27 @@ function applyLocksFromGuidelineId(schema: PlanSchema, guidelineId?: string): Pl
   const labels = g?.compliance_brief.required_fields ?? [];
   return labels.length ? applyLocks(schema, labels) : schema;
 }
+
+// ----------------------------------------------------------------------------
+// CONTRACT CONFORMANCE. This compile-time check asserts the mock implementation
+// satisfies the IcmHostBridge contract. When your team builds the real bridge
+// (real-bridge.stub.ts), it must satisfy the same interface — so the UI behaves
+// identically before and after wiring. If you change a bridge signature here,
+// TypeScript will flag the contract and the real bridge until they match.
+// ----------------------------------------------------------------------------
+const _hostBridgeConformance: IcmHostBridge = {
+  getCurrentSession,
+  getIndividual,
+  listIndividuals,
+  getIndividualOrgContext,
+  getProfileData,
+  staffSupporting,
+  getCareTrackerProgress,
+  readCareTrackerProgress,
+  listCareTrackerServices,
+  getActiveCareTrackerSource,
+  writeGoalOutcomeTree,
+  pushToCareTracker,
+  publishTrainingToModule,
+};
+void _hostBridgeConformance;
