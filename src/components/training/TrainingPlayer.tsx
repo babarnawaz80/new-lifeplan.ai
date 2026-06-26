@@ -8,7 +8,7 @@
 // browser's Web Speech voice, and the player labels which voice is in use.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Play, Pause, SkipForward, SkipBack, RotateCcw, Volume2, VolumeX, Sparkles } from "lucide-react";
+import { Play, Pause, SkipForward, SkipBack, RotateCcw, Volume2, VolumeX, Sparkles, Loader2 } from "lucide-react";
 import type { TrainingContent } from "@/data/mock";
 import { synthesizeTrainingAudio } from "@/lib/generate-training-audio.functions";
 
@@ -44,6 +44,7 @@ export function TrainingPlayer({
   const [done, setDone] = useState(false);
   const [aiUnavailable, setAiUnavailable] = useState(false);
   const [voiceSource, setVoiceSource] = useState<"ai" | "browser" | null>(null);
+  const [buffering, setBuffering] = useState(false);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
 
@@ -133,8 +134,12 @@ export function TrainingPlayer({
       if (line !== 0) return;
       let cancelled = false;
       (async () => {
+        // Show a buffering indicator only when this slide's clip isn't cached
+        // yet (prefetch usually has it ready, so transitions feel instant).
+        if (audioCacheRef.current.get(slide) === undefined) setBuffering(true);
         const clip = await getSlideAudio(slide);
         if (cancelled) return;
+        setBuffering(false);
         if (clip === "none") { setAiUnavailable(true); setVoiceSource("browser"); return; }
         setVoiceSource("ai");
         const el = audioElRef.current;
@@ -144,7 +149,7 @@ export function TrainingPlayer({
         el.onerror = advanceSlide;
         el.play().catch(() => { setAiUnavailable(true); setVoiceSource("browser"); });
       })();
-      return () => { cancelled = true; const el = audioElRef.current; if (el) { el.onended = null; el.pause(); } };
+      return () => { cancelled = true; setBuffering(false); const el = audioElRef.current; if (el) { el.onended = null; el.pause(); } };
     }
 
     // Browser speech fallback (per line).
@@ -166,6 +171,14 @@ export function TrainingPlayer({
     window.speechSynthesis.speak(u);
     return () => window.speechSynthesis.cancel();
   }, [playing, slide, line, done, aiUnavailable, speechSupported, slides, alexVoice, jamieVoice, advanceLine, advanceSlide, getSlideAudio]);
+
+  // Prefetch the next slide's audio while the current one plays, so advancing
+  // is instant (no gap). Also warms slide 0/1 as soon as playback starts.
+  useEffect(() => {
+    if (!playing || aiUnavailable || mutedRef.current) return;
+    void getSlideAudio(slide + 1);
+    if (slide === 0) void getSlideAudio(1);
+  }, [playing, slide, aiUnavailable, getSlideAudio]);
 
   // Stop everything on unmount.
   useEffect(() => () => stopAudio(), [stopAudio]);
@@ -244,6 +257,13 @@ export function TrainingPlayer({
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Buffering while a slide's AI audio loads */}
+        {buffering && playing && !done && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/45 backdrop-blur text-white text-[11px] font-semibold">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Preparing AI narration…
           </div>
         )}
 

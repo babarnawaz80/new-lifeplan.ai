@@ -8,6 +8,7 @@ import { ChevronDown, ChevronRight, X, ExternalLink } from "lucide-react";
 import { ComplianceRing, RingGauge } from "./dashboard-ui";
 import { ProgressDrawer } from "./ProgressDrawer";
 import { OverviewAsk } from "./OverviewAsk";
+import { OverviewTrends } from "./OverviewTrends";
 import { useLifeplanSummary, useLifeplanDistribution, useScopedPlans, SCOPE_PAGE_SIZE } from "@/lib/useLifeplanScale";
 import {
   EXCEPTION_CATEGORIES,
@@ -51,8 +52,10 @@ export function OverviewScale({
     queueMicrotask(() => document.getElementById("lp-scoped")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const openProgram = (p: string) => {
+    // Open the program's scoped breakdown WITHOUT filtering the whole dashboard.
+    // (Previously this set the global program filter, which left the Overview
+    // stuck on that program after Clear — health/meters/strip all narrowed.)
     setScope({ kind: "program", program: p });
-    onSetProgram?.(p);
     queueMicrotask(() => document.getElementById("lp-scoped")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
@@ -66,6 +69,9 @@ export function OverviewScale({
         <HealthSummary summary={summary} />
         <NeedsAttention summary={summary} onPick={(c) => openCategory(c)} />
       </div>
+
+      {/* Trends — on-demand pattern detection (refusals, declining, behind) */}
+      <OverviewTrends />
 
       {/* Section 5 — scoped results (on demand) */}
       <div id="lp-scoped">
