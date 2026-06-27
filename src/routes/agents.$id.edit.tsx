@@ -17,8 +17,12 @@ import {
   accentColor,
   resolveTrainingTemplate,
   resolveTrainingConfig,
+  resolveRetrainingTemplate,
+  resolveRetrainingConfig,
   DEFAULT_TRAINING_TEMPLATE,
   DEFAULT_TRAINING_CONFIG,
+  DEFAULT_RETRAINING_TEMPLATE,
+  DEFAULT_RETRAINING_CONFIG,
   type TrainingConfig,
 } from "@/data/mock";
 import { buildAgent } from "@/lib/build-agent.functions";
@@ -81,6 +85,8 @@ function AgentEditor() {
   const [instructions, setInstructions] = useState(agent.instructions);
   const [trainingTemplate, setTrainingTemplate] = useState(resolveTrainingTemplate(agent));
   const [trainingConfig, setTrainingConfig] = useState<TrainingConfig>(resolveTrainingConfig(agent));
+  const [retrainingTemplate, setRetrainingTemplate] = useState(resolveRetrainingTemplate(agent));
+  const [retrainingConfig, setRetrainingConfig] = useState<TrainingConfig>(resolveRetrainingConfig(agent));
   const [schema, setSchema] = useState<PlanSchema>(agent.plan_schema);
   const [mode, setMode] = useState<BuilderMode>("workflow");
   const [schemaSelection, setSchemaSelection] = useState<SchemaSelection>({ kind: null });
@@ -147,6 +153,8 @@ function AgentEditor() {
       instructions,
       training_prompt_template: trainingTemplate,
       training_config: trainingConfig,
+      retraining_prompt_template: retrainingTemplate,
+      retraining_config: retrainingConfig,
       status: "active",
     });
     updateAgentSchema(agent.id, schema);
@@ -300,6 +308,15 @@ function AgentEditor() {
                 setTrainingTemplate(DEFAULT_TRAINING_TEMPLATE);
                 setTrainingConfig({ ...DEFAULT_TRAINING_CONFIG });
                 toast.success("Training recipe reset to default.");
+              }}
+              retrainingTemplate={retrainingTemplate}
+              retrainingConfig={retrainingConfig}
+              onRetrainingTemplateChange={setRetrainingTemplate}
+              onRetrainingConfigChange={(patch) => setRetrainingConfig((c) => ({ ...c, ...patch }))}
+              onResetRetraining={() => {
+                setRetrainingTemplate(DEFAULT_RETRAINING_TEMPLATE);
+                setRetrainingConfig({ ...DEFAULT_RETRAINING_CONFIG });
+                toast.success("Retraining recipe reset to default.");
               }}
             />
           </div>

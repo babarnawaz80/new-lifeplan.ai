@@ -848,16 +848,20 @@ export function publishTrainingToModule(args: {
   const now = new Date().toISOString();
   updateTraining(args.training.id, { published_at: now });
 
-  // Demo seed so the certification queue reads realistically right away. The
-  // real module owns real watch/score state.
-  const seed: Array<{ status: TrainingTodo["status"]; watched: number; score: number | null }> = [
-    { status: "certified", watched: 100, score: 92 },
-    { status: "certified", watched: 100, score: 83 },
-    { status: "in_progress", watched: 60, score: null },
-    { status: "in_progress", watched: 25, score: null },
-    { status: "not_started", watched: 0, score: null },
-    { status: "not_started", watched: 0, score: null },
-  ];
+  // A retraining re-opens certification: every staff member must re-watch and
+  // re-pass, so all to-dos start not-started. A first-time training uses the
+  // realistic demo seed so the queue reads naturally right away.
+  const reopen = args.training.kind === "retraining";
+  const seed: Array<{ status: TrainingTodo["status"]; watched: number; score: number | null }> = reopen
+    ? Array.from({ length: 6 }, () => ({ status: "not_started" as const, watched: 0, score: null }))
+    : [
+        { status: "certified", watched: 100, score: 92 },
+        { status: "certified", watched: 100, score: 83 },
+        { status: "in_progress", watched: 60, score: null },
+        { status: "in_progress", watched: 25, score: null },
+        { status: "not_started", watched: 0, score: null },
+        { status: "not_started", watched: 0, score: null },
+      ];
   const staff = staffSupporting(args.individualId);
   staff.forEach((s, i) => {
     const exists = trainingTodos.find(
@@ -916,6 +920,55 @@ export function listTrainingTodos(filter: { individualId?: string; trainingId?: 
 
 export function getTrainingPublication(trainingId: string): TrainingPublication | undefined {
   return trainingPublications.find((p) => p.training_id === trainingId);
+}
+
+// ---- Retraining loop events (drift noticed + retraining generated) ----
+// Recorded on the plan's compliance record (persists in plan_content) and
+// mirrored to the activity log so they show up in the Activity tab.
+export function recordDriftNoticed(planId: string, reason: string): void {
+  const comp = getPlanCompliance(planId);
+  const retraining = comp.retraining ?? { drift_noticed: [], retraining_generated: [] };
+  const next = { ...retraining, drift_noticed: [...retraining.drift_noticed, { at: new Date().toISOString(), reason }] };
+  updatePlanCompliance(planId, { retraining: next }, { what: `Drift noticed: ${reason}` });
+  const plan = plans.find((p) => p.id === planId);
+  if (plan) {
+    logAgentActivity({
+      agent_id: plan.agent_id,
+      individual_id: plan.individual_id,
+      plan_id: planId,
+      action_type: "drift_noticed",
+      status: "flagged",
+      summary: `Drift noticed on this plan: ${reason}.`,
+    });
+  }
+}
+
+export function recordRetrainingGenerated(planId: string, reason: string, focusAreas: string[]): void {
+  const comp = getPlanCompliance(planId);
+  const retraining = comp.retraining ?? { drift_noticed: [], retraining_generated: [] };
+  const next = {
+    ...retraining,
+    retraining_generated: [...retraining.retraining_generated, { at: new Date().toISOString(), reason, focus_areas: focusAreas }],
+  };
+  updatePlanCompliance(planId, { retraining: next }, { what: `Retraining generated: ${reason}` });
+  const plan = plans.find((p) => p.id === planId);
+  if (plan) {
+    logAgentActivity({
+      agent_id: plan.agent_id,
+      individual_id: plan.individual_id,
+      plan_id: planId,
+      action_type: "retraining_generated",
+      status: "action_taken",
+      summary: `Generated a retraining video addressing: ${reason}.${focusAreas.length ? ` Focus: ${focusAreas.join(", ")}.` : ""}`,
+      payload: { reason, focusAreas },
+    });
+  }
+}
+
+// Per-plan retraining counters (drift noticed + retraining videos generated).
+export function getRetrainingCounts(planId: string): { driftNoticed: number; retrainingGenerated: number } {
+  const r = getPlanCompliance(planId).retraining;
+  return { driftNoticed: r?.drift_noticed.length ?? 0, retrainingGenerated: r?.retraining_generated.length ?? 0 };
 }
 
 // ---- Profile data ----

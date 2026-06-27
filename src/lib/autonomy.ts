@@ -27,12 +27,16 @@ import {
   getPlan,
   getIndividual,
   getAgent,
+  recordDriftNoticed,
+  recordRetrainingGenerated,
 } from "@/integrations/icm";
 import { prePlanningPhases } from "@/lib/plan-runtime";
 import {
   planTypeInfo,
   resolveTrainingTemplate,
   resolveTrainingConfig,
+  resolveRetrainingTemplate,
+  resolveRetrainingConfig,
   DEFAULT_AUTONOMY_CONFIG,
   type Agent,
   type Plan,
@@ -43,6 +47,37 @@ import {
 const DAY = 86400000;
 const daysUntil = (iso?: string) => (iso ? Math.round((new Date(iso).getTime() - Date.now()) / DAY) : 0);
 const cfgFor = (a: Agent): AutonomyConfig => a.autonomy_config ?? DEFAULT_AUTONOMY_CONFIG;
+
+// Drift detection for the retraining loop. Reads CareTracker progress and flags
+// the same slipping pattern the advocate watches (declining trend, documentation
+// behind, or low completion). Drifting when >= 2 services are slipping. The
+// slipping service titles are the focus areas to re-teach. Shared by the
+// autonomous tick and the per-plan one-click "Generate retraining" action.
+export type PlanDrift = {
+  drifting: boolean;
+  reason: string;
+  driftSummary: string;
+  focusAreas: string[];
+};
+export function detectPlanDrift(plan: Plan, opts: { noProgressDays?: number } = {}): PlanDrift {
+  const noProgressDays = opts.noProgressDays ?? DEFAULT_AUTONOMY_CONFIG.no_progress_days;
+  const empty: PlanDrift = { drifting: false, reason: "", driftSummary: "", focusAreas: [] };
+  if (plan.status !== "implemented") return empty;
+  const svc = readCareTrackerProgress(plan.individual_id, plan.id);
+  if (!svc.length) return empty;
+  const slipping = svc.filter((s) => {
+    const lastDays = s.lastDocumented ? Math.round((Date.now() - new Date(s.lastDocumented).getTime()) / DAY) : 999;
+    return s.trend === "down" || lastDays > noProgressDays || s.pctComplete < 40;
+  });
+  if (slipping.length < 2) return empty;
+  const titles = slipping.map((s) => s.serviceTitle);
+  return {
+    drifting: true,
+    reason: `${slipping.length} services slipping (declining engagement, missed documentation)`,
+    driftSummary: titles.join(", "),
+    focusAreas: titles,
+  };
+}
 
 export type TickResult = {
   agentsRun: number;
@@ -115,7 +150,11 @@ export async function processAutoTrainingQueue(
       continue;
     }
     const agent = getAgent(plan.agent_id);
-    const cfg = resolveTrainingConfig(agent ?? {});
+    const isRetraining = t.kind === "retraining";
+    // Retraining uses the agent's retraining recipe; first-time/refresh uses the
+    // training recipe.
+    const cfg = isRetraining ? resolveRetrainingConfig(agent ?? {}) : resolveTrainingConfig(agent ?? {});
+    const recipe = isRetraining ? resolveRetrainingTemplate(agent ?? {}) : resolveTrainingTemplate(agent ?? {});
     const typeLabel = planTypeInfo(agent?.plan_type ?? "").label;
     const firstName = individual.name.split(/\s+/)[0] ?? individual.name;
     const trendSummary = t.auto_trigger_reason ?? t.trigger_reason ?? "";
@@ -146,13 +185,17 @@ export async function processAutoTrainingQueue(
           individualFirstName: firstName,
           planTypeLabel: typeLabel,
           planDate,
-          trainingTemplate: resolveTrainingTemplate(agent ?? {}),
+          trainingTemplate: recipe,
           quizQuestionCount: cfg.quiz_question_count,
           videoLengthTarget: cfg.video_length_target,
           firstNameOnly: cfg.first_name_only,
           narratorMode: cfg.narrator_mode,
           trendContext: trendSummary,
           researchNotes,
+          isRetraining,
+          retrainingReason: isRetraining ? trendSummary : "",
+          driftSummary: isRetraining ? trendSummary : "",
+          focusAreas: isRetraining ? (t.trigger_reason ?? "") : "",
         },
       });
       updateTraining(t.id, { content, status: "ready", video_status: "ready", auto_trigger_reason: undefined });
@@ -271,27 +314,27 @@ function implementationWatcher(agent: Agent, plan: Plan, cfg: AutonomyConfig, bu
 // video/quiz regeneration is done by processAutoTrainingQueue() (needs the AI).
 function trainingAdvocate(agent: Agent, plan: Plan, cfg: AutonomyConfig, bump: (s: string) => void) {
   if (!planComplete(plan)) return;
-  const svc = readCareTrackerProgress(plan.individual_id, plan.id);
-  if (!svc.length) return;
-  const slipping = svc.filter((s) => {
-    const lastDays = s.lastDocumented ? Math.round((Date.now() - new Date(s.lastDocumented).getTime()) / DAY) : 999;
-    return s.trend === "down" || lastDays > cfg.no_progress_days || s.pctComplete < 40;
-  });
+  const drift = detectPlanDrift(plan, { noProgressDays: cfg.no_progress_days });
   // Need a real pattern, not a one-off — staff are dropping the ball.
-  if (slipping.length < 2) return;
-  if (hasRecentActivity({ agentId: agent.id, planId: plan.id, actionType: "auto_training", withinDays: cfg.no_progress_days })) return;
+  if (!drift.drifting) return;
+  if (hasRecentActivity({ agentId: agent.id, planId: plan.id, actionType: "retraining_generated", withinDays: cfg.no_progress_days })) return;
 
-  const reason = `${slipping.length} services slipping (declining engagement, missed documentation)`;
-  // Create a NEW training (a fresh version in the plan's history), flag it for
-  // regeneration with the trend context, and drop it into the staff queue now.
+  // Record the drift on the plan (per-plan counter + activity log).
+  recordDriftNoticed(plan.id, drift.reason);
+
+  // Create a NEW retraining (a fresh version in the plan's history), flag it for
+  // regeneration with the drift context, and drop it into the staff queue now.
+  // Publishing the retraining re-opens certification (all staff back to
+  // not-started). The actual video is produced by processAutoTrainingQueue().
   const training = createPendingTraining({
     planId: plan.id,
     individualId: plan.individual_id,
     trigger: "advocate",
-    triggerReason: reason,
+    triggerReason: drift.reason,
   });
-  updateTraining(training.id, { auto_trigger_reason: reason });
-  publishTrainingToModule({ individualId: plan.individual_id, planId: plan.id, training });
+  updateTraining(training.id, { kind: "retraining", auto_trigger_reason: drift.reason });
+  publishTrainingToModule({ individualId: plan.individual_id, planId: plan.id, training: { ...training, kind: "retraining" } });
+  recordRetrainingGenerated(plan.id, drift.reason, drift.focusAreas);
 
   logAgentActivity({
     agent_id: agent.id,
@@ -299,8 +342,8 @@ function trainingAdvocate(agent: Agent, plan: Plan, cfg: AutonomyConfig, bump: (
     plan_id: plan.id,
     action_type: "auto_training",
     status: "action_taken",
-    summary: `Staff engagement on this ${planTypeInfo(agent.plan_type).label} is slipping (${slipping.length} services). Refreshed the staff training and dropped it into the staff queue.`,
-    payload: { services: slipping.map((s) => s.serviceTitle), reason },
+    summary: `Staff engagement on this ${planTypeInfo(agent.plan_type).label} is slipping (${drift.focusAreas.length} services). Generated a retraining video and re-opened certification.`,
+    payload: { services: drift.focusAreas, reason: drift.reason },
   });
   bump("action_taken");
 }

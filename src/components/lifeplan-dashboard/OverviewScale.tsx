@@ -5,10 +5,11 @@
 // readiness rings), a scoped results area on demand, programs by risk, trends.
 // Every count drills into the existing scoped list + individual slide-out.
 import { useMemo, useState, type CSSProperties } from "react";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, X, Sparkles } from "lucide-react";
 import { ProgressDrawer } from "./ProgressDrawer";
 import { OverviewAsk } from "./OverviewAsk";
 import { OverviewTrends } from "./OverviewTrends";
+import { TrendsPanel } from "./TrendsPanel";
 import { useLifeplanSummary, useLifeplanDistribution, useScopedPlans, SCOPE_PAGE_SIZE } from "@/lib/useLifeplanScale";
 import {
   EXCEPTION_CATEGORIES,
@@ -50,6 +51,7 @@ export function OverviewScale({
 
   const [scope, setScope] = useState<Scope>(null);
   const [slideIndividual, setSlideIndividual] = useState<string | null>(null);
+  const [trendsOpen, setTrendsOpen] = useState(false);
 
   const openCategory = (category: ExceptionCategory, answer?: string) => {
     setScope({ kind: "category", category, answer });
@@ -62,8 +64,20 @@ export function OverviewScale({
 
   return (
     <>
-      {/* Ask */}
-      <OverviewAsk filters={filters} onResult={(category, answer) => openCategory(category, answer)} />
+      {/* Ask + a reachable Generate trends trigger (opens the side panel) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <OverviewAsk filters={filters} onResult={(category, answer) => openCategory(category, answer)} />
+        </div>
+        <button
+          onClick={() => setTrendsOpen(true)}
+          className="lp-act"
+          style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: 7, padding: "11px 16px", borderRadius: 11, border: "none", background: "var(--ai-gradient)", color: "#fff", fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", boxShadow: "0 6px 16px rgba(124,58,237,.22)" }}
+          title="Analyze portfolio trends"
+        >
+          <Sparkles className="h-4 w-4" /> Generate trends
+        </button>
+      </div>
 
       {/* Hero: portfolio health donut + provider coverage */}
       <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 18, alignItems: "stretch", marginBottom: 18 }}>
@@ -98,9 +112,9 @@ export function OverviewScale({
       {/* Programs by risk */}
       <ProgramStrip distribution={distribution} onPick={openProgram} />
 
-      {/* Trends, on-demand pattern detection */}
+      {/* Trends, on-demand pattern detection (card opens the side panel) */}
       <div style={{ marginTop: 18 }}>
-        <OverviewTrends />
+        <OverviewTrends onOpen={() => setTrendsOpen(true)} />
       </div>
 
       <div style={{ fontFamily: "var(--font-text)", fontSize: 12, color: "var(--fg4)", padding: "0 2px", marginTop: 10 }}>
@@ -116,6 +130,9 @@ export function OverviewScale({
           onClose={() => setSlideIndividual(null)}
         />
       )}
+
+      {/* Trends results in a right-side slide-in panel */}
+      <TrendsPanel open={trendsOpen} onClose={() => setTrendsOpen(false)} />
     </>
   );
 }
@@ -309,7 +326,7 @@ function LifecycleGroup({ summary, onPick }: { summary: ReturnType<typeof useLif
 }
 
 // ---- Group 3: delivery & readiness (ring meters) ---------------------------
-const READINESS_CATS: ExceptionCategory[] = ["off_track", "missing_source", "staff_untrained"];
+const READINESS_CATS: ExceptionCategory[] = ["off_track", "missing_source", "staff_untrained", "retraining_triggered"];
 function ReadinessGroup({ summary, onPick }: { summary: ReturnType<typeof useLifeplanSummary>; onPick: (c: ExceptionCategory) => void }) {
   const flagged = summary.needsAttention || 1;
   const items = READINESS_CATS.map((cat) => ({ cat, count: summary.categories[cat], meta: CATEGORY_META[cat] }));
@@ -506,6 +523,7 @@ function ScopedGroup({
 function reasonDetail(category: ExceptionCategory, r: PortfolioRow): string {
   if (category === "missing_source") return "source missing";
   if (category === "awaiting_implementation") return "drafted, not live";
+  if (category === "retraining_triggered") return `${r.driftNoticedCount} drift, ${r.retrainingCount} retrained`;
   if (r.status === "implemented") return "implemented";
   if (r.overdue) return `${Math.abs(r.daysUntil)}d overdue`;
   return `due in ${r.daysUntil}d`;

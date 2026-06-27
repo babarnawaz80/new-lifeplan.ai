@@ -99,7 +99,9 @@ export type AgentActivity = {
     | "deadline"
     | "guideline_drift"
     | "source_drift"
-    | "auto_training";
+    | "auto_training"
+    | "drift_noticed"
+    | "retraining_generated";
   summary: string;
   status: "info" | "action_taken" | "blocked" | "flagged";
   payload?: Record<string, unknown>;
@@ -141,6 +143,12 @@ export type Agent = {
   // before this existed still fall back to the seeded defaults.
   training_prompt_template?: string;
   training_config?: TrainingConfig;
+  // Retraining video recipe (sibling of the training recipe). Used when a live
+  // plan drifts and staff need to be retrained on what slipped. Seeded with
+  // DEFAULT_RETRAINING_TEMPLATE / DEFAULT_RETRAINING_CONFIG; resolve with
+  // resolveRetrainingTemplate()/resolveRetrainingConfig().
+  retraining_prompt_template?: string;
+  retraining_config?: TrainingConfig;
   created_from_template_id: string | null;
   created_at: string;
   updated_at: string;
@@ -324,6 +332,13 @@ export type PlanCompliance = {
   distributed_to?: string[];
   // Source-plan-version this implementation plan was built on (drift detection).
   built_on_source_version?: string;
+  // Retraining loop: drift noticed on a live plan, and retraining videos
+  // generated in response. Counters derive from these arrays; the org dashboard
+  // aggregates them.
+  retraining?: {
+    drift_noticed: { at: string; reason: string }[];
+    retraining_generated: { at: string; reason: string; focus_areas: string[] }[];
+  };
   audit?: AuditEntry[];
 };
 
@@ -393,6 +408,9 @@ export type Training = {
   trigger?: "implement" | "manual" | "advocate";
   // Human-readable reason for an advocate-triggered training (the trend).
   trigger_reason?: string;
+  // "retraining" videos use the retraining recipe and re-open certification;
+  // "initial" is the first-time training. Defaults to initial when unset.
+  kind?: "initial" | "retraining";
   created_at: string;
 };
 
@@ -449,6 +467,51 @@ export function resolveTrainingTemplate(agent: Pick<Agent, "training_prompt_temp
 
 export function resolveTrainingConfig(agent: Pick<Agent, "training_config">): TrainingConfig {
   return { ...DEFAULT_TRAINING_CONFIG, ...(agent.training_config ?? {}) };
+}
+
+// ---- Retraining video recipe (seeded default, editable per agent) ----
+// Used when a live plan drifts and staff must be retrained on what slipped.
+// Filled at generation from the detected drift: {{retraining_reason}},
+// {{drift_summary}}, {{focus_areas}} alongside the usual placeholders.
+export const DEFAULT_RETRAINING_TEMPLATE = `You are scripting a short retraining video for direct support professionals and other team members who already support a specific person and were trained on this plan before. This is not a first-time introduction. Staff are being retrained because something has slipped. The goal is that anyone who watches understands what changed, why it matters for this person, and exactly what to do differently from here. Warm and respectful, never blaming, and direct about the gap.
+
+WHY THIS RETRAINING
+- Reason staff are being retrained: {{retraining_reason}}
+- What has slipped or drifted: {{drift_summary}}
+- Focus areas to re-teach: {{focus_areas}}
+
+PERSON AND PLAN
+- First name: {{individual_first_name}}
+- Plan type: {{plan_type_label}}
+- Plan content for reference (authoritative, do not invent beyond it):
+{{plan_content}}
+
+FORMAT
+- Two narrators in natural conversation. Host A asks the questions a returning staff member would ask. Host B answers clearly and concretely. They alternate naturally.
+- Target length: {{video_length_target}}. Keep it shorter than the first-time training. Do not re-teach the whole plan.
+- Open by stating plainly, and without blame, that the plan has not been followed as written, and why this retraining is happening.
+- Spend the body on the specific focus areas that slipped: what the plan asks, what good documentation looks like, and the difference it makes for {{individual_first_name}}.
+- Use {{individual_first_name}} throughout. First name only. Never state date of birth or full name.
+- Plain language. When a clinical or regulatory term appears, say it, then explain it in everyday words.
+- Close with a short, encouraging recap of the few things to get right from here on.`;
+
+export const DEFAULT_RETRAINING_CONFIG: TrainingConfig = {
+  narrator_mode: "two_narrator_conversational",
+  video_length_target: "3 to 5 minutes",
+  quiz_question_count: 6,
+  quiz_min: 4,
+  quiz_max: 10,
+  first_name_only: true,
+  include_documentation_section: true,
+};
+
+export function resolveRetrainingTemplate(agent: Pick<Agent, "retraining_prompt_template">): string {
+  const t = agent.retraining_prompt_template?.trim();
+  return t && t.length > 0 ? t : DEFAULT_RETRAINING_TEMPLATE;
+}
+
+export function resolveRetrainingConfig(agent: Pick<Agent, "retraining_config">): TrainingConfig {
+  return { ...DEFAULT_RETRAINING_CONFIG, ...(agent.retraining_config ?? {}) };
 }
 
 // ---- Training module distribution (staff to-do list) ----

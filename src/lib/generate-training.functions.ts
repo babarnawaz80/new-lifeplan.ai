@@ -31,6 +31,12 @@ const InputSchema = z.object({
   // addresses what's slipping and how to do better.
   trendContext: z.string().default(""),
   researchNotes: z.string().default(""),
+  // Retraining loop: when true, this uses the agent's retraining recipe and the
+  // placeholders below describe the drift that triggered it.
+  isRetraining: z.boolean().default(false),
+  retrainingReason: z.string().default(""),
+  driftSummary: z.string().default(""),
+  focusAreas: z.string().default(""),
 });
 
 const SlideSchema = z.object({
@@ -66,13 +72,25 @@ const FALLBACK_RECIPE = `Script a warm, practical two-narrator staff training vi
 
 function fillTemplate(
   template: string,
-  vars: { firstName: string; planTypeLabel: string; planContent: string; lengthTarget: string },
+  vars: {
+    firstName: string;
+    planTypeLabel: string;
+    planContent: string;
+    lengthTarget: string;
+    // Retraining placeholders (empty for first-time training).
+    retrainingReason?: string;
+    driftSummary?: string;
+    focusAreas?: string;
+  },
 ): string {
   return (template && template.trim() ? template : FALLBACK_RECIPE)
     .replaceAll("{{individual_first_name}}", vars.firstName)
     .replaceAll("{{plan_type_label}}", vars.planTypeLabel)
     .replaceAll("{{plan_content}}", vars.planContent)
-    .replaceAll("{{video_length_target}}", vars.lengthTarget);
+    .replaceAll("{{video_length_target}}", vars.lengthTarget)
+    .replaceAll("{{retraining_reason}}", vars.retrainingReason ?? "")
+    .replaceAll("{{drift_summary}}", vars.driftSummary ?? "")
+    .replaceAll("{{focus_areas}}", vars.focusAreas ?? "");
 }
 
 export const generateTraining = createServerFn({ method: "POST" })
@@ -98,11 +116,14 @@ export const generateTraining = createServerFn({ method: "POST" })
         correct_index: 0,
         explanation: "Connect AI to generate the real certification quiz.",
       });
+      const intro = data.isRetraining
+        ? slide(`Retraining: supporting ${firstName}`, [data.retrainingReason || "What slipped", data.focusAreas ? `Focus: ${data.focusAreas}` : "Focus areas", "A short refresher, not the whole plan"], `Hi team, I'm Alex. This is a quick retraining on ${firstName}'s plan because something slipped: ${data.driftSummary || data.retrainingReason || "the plan was not followed as written"}.`, `And I'm Jamie. We'll keep it short and focus on exactly what to do differently from here.`)
+        : slide(`Welcome, supporting ${firstName}`, [`${data.planTypeLabel}`, data.planDate ? `Effective ${data.planDate}` : "Implemented plan", "For everyone who supports " + firstName], `Hi team, I'm Alex. Today we'll walk through ${firstName}'s plan.`, `And I'm Jamie. By the end you'll know exactly how to support ${firstName} day to day.`);
       return {
-        title: `${data.planTypeLabel}: Staff Training for ${firstName}`,
+        title: data.isRetraining ? `${data.planTypeLabel}: Retraining for ${firstName}` : `${data.planTypeLabel}: Staff Training for ${firstName}`,
         subtitle: data.planDate ? `Effective ${data.planDate}` : "",
         slides: [
-          slide(`Welcome, supporting ${firstName}`, [`${data.planTypeLabel}`, data.planDate ? `Effective ${data.planDate}` : "Implemented plan", "For everyone who supports " + firstName], `Hi team, I'm Alex. Today we'll walk through ${firstName}'s plan.`, `And I'm Jamie. By the end you'll know exactly how to support ${firstName} day to day.`),
+          intro,
           slide("What this plan covers", ["Goals and outcomes", "How to support each goal", "What to document"], "This is a design-only preview.", "Connect AI to generate the full narrated training."),
           slide("Your role", ["Follow the strategies", "Use the listed prompts", "Document every shift"], "Each goal has concrete steps.", "We'll keep it practical and specific."),
           slide("Health and safety", ["Know the protocols", "Report concerns", "Stay person-centered"], "Safety first, always.", "When in doubt, ask and document."),
@@ -118,6 +139,9 @@ export const generateTraining = createServerFn({ method: "POST" })
       planTypeLabel: data.planTypeLabel,
       planContent: data.planContent.slice(0, 16000),
       lengthTarget: data.videoLengthTarget,
+      retrainingReason: data.retrainingReason,
+      driftSummary: data.driftSummary,
+      focusAreas: data.focusAreas,
     });
 
     const twoNarrator = data.narratorMode !== "single_narrator";

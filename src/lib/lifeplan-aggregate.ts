@@ -17,6 +17,7 @@ import {
   getSourcePlanStatus,
   getTrainingForPlan,
   listTrainingTodos,
+  getRetrainingCounts,
 } from "@/integrations/icm";
 import { requiredSignerRoles, signaturesSatisfied } from "@/lib/plan-runtime";
 import { planTypeInfo } from "@/data/mock";
@@ -53,6 +54,10 @@ export type PortfolioRow = {
   sourceDrift: boolean;
   staffUntrained: boolean;
   sourceIncomplete: boolean;
+  // Retraining loop (Section 4): per-plan counts of drift noticed and retraining
+  // videos generated.
+  driftNoticedCount: number;
+  retrainingCount: number;
   compliance: ComplianceBucket;
 };
 
@@ -196,6 +201,14 @@ export function buildRow(plan: Plan): PortfolioRow | null {
 
   const flags = complianceFlags(plan, agent, implemented, now);
 
+  // Retraining loop counts (Section 4). Recorded events win; a deterministic
+  // seeded fallback gives a believable spread on live plans before any real
+  // drift/retraining has occurred.
+  const rc = getRetrainingCounts(plan.id);
+  const seedRetrain = implemented && rc.retrainingGenerated === 0 && seedOf(`${plan.id}:retrain`) % 100 < 12;
+  const driftNoticedCount = rc.driftNoticed > 0 ? rc.driftNoticed : seedRetrain ? 1 : 0;
+  const retrainingCount = rc.retrainingGenerated > 0 ? rc.retrainingGenerated : seedRetrain ? 1 : 0;
+
   // A live plan is no longer automatically "on track": a hard provider-side gap
   // (missing signatures, billing-blocked units, source intake incomplete) puts
   // it out of compliance; a softer gap (restriction review, source drift,
@@ -233,6 +246,8 @@ export function buildRow(plan: Plan): PortfolioRow | null {
     sourceDrift: flags.sourceDrift,
     staffUntrained: flags.staffUntrained,
     sourceIncomplete: flags.sourceIncomplete,
+    driftNoticedCount,
+    retrainingCount,
     compliance,
   };
 }
@@ -274,6 +289,8 @@ export const EXCEPTION_CATEGORIES = [
   "source_drift",
   "staff_untrained",
   "source_incomplete",
+  // Retraining loop (Section 4)
+  "retraining_triggered",
 ] as const;
 export type ExceptionCategory = (typeof EXCEPTION_CATEGORIES)[number];
 
@@ -302,6 +319,7 @@ export const CATEGORY_META: Record<
   source_drift: { label: "Source plan drift", descriptor: "out of sync upstream", severity: "amber" },
   staff_untrained: { label: "Staff not certified", descriptor: "untrained on live plan", severity: "amber" },
   source_incomplete: { label: "Source intake incomplete", descriptor: "assessment or consent", severity: "red" },
+  retraining_triggered: { label: "Retraining triggered", descriptor: "drift, retrained", severity: "amber" },
 };
 
 export const CATEGORY_PREDICATE: Record<ExceptionCategory, (r: PortfolioRow) => boolean> = {
@@ -318,6 +336,7 @@ export const CATEGORY_PREDICATE: Record<ExceptionCategory, (r: PortfolioRow) => 
   source_drift: (r) => r.sourceDrift,
   staff_untrained: (r) => r.staffUntrained,
   source_incomplete: (r) => r.sourceIncomplete,
+  retraining_triggered: (r) => r.retrainingCount > 0,
 };
 
 // ---- Summary -----------------------------------------------------------------

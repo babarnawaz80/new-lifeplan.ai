@@ -5,7 +5,7 @@
 // name and the plan date. If no training exists yet, a director can generate
 // one on demand here. The staff certification queue is demo data; wiring to
 // real assignments/auth comes later.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -20,6 +20,7 @@ import {
   Loader2,
   Wand2,
   Users,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
@@ -36,12 +37,18 @@ import {
   listTrainingsForPlan,
   publishTrainingToModule,
   listTrainingTodos,
+  recordDriftNoticed,
+  recordRetrainingGenerated,
+  getRetrainingCounts,
 } from "@/integrations/icm";
 import { generateTraining } from "@/lib/generate-training.functions";
+import { detectPlanDrift } from "@/lib/autonomy";
 import {
   planTypeInfo,
   resolveTrainingTemplate,
   resolveTrainingConfig,
+  resolveRetrainingTemplate,
+  resolveRetrainingConfig,
   type TrainingContent,
 } from "@/data/mock";
 
@@ -211,7 +218,12 @@ function IndividualTrainingsPage() {
   // a training was published; otherwise the seeded demo roster.
   const [staffTick, setStaffTick] = useState(0);
   const staff: StaffCert[] = useMemo(() => {
-    const todos = listTrainingTodos({ individualId: id });
+    // Scope to the latest training so a retraining's re-opened to-dos replace
+    // the prior training's certified ones (re-certification), not stack on them.
+    const latest = sourcePlan ? getTrainingForPlan(sourcePlan.id) : undefined;
+    const todos = latest
+      ? listTrainingTodos({ individualId: id, trainingId: latest.id })
+      : listTrainingTodos({ individualId: id });
     if (todos.length === 0) return MOCK_STAFF;
     return todos.map((t) => ({
       name: t.staff_name,
@@ -228,6 +240,83 @@ function IndividualTrainingsPage() {
   // Two views: the training + paged quiz (default), and the staff certification
   // roster on its own tab, reachable in one click (no scrolling past the quiz).
   const [view, setView] = useState<"training" | "staff">("training");
+
+  // ---- Retraining loop (Section 1) ----
+  // Drift on this live plan, per the same detection the autonomy advocate uses.
+  const planAgent = sourcePlan ? getAgent(sourcePlan.agent_id) : undefined;
+  const drift = useMemo(
+    () => (sourcePlan ? detectPlanDrift(sourcePlan) : { drifting: false, reason: "", driftSummary: "", focusAreas: [] as string[] }),
+    [sourcePlan?.id],
+  );
+  const autoRetrainOn = !!planAgent?.autonomy_enabled && (planAgent?.autonomy_config?.training_advocate ?? true);
+  const [retraining, setRetraining] = useState(false);
+  const retrainRef = useRef(false);
+  const retrainCounts = useMemo(
+    () => (sourcePlan ? getRetrainingCounts(sourcePlan.id) : { driftNoticed: 0, retrainingGenerated: 0 }),
+    [sourcePlan?.id, historyTick, staffTick],
+  );
+
+  // Generate the retraining video: record the drift, build it from the agent's
+  // retraining recipe + the detected drift, publish it (re-opening staff
+  // certification), and record the retraining-generated event. Content only,
+  // never a CareTracker write.
+  const generateRetraining = async () => {
+    if (!sourcePlan || !drift.drifting || retraining) return;
+    setRetraining(true);
+    const ag = getAgent(sourcePlan.agent_id);
+    const rcfg = resolveRetrainingConfig(ag ?? {});
+    const markdown =
+      (sourcePlan.plan_content as { markdown?: string })?.markdown ??
+      `${sourcePlan.plan_type_label} plan for ${individual.name}.`;
+    recordDriftNoticed(sourcePlan.id, drift.reason);
+    const rec = createPendingTraining({ planId: sourcePlan.id, individualId: id, trigger: "advocate", triggerReason: drift.reason });
+    updateTraining(rec.id, { kind: "retraining", status: "pending", video_status: "pending" });
+    setHistoryTick((t) => t + 1);
+    try {
+      const generated = await generateFn({
+        data: {
+          planContent: markdown,
+          individualName: individual.name,
+          individualFirstName: individual.name.split(/\s+/)[0] ?? individual.name,
+          planTypeLabel: planTypeInfo(ag?.plan_type ?? "").label,
+          planDate: planDate || "",
+          trainingTemplate: resolveRetrainingTemplate(ag ?? {}),
+          quizQuestionCount: rcfg.quiz_question_count,
+          videoLengthTarget: rcfg.video_length_target,
+          firstNameOnly: rcfg.first_name_only,
+          narratorMode: rcfg.narrator_mode,
+          isRetraining: true,
+          retrainingReason: drift.reason,
+          driftSummary: drift.driftSummary,
+          focusAreas: drift.focusAreas.join(", "),
+        },
+      });
+      updateTraining(rec.id, { status: "ready", video_status: "ready", content: generated });
+      setContent(generated);
+      const ready = getTrainingForPlan(sourcePlan.id);
+      if (ready) publishTrainingToModule({ individualId: id, planId: sourcePlan.id, training: ready });
+      recordRetrainingGenerated(sourcePlan.id, drift.reason, drift.focusAreas);
+      setStaffTick((t) => t + 1);
+      setHistoryTick((t) => t + 1);
+      toast.success("Retraining ready. Staff certification re-opened.");
+    } catch (err) {
+      updateTraining(rec.id, { status: "failed", video_status: "failed" });
+      toast.error(err instanceof Error ? err.message : "Retraining generation failed.");
+    } finally {
+      setRetraining(false);
+    }
+  };
+
+  // Autonomy on: the agent retrains automatically when drift is detected on a
+  // trained plan. Idempotent (once per plan until a retraining exists).
+  useEffect(() => {
+    if (!sourcePlan || !content || !drift.drifting || !autoRetrainOn) return;
+    if (retrainRef.current) return;
+    if (getRetrainingCounts(sourcePlan.id).retrainingGenerated > 0) return;
+    retrainRef.current = true;
+    void generateRetraining();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourcePlan?.id, content, drift.drifting, autoRetrainOn]);
 
   const agentShort = sourcePlan ? planTypeInfo(getAgent(sourcePlan.agent_id)?.plan_type ?? "").short : "";
   const planTypeName = sourcePlan ? planTypeInfo(getAgent(sourcePlan.agent_id)?.plan_type ?? "").label : "";
@@ -309,6 +398,39 @@ function IndividualTrainingsPage() {
 
             {view === "training" ? (
             <>
+            {/* Retraining loop: drift on this live plan. Autonomy on retrains
+                automatically; off offers a one-click action. */}
+            {content && drift.drifting && (
+              <div className="mb-5 rounded-2xl border border-amber/40 bg-amber/10 p-4 flex flex-wrap items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber shrink-0" />
+                <div className="flex-1 min-w-[260px]">
+                  <div className="text-[13.5px] font-bold text-ink">Drift detected on this plan</div>
+                  <div className="text-[12.5px] text-ink2">
+                    {drift.reason}. Focus areas: {drift.focusAreas.join(", ")}.
+                    {(retrainCounts.driftNoticed > 0 || retrainCounts.retrainingGenerated > 0) && (
+                      <span className="text-ink3"> ({retrainCounts.driftNoticed} drift noticed, {retrainCounts.retrainingGenerated} retraining generated)</span>
+                    )}
+                  </div>
+                </div>
+                {autoRetrainOn ? (
+                  <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-indigo">
+                    {retraining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                    {retraining ? "Retraining…" : "The agent is retraining automatically"}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={generateRetraining}
+                    disabled={retraining}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[10px] text-white text-[13px] font-bold disabled:opacity-60"
+                    style={{ background: "var(--ai-gradient)" }}
+                  >
+                    {retraining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                    {retraining ? "Generating retraining…" : "Generate retraining"}
+                  </button>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
               {/* Video */}
               <div className="space-y-3">
