@@ -46,7 +46,7 @@ import {
 } from "@/data/mock";
 
 export const Route = createFileRoute("/individuals/$id/trainings")({
-  head: () => ({ meta: [{ title: "Individual Trainings — LifePlan" }] }),
+  head: () => ({ meta: [{ title: "Individual Trainings · LifePlan" }] }),
   // Training is per-plan: ?plan=<planId> scopes to that specific plan's
   // training. Without it, fall back to the latest implemented plan.
   validateSearch: z.object({ plan: z.string().optional() }),
@@ -198,7 +198,7 @@ function IndividualTrainingsPage() {
         if (ready) publishTrainingToModule({ individualId: id, planId: sourcePlan.id, training: ready });
         setStaffTick((t) => t + 1);
         setHistoryTick((t) => t + 1);
-        toast.success("Training ready — published to the training module.");
+        toast.success("Training ready. Published to the training module.");
       })
       .catch((err) => {
         updateTraining(training.id, { status: "failed", video_status: "failed" });
@@ -225,7 +225,9 @@ function IndividualTrainingsPage() {
   }, [id, staffTick, content]);
   const certified = staff.filter((s) => s.status === "certified").length;
   const published = !!content && listTrainingTodos({ individualId: id }).length > 0;
-  const [showQueue, setShowQueue] = useState(false);
+  // Two views: the training + paged quiz (default), and the staff certification
+  // roster on its own tab, reachable in one click (no scrolling past the quiz).
+  const [view, setView] = useState<"training" | "staff">("training");
 
   const agentShort = sourcePlan ? planTypeInfo(getAgent(sourcePlan.agent_id)?.plan_type ?? "").short : "";
   const planTypeName = sourcePlan ? planTypeInfo(getAgent(sourcePlan.agent_id)?.plan_type ?? "").label : "";
@@ -276,7 +278,7 @@ function IndividualTrainingsPage() {
               {content && (
                 <button
                   type="button"
-                  onClick={() => setShowQueue((q) => !q)}
+                  onClick={() => setView((v) => (v === "staff" ? "training" : "staff"))}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-navy text-[13px] font-bold hover:opacity-95"
                 >
                   <Users className="h-4 w-4" /> Certification queue
@@ -290,6 +292,23 @@ function IndividualTrainingsPage() {
       <div className="max-w-6xl mx-auto px-6 py-8">
         {content ? (
           <>
+            {/* Two-view toggle: training + quiz, or the staff certification roster */}
+            <div className="inline-flex rounded-[10px] border border-line bg-card p-1 mb-6">
+              {([["training", "Training and quiz"], ["staff", "Staff certification"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setView(key)}
+                  className={`px-4 py-1.5 rounded-[7px] text-[13px] font-semibold transition-colors ${view === key ? "bg-navy text-white" : "text-ink2 hover:text-ink"}`}
+                >
+                  {label}
+                  {key === "staff" && <span className="ml-1.5 opacity-80">{certified}/{staff.length}</span>}
+                </button>
+              ))}
+            </div>
+
+            {view === "training" ? (
+            <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
               {/* Video */}
               <div className="space-y-3">
@@ -346,11 +365,20 @@ function IndividualTrainingsPage() {
               </div>
             </div>
 
-            {/* Certification queue (toggled from the hero) */}
-            {showQueue && (
-              <div className="mt-8 rounded-2xl border border-line bg-card p-5 shadow-soft">
+            {/* Slim link to the staff certification tab (one click, no scroll) */}
+            {published && (
+              <div className="flex items-center gap-2.5 mt-6 pt-5 border-t border-line text-[13.5px]">
+                <Users className="h-4.5 w-4.5 text-ink3" />
+                <span className="text-ink2">Dropped into the to-do list of {staff.length} staff who support {individual.name.split(/\s+/)[0]}.</span>
+                <button onClick={() => setView("staff")} className="font-bold text-navy hover:underline">View certification queue</button>
+              </div>
+            )}
+            </>
+            ) : (
+              /* Staff certification roster on its own tab */
+              <div className="rounded-2xl border border-line bg-card p-5 shadow-soft">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[12px] font-bold uppercase tracking-wider text-ink3">Staff certification</span>
+                  <span className="text-[13px] font-bold text-ink">Staff certification</span>
                   <span className="text-[12px] font-semibold text-ink">{certified} of {staff.length} certified</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-4">
@@ -386,15 +414,12 @@ function IndividualTrainingsPage() {
                     );
                   })}
                 </div>
-              </div>
-            )}
-
-            {/* Footer */}
-            {published && (
-              <div className="flex items-center gap-2.5 mt-8 pt-6 border-t border-line text-[14px]">
-                <Users className="h-4.5 w-4.5 text-ink3" />
-                <span className="text-ink2">Dropped into the to-do list of {staff.length} staff who support {individual.name}.</span>
-                <button onClick={() => setShowQueue(true)} className="font-bold text-navy hover:underline">View certification queue</button>
+                {published && (
+                  <div className="flex items-center gap-2.5 mt-5 pt-4 border-t border-line text-[13.5px]">
+                    <Users className="h-4.5 w-4.5 text-ink3" />
+                    <span className="text-ink2">Dropped into the to-do list of {staff.length} staff who support {individual.name.split(/\s+/)[0]}.</span>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -407,7 +432,7 @@ function IndividualTrainingsPage() {
             <h2 className="text-[18px] font-extrabold text-ink">Generate {individual.name}'s training</h2>
             <p className="text-[13.5px] text-ink2 mt-2">
               {sourcePlan
-                ? `A 5–10 minute narrated video and a certification quiz, built from ${individual.name}'s ${planTypeName}${planDate ? ` (effective ${planDate})` : ""}.`
+                ? `A 5 to 10 minute narrated video and a certification quiz, built from ${individual.name}'s ${planTypeName}${planDate ? ` (effective ${planDate})` : ""}.`
                 : "Once a plan is implemented for this individual, you can generate a narrated training and quiz here."}
             </p>
             <button
