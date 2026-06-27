@@ -5,7 +5,7 @@
 // choice + alternative settings, and consent to the overarching plan. Missing
 // items are flagged so the provider can request them.
 import { useEffect, useState } from "react";
-import { FileCheck2, AlertTriangle, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
+import { FileCheck2, AlertTriangle, ChevronDown, ChevronRight, Sparkles, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { getPlanCompliance, updatePlanCompliance } from "@/integrations/icm";
 import type { SourceIntake } from "@/data/mock";
@@ -25,7 +25,13 @@ export function SourceIntakePanel({
   // source-document label. Pre-filled, confirmable, never required.
   defaultSourceType?: string;
 }) {
-  const [open, setOpen] = useState(true);
+  // Once the provider saves, the intake is "confirmed" (detected_by_ai set to
+  // false). Use that as the completed signal so the panel reads as done and
+  // collapses, and stays that way across reloads. Implemented plans are locked
+  // and treated as complete.
+  const initialSaved = !!locked || getPlanCompliance(planId).intake?.detected_by_ai === false;
+  const [saved, setSaved] = useState(initialSaved);
+  const [open, setOpen] = useState(!initialSaved);
   const [intake, setIntake] = useState<SourceIntake>(() => {
     const existing = getPlanCompliance(planId).intake ?? {};
     if (!existing.source_plan_label && defaultSourceType) {
@@ -53,6 +59,8 @@ export function SourceIntakePanel({
     const confirmed = { ...intake, detected_by_ai: false };
     setIntake(confirmed);
     updatePlanCompliance(planId, { intake: confirmed }, { what: "Confirmed source plan intake / verification" });
+    setSaved(true);
+    setOpen(false); // collapse on save; the header shows the completed check
     toast.success("Source plan intake saved.");
   };
 
@@ -83,13 +91,17 @@ export function SourceIntakePanel({
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-2 px-4 py-3 text-left"
       >
-        <FileCheck2 className="h-4 w-4 text-navy shrink-0" />
+        <FileCheck2 className={`h-4 w-4 shrink-0 ${saved ? "text-green" : "text-navy"}`} />
         <span className="text-[13px] font-bold text-ink flex-1">Source plan intake</span>
-        {missing.length > 0 && (
+        {saved ? (
+          <span className="inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-green">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Completed
+          </span>
+        ) : missing.length > 0 ? (
           <span className="inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-amber">
             <AlertTriangle className="h-3 w-3" /> {missing.length} missing
           </span>
-        )}
+        ) : null}
         {open ? <ChevronDown className="h-4 w-4 text-ink3" /> : <ChevronRight className="h-4 w-4 text-ink3" />}
       </button>
 
