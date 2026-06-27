@@ -134,7 +134,7 @@ function complianceFlags(plan: Plan, agent: Agent, implemented: boolean, now: nu
     (r) => !!r.next_review_date && new Date(r.next_review_date).getTime() < now,
   );
 
-  // 4) Source drift — provider plan out of sync with the care-manager source.
+  // 4) Source drift — provider plan out of sync with the case-manager source.
   let sourceDrift = false;
   if (isSource && implemented) {
     const status = getSourcePlanStatus(plan.individual_id);
@@ -321,6 +321,17 @@ export const CATEGORY_PREDICATE: Record<ExceptionCategory, (r: PortfolioRow) => 
 };
 
 // ---- Summary -----------------------------------------------------------------
+// Provider coverage of LIVE (implemented) plans: the healthy percentage for each
+// signal, plus the count still outstanding. Higher percentage is better.
+export type CoverageStats = {
+  signaturesPct: number;
+  staffPct: number;
+  syncPct: number;
+  unsigned: number;
+  untrained: number;
+  drifted: number;
+};
+
 export type LifeplanSummary = {
   totalActive: number;
   onTrack: number;
@@ -330,6 +341,10 @@ export type LifeplanSummary = {
   needsAttention: number; // sum of category counts (flags to act on)
   categories: Record<ExceptionCategory, number>;
   people: number;
+  // Lifecycle + provider-coverage rollups for the Overview hero/groups.
+  live: number; // implemented plans
+  coverage: CoverageStats;
+  exposed: number; // unique plans out of compliance, billing blocked, or unsigned and live
 };
 
 export function summarize(rows: PortfolioRow[]): LifeplanSummary {
@@ -344,6 +359,23 @@ export function summarize(rows: PortfolioRow[]): LifeplanSummary {
   const offTrack = rows.filter((r) => r.compliance === "off_track").length;
   const outOfCompliance = rows.filter((r) => r.compliance === "out_of_compliance").length;
   const people = new Set(rows.map((r) => r.individualId)).size;
+
+  // Coverage is measured against live plans only.
+  const live = rows.filter((r) => r.status === "implemented").length;
+  const pct = (outstanding: number) => (live > 0 ? Math.round(((live - outstanding) / live) * 100) : 100);
+  const coverage: CoverageStats = {
+    unsigned: categories.missing_signatures,
+    untrained: categories.staff_untrained,
+    drifted: categories.source_drift,
+    signaturesPct: pct(categories.missing_signatures),
+    staffPct: pct(categories.staff_untrained),
+    syncPct: pct(categories.source_drift),
+  };
+  // Exposure is a UNIQUE plan count (the flags overlap), not a sum.
+  const exposed = rows.filter(
+    (r) => r.compliance === "out_of_compliance" || r.unitsOverAuth || r.missingSignatures,
+  ).length;
+
   return {
     totalActive: rows.length,
     onTrack,
@@ -353,6 +385,9 @@ export function summarize(rows: PortfolioRow[]): LifeplanSummary {
     needsAttention,
     categories,
     people,
+    live,
+    coverage,
+    exposed,
   };
 }
 
