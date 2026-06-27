@@ -32,7 +32,11 @@ export interface AiChatPaneProps {
   sourceKind?: "case_management" | "previous_plan";
   enabledProfileFieldNames: string[];
   initialMarkdown?: string;
+  // Plan classification selector (Section 2), shown above Generate.
+  planClass?: "Initial" | "Revised" | "Emergency";
+  onPlanClassChange?: (c: "Initial" | "Revised" | "Emergency") => void;
   canImplement: boolean;
+  implementBlockedReason?: string | null;
   // Draft gate (Section 2/3): when set, generation is blocked — no model call
   // fires from any entry point (generate, regenerate, revise, chat).
   draftBlockedReason?: string | null;
@@ -146,6 +150,9 @@ function AttachSourceInline({
         className="hidden"
         onChange={(e) => handleFile(e.target.files?.[0])}
       />
+      <p className="text-[11px] text-ink3 mt-2">
+        Text is extracted in your browser. The file is never uploaded.
+      </p>
       {error && <p className="text-[12px] text-red mt-2">{error}</p>}
     </div>
   );
@@ -165,7 +172,10 @@ export function AiChatPane({
   sourceKind,
   enabledProfileFieldNames,
   initialMarkdown,
+  planClass,
+  onPlanClassChange,
   canImplement,
+  implementBlockedReason,
   draftBlockedReason,
   needsSourceAttach,
   sourceDocLabel,
@@ -346,6 +356,28 @@ export function AiChatPane({
                 </p>
               </div>
             </div>
+            {/* Section 2: plan classification, chosen before Generate. */}
+            {planClass && onPlanClassChange && (
+              <div className="mb-3">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-ink3 mb-1.5">
+                  Plan classification
+                </span>
+                <div className="inline-flex rounded-[9px] border border-line overflow-hidden">
+                  {(["Initial", "Revised", "Emergency"] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => onPlanClassChange(c)}
+                      className={`px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                        planClass === c ? "bg-navy text-white" : "bg-card text-ink2 hover:bg-muted"
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button
               type="button"
               onClick={() =>
@@ -379,13 +411,13 @@ export function AiChatPane({
                   <span className="font-semibold text-ink">No new document?</span>{" "}
                   {hasPreviousPlan ? (
                     <>
-                      Proceed without one — base this plan on the previous implemented plan
+                      Proceed without one. Base this plan on the previous implemented plan
                       {previousLabel ? ` (${previousLabel.toLowerCase()})` : ""}. The AI carries it
                       forward and you'll get a side-by-side comparison.
                     </>
                   ) : (
                     <>
-                      Proceed without one — the AI will draft from {individualName}'s chart and
+                      Proceed without one. The AI will draft from {individualName}'s chart and
                       assessment data. Review carefully before implementing.
                     </>
                   )}
@@ -498,6 +530,7 @@ export function AiChatPane({
         <div className="mt-3 shrink-0">
           <ActionRow
             canImplement={canImplement}
+            implementBlockedReason={implementBlockedReason}
             canDraft={!draftBlockedReason}
             draftDisabledReason={draftBlockedReason ?? undefined}
             reviseInput={reviseInput}

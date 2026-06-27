@@ -3,10 +3,19 @@
 // (all plan types), a named monitor at the provider, and a plain-language
 // summary for the individual and staff. Missing required ones are flagged.
 import { useState } from "react";
-import { ClipboardList, AlertTriangle } from "lucide-react";
+import { ClipboardList, AlertTriangle, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getPlanCompliance, updatePlanCompliance } from "@/integrations/icm";
 import type { PlanCompliance } from "@/data/mock";
+
+// The narrative fields the AI may draft (Tier B). The named monitor is excluded
+// on purpose: it is a staffing assignment only the provider knows.
+export type DraftableProviderFields = {
+  backup_plan?: string;
+  natural_supports?: string;
+  risk_mitigation?: string;
+  plain_language_summary?: string;
+};
 
 const ta = "w-full p-2 rounded-[8px] border border-line bg-card text-[12.5px] text-ink focus:outline-none focus:border-navy";
 const labelCls = "block text-[11px] font-bold uppercase tracking-wider text-ink3 mb-1";
@@ -25,14 +34,43 @@ export function ProviderFieldsPanel({
   requiredFields,
   locked,
   onChange,
+  canDraft,
+  onDraft,
 }: {
   planId: string;
   requiredFields: string[]; // labels from the compliance brief
   locked?: boolean;
   onChange?: () => void;
+  // Tier B: enabled only when a plan draft exists (the AI drafts from it).
+  canDraft?: boolean;
+  onDraft?: () => Promise<DraftableProviderFields>;
 }) {
   const [val, setVal] = useState<PlanCompliance>(() => getPlanCompliance(planId));
+  const [drafting, setDrafting] = useState(false);
+  const [aiDrafted, setAiDrafted] = useState(false);
   const isRequired = (label: string) => requiredFields.some((r) => r.toLowerCase() === label.toLowerCase()) || label.startsWith("Risk");
+
+  const runDraft = async () => {
+    if (!onDraft) return;
+    setDrafting(true);
+    try {
+      const d = await onDraft();
+      // AI drafts the narrative fields only; the named monitor stays manual.
+      setVal((v) => ({
+        ...v,
+        backup_plan: d.backup_plan || v.backup_plan,
+        natural_supports: d.natural_supports || v.natural_supports,
+        risk_mitigation: d.risk_mitigation || v.risk_mitigation,
+        plain_language_summary: d.plain_language_summary || v.plain_language_summary,
+      }));
+      setAiDrafted(true);
+      toast.success("AI drafted the provider elements. Review and edit, then save.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "AI draft failed.");
+    } finally {
+      setDrafting(false);
+    }
+  };
 
   const save = () => {
     updatePlanCompliance(
@@ -46,6 +84,7 @@ export function ProviderFieldsPanel({
       },
       { what: "Updated provider-owned plan elements" },
     );
+    setAiDrafted(false);
     onChange?.();
     toast.success("Provider elements saved.");
   };
@@ -64,6 +103,21 @@ export function ProviderFieldsPanel({
         )}
       </div>
       <div className="p-3 space-y-2.5">
+        {!locked && onDraft && (
+          <button
+            onClick={runDraft}
+            disabled={drafting || !canDraft}
+            title={canDraft ? "Draft the narrative fields from the plan" : "Generate the plan first, then draft these from it"}
+            className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-[9px] text-white text-[12.5px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: "var(--ai-gradient)" }}
+          >
+            {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {drafting ? "Drafting" : "Draft provider elements with AI"}
+          </button>
+        )}
+        {aiDrafted && !locked && (
+          <p className="text-[11px] text-indigo">AI draft. Review and edit each field before saving. The named monitor stays manual.</p>
+        )}
         {FIELDS.map((f) => (
           <div key={f.key}>
             <span className={labelCls}>

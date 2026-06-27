@@ -2,6 +2,7 @@ import { RefreshCw, Save, Sparkles, Rocket } from "lucide-react";
 
 export function ActionRow({
   canImplement,
+  implementBlockedReason,
   canDraft = true,
   draftDisabledReason,
   saving,
@@ -13,6 +14,8 @@ export function ActionRow({
   onImplement,
 }: {
   canImplement: boolean;
+  // Reason the Implement gate is blocked (Section 6), shown on the control.
+  implementBlockedReason?: string | null;
   // Draft gate: when false, Regenerate and AI revise are disabled (no model call).
   canDraft?: boolean;
   draftDisabledReason?: string;
@@ -51,13 +54,17 @@ export function ActionRow({
           type="button"
           onClick={onImplement}
           disabled={!canImplement}
-          title={canImplement ? "" : "Complete required tasks first"}
+          title={canImplement ? "" : implementBlockedReason ?? "Complete required tasks first"}
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[9px] bg-navy text-white text-[13px] font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Rocket className="h-3.5 w-3.5" />
           Implement plan
         </button>
       </div>
+
+      {!canImplement && implementBlockedReason && (
+        <p className="text-[11.5px] text-amber">{implementBlockedReason}</p>
+      )}
 
       <div className="flex items-center gap-2">
         <div className="flex-1 flex items-center gap-2 rounded-[9px] border border-line bg-muted/40 px-3 py-2">

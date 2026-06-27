@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronRight, Sparkles, Edit3, FileDown, GraduationCap, Loader2 } from "lucide-react";
@@ -39,6 +39,7 @@ import { SignaturesPanel } from "@/components/plan-runtime/SignaturesPanel";
 import { AuthorizationPanel } from "@/components/plan-runtime/AuthorizationPanel";
 import { RestrictionPanel, restrictionComplete } from "@/components/plan-runtime/RestrictionPanel";
 import { ProviderFieldsPanel } from "@/components/plan-runtime/ProviderFieldsPanel";
+import { ImplementationReadiness } from "@/components/plan-runtime/ImplementationReadiness";
 import { AuditTrailPanel } from "@/components/plan-runtime/AuditTrailPanel";
 import { CutoverWarningDialog } from "@/components/plan-runtime/CutoverWarningDialog";
 import { ActionRow } from "@/components/plan-runtime/ActionRow";
@@ -46,6 +47,8 @@ import { PlanPreview } from "@/components/plan-runtime/PlanPreview";
 import { enrichImplementationTasks } from "@/lib/enrich-tasks.functions";
 import { generateTraining } from "@/lib/generate-training.functions";
 import { suggestTaskOutcome } from "@/lib/suggest-outcome.functions";
+import { analyzeSourceDocument } from "@/lib/analyze-source.functions";
+import { draftProviderElements } from "@/lib/draft-provider-elements.functions";
 import type { WorkflowTask } from "@/data/lifeplan-types";
 import { allCompulsoryComplete, prePlanningCompulsoryComplete, requiredSignerRoles, signaturesSatisfied } from "@/lib/plan-runtime";
 import {
@@ -74,8 +77,21 @@ function planTree(p?: Plan | null): IcmPlanTree | null {
   );
 }
 
+// Best-guess the received upstream document type from the extracted text + file
+// name (Section 2). A lightweight, local heuristic; the same seam could call a
+// model on extraction later. Returns "" when nothing recognizable is found, so
+// the caller can fall back to the carried-forward or agent-configured default.
+function guessSourcePlanType(name: string, text: string): string {
+  const hay = `${name}\n${text.slice(0, 4000)}`.toLowerCase();
+  if (/\blife\s*plan\b/.test(hay)) return "Life Plan";
+  if (/\bpcsp\b|person[-\s]?centered\s+(support\s+)?plan/.test(hay)) return "PCSP";
+  if (/\bisp\b|individualized\s+service\s+plan/.test(hay)) return "ISP";
+  if (/individual\s+plan\b|\bip\b/.test(hay)) return "IP";
+  return "";
+}
+
 export const Route = createFileRoute("/individuals/$id/plan/$planId")({
-  head: () => ({ meta: [{ title: "Plan — LifePlan" }] }),
+  head: () => ({ meta: [{ title: "Plan · LifePlan" }] }),
   component: PlanRuntime,
   notFoundComponent: () => (
     <AppShell>
@@ -112,6 +128,8 @@ function PlanRuntime() {
   const enrichTasksFn = useServerFn(enrichImplementationTasks);
   const generateTrainingFn = useServerFn(generateTraining);
   const suggestOutcomeFn = useServerFn(suggestTaskOutcome);
+  const analyzeSourceFn = useServerFn(analyzeSourceDocument);
+  const draftProviderElementsFn = useServerFn(draftProviderElements);
 
   // ---- Task assignment state (track in component so toggles re-render) ----
   const [tick, setTick] = useState(0);
@@ -185,9 +203,18 @@ function PlanRuntime() {
   );
 
   // Implement is gated on compulsory tasks, required signatures, and complete
-  // restriction documentation.
-  const canImplement =
-    allCompulsoryComplete(agent.workflow_data, isComplete) && signaturesOk && restrictionsOk;
+  // restriction documentation. The reason is surfaced on the Implement control
+  // so a blocked gate explains itself (Section 6), the same way missing
+  // signatures and over-authorization already do.
+  const tasksDone = allCompulsoryComplete(agent.workflow_data, isComplete);
+  const canImplement = tasksDone && signaturesOk && restrictionsOk;
+  const implementBlockedReason = !tasksDone
+    ? "Complete the compulsory tasks to implement."
+    : !signaturesOk
+      ? "Record the required signatures to implement."
+      : !restrictionsOk
+        ? "Finish every restrictive intervention (all parts, the next review date, and approval where required) to implement."
+        : null;
   // Once implemented, the plan is locked: no toggling tasks, no generate /
   // regenerate / revise / edit, no re-implement. View + Export only.
   const locked = plan.status === "implemented";
@@ -214,7 +241,6 @@ function PlanRuntime() {
   // agents, and (2) all compulsory pre-planning tasks complete. Both are
   // driven by the same task-completion data the checklist shows.
   const [sourceTick, setSourceTick] = useState(0);
-  void sourceTick;
   const sourceText = plan.source_document_text?.trim() ?? "";
   const uploadedMissing = agent.content_origin === "source_plan" && !sourceText;
 
@@ -254,22 +280,69 @@ function PlanRuntime() {
       ? { name: plan.source_document_name ?? "Source document", text: sourceText, kind: "case_management" }
       : proceedWithoutUpload && previousPlanText
         ? {
-            name: `Previous plan — ${previousImplemented!.plan_type_label} (${new Date(
+            name: `Previous plan: ${previousImplemented!.plan_type_label} (${new Date(
               previousImplemented!.implementation_date ?? previousImplemented!.created_at,
             ).toLocaleDateString()})`,
             text: previousPlanText,
             kind: "previous_plan",
           }
         : null;
-  const handleAttachSource = (name: string, text: string) => {
+  const handleAttachSource = async (name: string, text: string) => {
     updatePlan(planId, {
       source_document_name: name,
       source_document_text: text,
       awaiting_source_document: false,
     });
     setSourceTick((t) => t + 1);
-    toast.success(`${name} attached — ${text.length.toLocaleString()} characters extracted locally.`);
+    toast.success(`${name} attached. ${text.length.toLocaleString()} characters extracted locally.`);
+
+    // Tier A: let the AI propose intake metadata + verification flags from the
+    // document. Suggestions only, marked AI-detected; the provider confirms by
+    // saving the intake. Best-effort: never block or undo the attach on failure.
+    try {
+      const d = await analyzeSourceFn({ data: { text, sourceDocLabel: agent.source_document_label ?? "" } });
+      const detectedAnything =
+        !!d.source_plan_label ||
+        !!d.source_plan_date ||
+        !!d.source_plan_version ||
+        !!d.functional_assessment_date ||
+        d.functional_assessment_present ||
+        d.setting_choice_addressed ||
+        d.alternative_settings_addressed ||
+        d.consent_present;
+      if (!detectedAnything) return; // no key / nothing found: leave intake blank
+      const prior = getPlanCompliance(planId).intake ?? {};
+      const patch: Record<string, unknown> = { detected_by_ai: true };
+      if (d.source_plan_label) patch.source_plan_label = d.source_plan_label;
+      if (d.source_plan_date) patch.source_plan_date = d.source_plan_date;
+      if (d.source_plan_version) patch.source_plan_version = d.source_plan_version;
+      if (d.functional_assessment_date) patch.functional_assessment_date = d.functional_assessment_date;
+      // Presence checks are pre-ticked suggestions until the provider saves.
+      patch.functional_assessment_present = d.functional_assessment_present;
+      patch.setting_choice_addressed = d.setting_choice_addressed;
+      patch.alternative_settings_addressed = d.alternative_settings_addressed;
+      patch.consent_present = d.consent_present;
+      updatePlanCompliance(
+        planId,
+        { intake: { ...prior, ...patch } },
+        { what: "AI pre-filled source plan intake from the uploaded document (pending verification)" },
+      );
+      setSourceTick((t) => t + 1);
+    } catch {
+      /* detection is best-effort */
+    }
   };
+
+  // Section 2: auto-derive the received source-plan type so the intake field is
+  // never an empty blocker. Prefer a guess from the attached document, then the
+  // carried-forward previous plan, then the agent's configured upstream label.
+  const derivedSourceType = useMemo(() => {
+    const carried = previousImplemented
+      ? getPlanCompliance(previousImplemented.id).intake?.source_plan_label ?? ""
+      : "";
+    const fromDoc = sourceText ? guessSourcePlanType(plan.source_document_name ?? "", sourceText) : "";
+    return fromDoc || carried || agent.source_document_label || "";
+  }, [sourceText, plan.source_document_name, previousImplemented, agent.source_document_label]);
 
   // ---- Plan content + caretracker + task instructions ----
   const initialMarkdown = (plan.plan_content as { markdown?: string }).markdown || "";
@@ -285,6 +358,47 @@ function PlanRuntime() {
   const [cutoverAcked, setCutoverAcked] = useState(false);
   const [trainingOpen, setTrainingOpen] = useState(false);
 
+  // Section 5: a draft "exists" once there is plan content (generated or saved)
+  // or the plan has moved past draft. Implementation-readiness panels stay
+  // hidden until then so the draft stage shows only what is needed to draft.
+  const hasDraft = plan.status !== "draft" || !!planMarkdown.trim() || !!structuredTree;
+  // Outstanding implementation-stage gate items (these block Implement, not the
+  // draft). Tasks live in the checklist, so they are not counted here.
+  const readinessOutstanding = [!signaturesOk, !restrictionsOk].filter(Boolean).length;
+
+  // Section 2: plan classification (Initial / Revised / Emergency). Stored in
+  // the existing plan_type_label field. Smart default: Initial when there is no
+  // prior implemented plan of this type, otherwise Revised. Editable until
+  // implemented (then locked with the plan).
+  type PlanClass = "Initial" | "Revised" | "Emergency";
+  const isPlanClass = (s: string): s is PlanClass =>
+    s === "Initial" || s === "Revised" || s === "Emergency";
+  const smartDefaultClass: PlanClass = previousImplemented ? "Revised" : "Initial";
+  const [classification, setClassification] = useState<PlanClass>(() => {
+    const stored = plan.plan_type_label;
+    // A brand-new draft still at the createPlan default: use the smart default.
+    if (plan.status === "draft" && !planMarkdown.trim() && !structuredTree) return smartDefaultClass;
+    return isPlanClass(stored) ? stored : smartDefaultClass;
+  });
+  // Annual flag is inferred from the cycle: a plan with an annual date that is
+  // not an off-cycle emergency lands on the annual cycle. The provider can
+  // quietly override when the inference is wrong. Stored in plan_mode.
+  const inferredAnnual = classification !== "Emergency" && !!plan.annual_plan_date;
+  const [annualOverride, setAnnualOverride] = useState<boolean | null>(null);
+  const isAnnual = annualOverride ?? inferredAnnual;
+  // Persist classification + mode so the header, PDF, and dashboard agree.
+  useEffect(() => {
+    if (locked) return;
+    const mode = isAnnual ? "annual" : "on_the_fly";
+    if (plan.plan_type_label !== classification || plan.plan_mode !== mode) {
+      updatePlan(planId, { plan_type_label: classification, plan_mode: mode });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classification, isAnnual, locked, planId]);
+  // What the header shows: live local state until locked, then the frozen plan.
+  const displayClass = locked ? plan.plan_type_label : classification;
+  const displayAnnual = locked ? plan.plan_mode === "annual" : isAnnual;
+
   // ---- Per-individual training video + quiz (generated from the plan) ----
   const [trainingTick, setTrainingTick] = useState(0);
   const training = useMemo(() => getTrainingForPlan(planId), [planId, trainingTick]);
@@ -296,11 +410,14 @@ function PlanRuntime() {
   // header and rolled up on the dashboard.
   const untrainedOnLive = useMemo(() => {
     if (plan.status !== "implemented") return [] as string[];
-    return listTrainingTodos({ individualId: id, trainingId: training?.id })
+    // Section 4: staff cannot be certified on a video that does not exist yet.
+    // Only count once training is published and ready.
+    if (!training || training.status !== "ready") return [] as string[];
+    return listTrainingTodos({ individualId: id, trainingId: training.id })
       .filter((t) => t.status !== "certified")
       .map((t) => t.staff_name);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan.status, id, training?.id, trainingTick, compTick]);
+  }, [plan.status, id, training?.id, training?.status, trainingTick, compTick]);
 
   // Generate the training assets from the plan content + the agent's editable
   // recipe. Runs in the background (pending -> ready); never blocks plan
@@ -345,7 +462,7 @@ function PlanRuntime() {
         const ready = getTrainingForPlan(planId);
         if (ready) publishTrainingToModule({ individualId: id, planId, training: ready });
         setTrainingTick((t) => t + 1);
-        toast.success("Staff training ready — published to the training module.");
+        toast.success("Staff training ready. Published to the training module.");
       } catch (err) {
         updateTraining(rec.id, { status: "failed", video_status: "failed" });
         setTrainingTick((t) => t + 1);
@@ -455,12 +572,9 @@ function PlanRuntime() {
     if (tree) setStructuredTree(tree);
     persistContent(markdown, ct ?? caretrackerData, undefined, tree ?? undefined);
 
-    // Section 3: once a plan is generated, produce the staff training video +
-    // quiz in the background (non-blocking, once per plan). The plan displays
-    // immediately; the training panel shows a pending -> ready state.
-    if (markdown.length > 400 && !locked) {
-      void startTrainingGeneration(markdown);
-    }
+    // Training is NOT produced here. The video is built from the final
+    // implemented plan, so generating it at draft time is premature (and a waste
+    // of tokens). Training is triggered only on a successful Implement.
 
     // Enrich tasks once we have substantial plan content
     if (markdown.length > 200 && Object.keys(taskInstructions).length === 0) {
@@ -541,6 +655,10 @@ function PlanRuntime() {
     setCompTick((t) => t + 1);
     setImplementOpen(false);
     setTrainingOpen(true);
+    // Section 3: training is built from the final implemented plan, so it starts
+    // here (not at draft time). Runs in the background; the header badge shows a
+    // preparing state until it is published.
+    void startTrainingGeneration(planMarkdown, { force: true });
   };
 
   const handleManualSave = (_goals: unknown, md: string) => {
@@ -597,8 +715,19 @@ function PlanRuntime() {
               </div>
             )}
             <div className="min-w-0">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-ink3">
-                {plan.plan_type_label} · {plan.plan_mode === "annual" ? "Annual" : "On-the-Fly"}
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-ink3">
+                <span>{displayClass} · {displayAnnual ? "Annual" : "On-the-Fly"}</span>
+                {/* Quiet override for the inferred Annual flag (Section 2). */}
+                {!locked && (
+                  <button
+                    type="button"
+                    onClick={() => setAnnualOverride(!displayAnnual)}
+                    className="font-semibold normal-case tracking-normal text-ink3 hover:text-navy underline decoration-dotted underline-offset-2"
+                    title="Override the inferred annual-cycle flag"
+                  >
+                    set {displayAnnual ? "on-the-fly" : "annual"}
+                  </button>
+                )}
               </div>
               <h1 className="text-[30px] font-extrabold text-ink leading-tight tracking-tight">
                 {planTypeInfo(agent.plan_type).label}
@@ -607,18 +736,24 @@ function PlanRuntime() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate({ to: "/individuals/$id/trainings", params: { id }, search: { plan: planId } })}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-white text-[12.5px] font-bold hover:opacity-95 shadow-soft"
-              style={{ background: "var(--ai-gradient)" }}
-              title="Staff training video & certification quiz for this plan"
-            >
-              {training?.status === "pending" ? (
-                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Training: preparing…</>
-              ) : (
-                <><GraduationCap className="h-3.5 w-3.5" /> Staff training</>
-              )}
-            </button>
+            {/* Section 3: training only exists after Implement. Before that the
+                badge is hidden (no premature "preparing" at draft or in
+                progress). Post-implement it shows preparing, then Staff
+                training once published. */}
+            {plan.status === "implemented" && (
+              <button
+                onClick={() => navigate({ to: "/individuals/$id/trainings", params: { id }, search: { plan: planId } })}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-white text-[12.5px] font-bold hover:opacity-95 shadow-soft"
+                style={{ background: "var(--ai-gradient)" }}
+                title="Staff training video and certification quiz for this plan"
+              >
+                {training?.status === "pending" ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Training: preparing</>
+                ) : (
+                  <><GraduationCap className="h-3.5 w-3.5" /> Staff training</>
+                )}
+              </button>
+            )}
             {untrainedOnLive.length > 0 && (
               <span
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
@@ -665,33 +800,15 @@ function PlanRuntime() {
             the page; you scroll within the plan pane. */}
         <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:h-[calc(100vh-200px)]">
           <aside className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1 space-y-4">
+            {/* Draft stage: only what is needed to draft. */}
             {agent.content_origin === "source_plan" && (
-              <SourceIntakePanel planId={planId} locked={locked} />
-            )}
-            <SignaturesPanel
-              planId={planId}
-              requiredRoles={requiredSignerRolesList}
-              locked={locked}
-              onChange={() => setCompTick((t) => t + 1)}
-            />
-            {structuredTree && (
-              <AuthorizationPanel individualId={id} tree={structuredTree} effective={locked} />
-            )}
-            {restrictionReviewRequired && (
-              <RestrictionPanel
+              <SourceIntakePanel
+                key={`intake-${sourceTick}`}
                 planId={planId}
-                committeeRequired={restrictionReviewRequired}
                 locked={locked}
-                onChange={() => setCompTick((t) => t + 1)}
+                defaultSourceType={derivedSourceType}
               />
             )}
-            <ProviderFieldsPanel
-              planId={planId}
-              requiredFields={providerRequiredFields}
-              locked={locked}
-              onChange={() => setCompTick((t) => t + 1)}
-            />
-            <AuditTrailPanel planId={planId} tick={compTick} />
             <ChecklistPanel
               phases={agent.workflow_data}
               annualDate={plan.annual_plan_date}
@@ -703,6 +820,56 @@ function PlanRuntime() {
               onAiDraft={handleAiDraftOutcome}
               locked={locked}
             />
+
+            {/* Implementation readiness: grouped, collapsed, and only available
+                once a draft exists. These flags count toward Implement. */}
+            {hasDraft && (
+              <ImplementationReadiness
+                ready={signaturesOk && restrictionsOk}
+                outstanding={readinessOutstanding}
+              >
+                <SignaturesPanel
+                  planId={planId}
+                  requiredRoles={requiredSignerRolesList}
+                  locked={locked}
+                  onChange={() => setCompTick((t) => t + 1)}
+                />
+                {structuredTree && (
+                  <AuthorizationPanel individualId={id} tree={structuredTree} effective={locked} />
+                )}
+                {restrictionReviewRequired && (
+                  <RestrictionPanel
+                    planId={planId}
+                    committeeRequired={restrictionReviewRequired}
+                    locked={locked}
+                    onChange={() => setCompTick((t) => t + 1)}
+                  />
+                )}
+                <ProviderFieldsPanel
+                  planId={planId}
+                  requiredFields={providerRequiredFields}
+                  locked={locked}
+                  onChange={() => setCompTick((t) => t + 1)}
+                  canDraft={hasDraft}
+                  onDraft={async () =>
+                    draftProviderElementsFn({
+                      data: {
+                        planContent: planMarkdown,
+                        individualName: individual.name,
+                        serviceType: individual.service_type,
+                        planTypeLabel: planTypeInfo(agent.plan_type).label,
+                        profile: profileData,
+                        briefRules: guidelinesBrief?.rules ?? [],
+                        providerRequiredFields,
+                      },
+                    })
+                  }
+                />
+              </ImplementationReadiness>
+            )}
+
+            {/* Audit trail stays visible: informational, not a demand. */}
+            <AuditTrailPanel planId={planId} tick={compTick} />
           </aside>
 
           <section className="min-w-0 lg:h-full min-h-0 flex flex-col">
@@ -721,7 +888,10 @@ function PlanRuntime() {
                 sourceKind={sourceForGeneration?.kind}
                 enabledProfileFieldNames={enabledProfileFieldNames}
                 initialMarkdown={planMarkdown}
+                planClass={classification}
+                onPlanClassChange={setClassification}
                 canImplement={canImplement}
+                implementBlockedReason={implementBlockedReason}
                 draftBlockedReason={draftBlockedReason}
                 needsSourceAttach={sourceMissing}
                 sourceDocLabel={agent.source_document_label}
@@ -777,6 +947,7 @@ function PlanRuntime() {
                   <div className="shrink-0">
                     <ActionRow
                       canImplement={canImplement}
+                      implementBlockedReason={implementBlockedReason}
                       reviseInput=""
                       onReviseInputChange={() => {}}
                       onRegenerate={() => setPlanMarkdown("")}
@@ -793,6 +964,7 @@ function PlanRuntime() {
                   outputFields={agent.output_fields}
                   onSave={handleManualSave}
                   canImplement={canImplement}
+                  implementBlockedReason={implementBlockedReason}
                   onImplement={(md) => {
                     setPlanMarkdown(md);
                     persistContent(md, caretrackerData);

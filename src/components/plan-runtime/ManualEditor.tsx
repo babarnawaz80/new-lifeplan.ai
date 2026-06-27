@@ -31,12 +31,14 @@ export function ManualEditor({
   onSave,
   saving,
   canImplement,
+  implementBlockedReason,
   onImplement,
 }: {
   outputFields: ToggleField[];
   onSave: (goals: ManualGoal[], markdown: string) => void;
   saving?: boolean;
   canImplement: boolean;
+  implementBlockedReason?: string | null;
   onImplement: (markdown: string) => void;
 }) {
   const enabledFields = outputFields.filter((f) => f.enabled).map((f) => f.name);
@@ -132,12 +134,15 @@ export function ManualEditor({
           type="button"
           onClick={() => onImplement(markdown)}
           disabled={!canImplement}
-          title={canImplement ? "" : "Complete required tasks first"}
+          title={canImplement ? "" : implementBlockedReason ?? "Complete required tasks first"}
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[9px] bg-navy text-white text-[13px] font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Implement plan
         </button>
       </div>
+      {!canImplement && implementBlockedReason && (
+        <p className="text-[11.5px] text-amber mt-2">{implementBlockedReason}</p>
+      )}
     </div>
   );
 }

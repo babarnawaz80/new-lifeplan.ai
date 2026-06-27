@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { exportPlanPdf } from "@/lib/plan-pdf";
 import type { IcmPlanTree } from "@/types/icmGoalOutcome";
 import { AppShell } from "@/components/layout/AppShell";
-import { ManualOrAIDialog, type PlanStartSource } from "@/components/lifeplan/ManualOrAIDialog";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +24,7 @@ import {
 import { planTypeInfo, type Plan } from "@/data/mock";
 
 export const Route = createFileRoute("/individuals/$id/log/$agentId")({
-  head: () => ({ meta: [{ title: "Plan log — LifePlan" }] }),
+  head: () => ({ meta: [{ title: "Plan log · LifePlan" }] }),
   component: PlanLogPage,
   notFoundComponent: () => (
     <AppShell>
@@ -49,23 +48,24 @@ function PlanLogPage() {
   const [tick, setTick] = useState(0);
   void tick;
   const plans = listPlansForIndividualAndAgent(id, agentId);
-  const [openModal, setOpenModal] = useState(false);
   // The draft/in-progress plan queued for deletion (null = dialog closed).
   const [toDelete, setToDelete] = useState<Plan | null>(null);
 
   // Single source for the plan-type label/short across all surfaces.
   const { label: planTypeLabel, short: planTypeShort } = planTypeInfo(agent.plan_type);
 
-  const handleChoose = (mode: "ai" | "manual", source: PlanStartSource) => {
+  // Start a plan in one click. The individual and plan type are already chosen
+  // (in the e-chart) and AI vs manual is the button the user pressed, so there
+  // is no chooser modal. The source document is asked about once, later, in the
+  // workspace "Ready when you are" panel. Source-plan agents open awaiting their
+  // upstream document; others open ready to draft.
+  const startPlan = (mode: "ai" | "manual") => {
     const plan = createPlan({
       individualId: id,
       agentId,
       creationMode: mode,
-      sourceDocumentName: source.kind === "uploaded" ? source.name : undefined,
-      sourceDocumentText: source.kind === "uploaded" ? source.text : undefined,
-      awaitingSourceDocument: source.kind === "awaiting",
+      awaitingSourceDocument: agent.content_origin === "source_plan",
     });
-    setOpenModal(false);
     navigate({
       to: "/individuals/$id/plan/$planId",
       params: { id, planId: plan.id },
@@ -154,14 +154,14 @@ function PlanLogPage() {
               Configure
             </Link>
             <button
-              onClick={() => setOpenModal(true)}
+              onClick={() => startPlan("manual")}
               className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] border border-line bg-card text-[13px] font-semibold text-ink hover:bg-muted"
             >
               <Plus className="h-4 w-4" />
               New plan
             </button>
             <button
-              onClick={() => setOpenModal(true)}
+              onClick={() => startPlan("ai")}
               className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] text-white text-[13px] font-bold hover:opacity-95 shadow-soft"
               style={{ background: "var(--ai-gradient)" }}
               title="Start a new plan and draft it with AI"
@@ -218,14 +218,6 @@ function PlanLogPage() {
         )}
       </div>
 
-      <ManualOrAIDialog
-        open={openModal}
-        onOpenChange={setOpenModal}
-        agent={agent}
-        individual={individual}
-        onChoose={handleChoose}
-      />
-
       <DeletePlanDialog
         plan={toDelete}
         planTypeLabel={planTypeLabel}
@@ -273,7 +265,7 @@ function DeletePlanDialog({
           <DialogTitle className="text-ink text-[18px]">Delete this plan?</DialogTitle>
           <DialogDescription className="text-ink2 leading-relaxed">
             This permanently deletes the {plan?.plan_type_label} {planTypeLabel} draft and its task
-            progress. This can't be undone. Implemented plans can't be deleted — replace them by
+            progress. This can't be undone. Implemented plans can't be deleted. Replace them by
             implementing a new plan.
           </DialogDescription>
         </DialogHeader>
@@ -469,12 +461,12 @@ function PlanLogRow({
           ) : plan.status === "in_progress" ? (
             <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-indigo">
               <Clock className="h-4 w-4" />
-              In progress — not yet implemented
+              In progress, not yet implemented
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-amber">
               <PencilLine className="h-4 w-4" />
-              Draft — not yet implemented
+              Draft, not yet implemented
             </span>
           )}
         </div>

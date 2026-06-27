@@ -45,7 +45,7 @@ export type AutonomyConfig = {
   implementation_watcher: boolean;
   deadline_catcher: boolean;
   guideline_drift: boolean;
-  // Source drift: the implementation plan references a care-manager-authored
+  // Source drift: the implementation plan references a case-manager-authored
   // source plan (Life Plan / ISP). When the source is revised, its review/annual
   // date passes, or a new functional assessment lands, the provider plan is out
   // of sync. Watches the source clocks separately from the provider's own.
@@ -249,7 +249,7 @@ export type Plan = {
 // All additive; driven by the guidelines compliance brief + per-plan-type config.
 
 // Source plan intake — the provider receives, dates, versions, and acknowledges
-// the plan it implements, and VERIFIES (cites, does not author) the care-manager
+// the plan it implements, and VERIFIES (cites, does not author) the case-manager
 // owned items.
 export type SourceIntake = {
   source_plan_label?: string; // state-agnostic: Life Plan / ISP / PCSP / IP
@@ -263,6 +263,9 @@ export type SourceIntake = {
   setting_choice_addressed?: boolean;
   alternative_settings_addressed?: boolean;
   consent_present?: boolean;
+  // True when the AI pre-filled values from the uploaded document (Tier A).
+  // These are suggestions until the provider verifies and saves the intake.
+  detected_by_ai?: boolean;
 };
 
 // One signature/approval on the provider's implementation plan.
