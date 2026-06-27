@@ -263,6 +263,13 @@ function PlanRuntime() {
   // Source is only "missing" (blocking) when there's no upload AND the user
   // hasn't opted to proceed without one.
   const sourceMissing = uploadedMissing && !proceedWithoutUpload;
+
+  // The intake can only verify against a real basis: an attached source document
+  // or an explicit carry-forward (the previous implemented plan). Until then the
+  // verify items and auto-filled fields stay inert (Section 1). Non-source_plan
+  // agents do not render the intake panel.
+  const intakeBasis: "document" | "previous_plan" | "none" =
+    sourceText ? "document" : proceedWithoutUpload ? "previous_plan" : "none";
   const prePlanningDone = prePlanningCompulsoryComplete(agent.workflow_data, isComplete);
   const draftBlockedReason =
     sourceMissing && !prePlanningDone
@@ -807,6 +814,7 @@ function PlanRuntime() {
                 planId={planId}
                 locked={locked}
                 defaultSourceType={derivedSourceType}
+                basis={intakeBasis}
               />
             )}
             <ChecklistPanel

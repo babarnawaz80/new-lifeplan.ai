@@ -17,6 +17,7 @@ export function SourceIntakePanel({
   planId,
   locked,
   defaultSourceType,
+  basis = "none",
 }: {
   planId: string;
   locked?: boolean;
@@ -24,6 +25,11 @@ export function SourceIntakePanel({
   // document, the carried-forward previous plan, or the agent's configured
   // source-document label. Pre-filled, confirmable, never required.
   defaultSourceType?: string;
+  // The basis the intake verifies against: an attached document, the previous
+  // implemented plan (carry-forward), or none yet. Until a basis exists the
+  // verify items and auto-filled fields stay inert (you cannot verify a
+  // document that was never received).
+  basis?: "document" | "previous_plan" | "none";
 }) {
   // Once the provider saves, the intake is "confirmed" (detected_by_ai set to
   // false). Use that as the completed signal so the panel reads as done and
@@ -51,6 +57,15 @@ export function SourceIntakePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultSourceType]);
 
+  // A basis exists once a document is attached or carry-forward is chosen;
+  // implemented (locked) plans always had a basis, and a previously-saved intake
+  // stays editable. Without one the verify items and auto-filled fields are
+  // inert (you cannot verify a document that was never received).
+  const hasBasis = !!locked || saved || basis !== "none";
+  const inert = !hasBasis;
+  const verifyHeading = basis === "previous_plan" ? "Verify against the previous plan" : "Verify against the received plan";
+  const basisNoun = basis === "previous_plan" ? "previous plan" : "received plan";
+
   const set = <K extends keyof SourceIntake>(k: K, v: SourceIntake[K]) =>
     setIntake((s) => ({ ...s, [k]: v }));
 
@@ -75,10 +90,10 @@ export function SourceIntakePanel({
     <label className="flex items-start gap-2 text-[12.5px] text-ink2">
       <input
         type="checkbox"
-        disabled={locked}
+        disabled={locked || inert}
         checked={!!intake[k]}
         onChange={(e) => set(k, e.target.checked as never)}
-        className="mt-0.5 h-4 w-4 accent-[var(--green)] shrink-0"
+        className="mt-0.5 h-4 w-4 accent-[var(--green)] shrink-0 disabled:opacity-50"
       />
       <span className="flex-1">{label}{children}</span>
     </label>
@@ -97,6 +112,10 @@ export function SourceIntakePanel({
           <span className="inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-green">
             <CheckCircle2 className="h-3.5 w-3.5" /> Completed
           </span>
+        ) : inert ? (
+          <span className="inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-ink3">
+            Needs a basis
+          </span>
         ) : missing.length > 0 ? (
           <span className="inline-flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-amber">
             <AlertTriangle className="h-3 w-3" /> {missing.length} missing
@@ -107,43 +126,49 @@ export function SourceIntakePanel({
 
       {open && (
         <div className="px-4 pb-4 space-y-3 border-t border-line pt-3">
+          {inert && (
+            <div className="flex items-start gap-2 text-[12px] text-ink2 bg-muted/40 border border-line rounded-xl px-3 py-2">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber" />
+              <span>Attach the source plan or choose to proceed without one to verify.</span>
+            </div>
+          )}
           {intake.detected_by_ai && !locked && (
             <div className="flex items-start gap-2 text-[12px] text-indigo bg-indigo/10 border border-indigo/30 rounded-xl px-3 py-2">
               <Sparkles className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               <span>AI detected these from the uploaded document. Verify each value, then save to confirm.</span>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className={`grid grid-cols-2 gap-2.5 ${inert ? "opacity-60" : ""}`}>
             <div className="col-span-2">
               <span className={labelCls}>Source plan type (received)</span>
-              <input className={inputCls} disabled={locked} placeholder="Life Plan, ISP, PCSP, IP" value={intake.source_plan_label ?? ""} onChange={(e) => set("source_plan_label", e.target.value)} />
+              <input className={inputCls} disabled={locked || inert} placeholder="Life Plan, ISP, PCSP, IP" value={intake.source_plan_label ?? ""} onChange={(e) => set("source_plan_label", e.target.value)} />
               <p className="text-[11px] text-ink3 mt-1">
                 The upstream document you received and are implementing from (not the plan you are creating). Auto-filled, optional, editable.
               </p>
             </div>
             <div>
               <span className={labelCls}>Source plan date</span>
-              <input type="date" className={inputCls} disabled={locked} value={(intake.source_plan_date ?? "").slice(0, 10)} onChange={(e) => set("source_plan_date", e.target.value)} />
+              <input type="date" className={inputCls} disabled={locked || inert} value={(intake.source_plan_date ?? "").slice(0, 10)} onChange={(e) => set("source_plan_date", e.target.value)} />
             </div>
             <div>
               <span className={labelCls}>Version</span>
-              <input className={inputCls} disabled={locked} placeholder="e.g. v3" value={intake.source_plan_version ?? ""} onChange={(e) => set("source_plan_version", e.target.value)} />
+              <input className={inputCls} disabled={locked || inert} placeholder="e.g. v3" value={intake.source_plan_version ?? ""} onChange={(e) => set("source_plan_version", e.target.value)} />
             </div>
             <div>
               <span className={labelCls}>Received</span>
-              <input type="date" className={inputCls} disabled={locked} value={(intake.received_date ?? "").slice(0, 10)} onChange={(e) => set("received_date", e.target.value)} />
+              <input type="date" className={inputCls} disabled={locked || inert} value={(intake.received_date ?? "").slice(0, 10)} onChange={(e) => set("received_date", e.target.value)} />
             </div>
             <div>
               <span className={labelCls}>Acknowledged by</span>
-              <input className={inputCls} disabled={locked} placeholder="Name" value={intake.acknowledged_by ?? ""} onChange={(e) => set("acknowledged_by", e.target.value)} />
+              <input className={inputCls} disabled={locked || inert} placeholder="Name" value={intake.acknowledged_by ?? ""} onChange={(e) => set("acknowledged_by", e.target.value)} />
             </div>
           </div>
 
-          <div className="rounded-xl bg-muted/40 border border-line p-3 space-y-2">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-ink3">Verify against the received plan</div>
+          <div className={`rounded-xl bg-muted/40 border border-line p-3 space-y-2 ${inert ? "opacity-60" : ""}`}>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-ink3">{verifyHeading}</div>
             <Check k="functional_assessment_present" label="Functional assessment present">
               {intake.functional_assessment_present && (
-                <input type="date" className="ml-2 h-7 px-2 rounded-md border border-line bg-card text-[12px]" disabled={locked} value={(intake.functional_assessment_date ?? "").slice(0, 10)} onChange={(e) => set("functional_assessment_date", e.target.value)} />
+                <input type="date" className="ml-2 h-7 px-2 rounded-md border border-line bg-card text-[12px]" disabled={locked || inert} value={(intake.functional_assessment_date ?? "").slice(0, 10)} onChange={(e) => set("functional_assessment_date", e.target.value)} />
               )}
             </Check>
             <Check k="setting_choice_addressed" label="Setting choice addressed in the plan" />
@@ -151,15 +176,15 @@ export function SourceIntakePanel({
             <Check k="consent_present" label="Individual's consent to the overarching plan present" />
           </div>
 
-          {missing.length > 0 && (
+          {!inert && missing.length > 0 && (
             <div className="flex items-start gap-2 text-[12px] text-amber bg-amber/10 border border-amber/30 rounded-xl px-3 py-2">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              <span>Missing from the received plan: {missing.join(", ")}. Request from the case manager. These are theirs to author, not the provider's.</span>
+              <span>Missing from the {basisNoun}: {missing.join(", ")}. Request from the case manager. These are theirs to author, not the provider's.</span>
             </div>
           )}
 
           {!locked && (
-            <button onClick={save} className="w-full py-2 rounded-[9px] text-white text-[13px] font-bold" style={{ background: "var(--navy)" }}>
+            <button onClick={save} disabled={inert} className="w-full py-2 rounded-[9px] text-white text-[13px] font-bold disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: "var(--navy)" }}>
               Save intake
             </button>
           )}
