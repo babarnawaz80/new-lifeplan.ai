@@ -235,7 +235,7 @@ export function TrainingPlayer({
           )}
           {done && (
             <div className="mt-6 inline-flex items-center gap-2 text-white text-[15px] font-bold">
-              ✓ Training complete — take the quiz to certify.
+              ✓ Training complete. Take the quiz to certify.
             </div>
           )}
         </div>

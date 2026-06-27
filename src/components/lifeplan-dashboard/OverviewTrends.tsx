@@ -17,7 +17,7 @@ const cardHead: CSSProperties = { padding: "13px 20px", borderBottom: "1px solid
 type TrendKey = "declining" | "stalled" | "needs_attention";
 
 const TREND_META: Record<TrendKey, { label: string; descriptor: string; color: string }> = {
-  declining: { label: "Declining engagement", descriptor: "trending down — repeated refusals or drop-off", color: "#DC2626" },
+  declining: { label: "Declining engagement", descriptor: "trending down, repeated refusals or drop-off", color: "#DC2626" },
   stalled: { label: "Not yet documented", descriptor: "expected but no documentation", color: "#94A3B8" },
   needs_attention: { label: "Needs attention", descriptor: "below target completion", color: "#F5A524" },
 };
@@ -85,7 +85,7 @@ export function OverviewTrends() {
       {!data ? (
         <div style={{ padding: "28px 20px", textAlign: "center" }}>
           <p style={{ fontFamily: "var(--font-text)", fontSize: 13, color: "var(--fg3)", maxWidth: 460, margin: "0 auto 14px" }}>
-            Spot patterns that need attention — repeated service refusals, declining engagement, and plans falling behind on documentation.
+            Spot patterns that need attention: repeated service refusals, declining engagement, and plans falling behind on documentation.
           </p>
           <button
             onClick={generate}
@@ -112,7 +112,7 @@ export function OverviewTrends() {
                   disabled={allClear}
                   className="lp-prog"
                   style={{ position: "relative", border: active ? "1px solid var(--icm-navy)" : "1px solid var(--border-soft)", borderRadius: 12, padding: "13px 15px 13px 16px", display: "flex", flexDirection: "column", gap: 6, textAlign: "left", background: active ? "var(--icm-slate-50)" : "#fff", cursor: allClear ? "default" : "pointer", overflow: "hidden" }}
-                  title={allClear ? "All clear" : `${count} — ${m.descriptor}`}
+                  title={allClear ? "All clear" : `${count}, ${m.descriptor}`}
                 >
                   <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: color }} />
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>

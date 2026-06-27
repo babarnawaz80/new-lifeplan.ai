@@ -7,7 +7,7 @@ import { IcmLinksLibrary } from "@/components/settings/libraries/IcmLinksLibrary
 import { OptionSetsLibrary } from "@/components/settings/libraries/OptionSetsLibrary";
 
 export const Route = createFileRoute("/settings/libraries")({
-  head: () => ({ meta: [{ title: "Libraries — LifePlan" }] }),
+  head: () => ({ meta: [{ title: "Libraries · LifePlan" }] }),
   component: LibrariesPage,
 });
 

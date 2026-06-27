@@ -22,7 +22,7 @@ const PLAN_TYPES = [
 ];
 
 export const Route = createFileRoute("/guidelines/new")({
-  head: () => ({ meta: [{ title: "New guideline — LifePlan" }] }),
+  head: () => ({ meta: [{ title: "New guideline · LifePlan" }] }),
   component: NewGuideline,
 });
 

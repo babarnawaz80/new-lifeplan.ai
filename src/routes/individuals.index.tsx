@@ -63,7 +63,7 @@ import {
 export const Route = createFileRoute("/individuals/")({
   head: () => ({
     meta: [
-      { title: "Individuals — iCareManager" },
+      { title: "Individuals · iCareManager" },
       {
         name: "description",
         content: "Browse and manage individuals enrolled in services.",

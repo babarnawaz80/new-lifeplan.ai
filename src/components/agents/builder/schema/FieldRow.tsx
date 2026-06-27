@@ -36,7 +36,7 @@ export function FieldRow({ field, selected, onSelect, onDelete }: Props) {
         </span>
       ) : isDocOnly ? (
         <span
-          title="Document-only — not sent to CareTracker"
+          title="Document-only, not sent to CareTracker"
           className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber bg-amber/10 px-2 py-0.5 rounded-md"
         >
           <AlertTriangle className="h-3 w-3" />

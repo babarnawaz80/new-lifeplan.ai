@@ -43,7 +43,7 @@ export function AskBar() {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Ask LifePlan — e.g. where is Johnny's plan"
+                  placeholder="Ask LifePlan, e.g. where is Johnny's plan"
                   style={{ flex: 1, minWidth: 0, width: "100%", border: "none", outline: "none", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--fg1)", background: "transparent" }}
                 />
               </div>

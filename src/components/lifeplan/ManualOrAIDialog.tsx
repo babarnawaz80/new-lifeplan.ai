@@ -89,7 +89,7 @@ export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoo
           // ── Step 1 (every plan): upload the source document this plan is built from ──
           <div className="px-7 py-5">
             <p className="text-[13px] text-ink2 mb-4 leading-relaxed">
-              Every plan starts from a real document — {individual.name}'s current or previous plan,
+              Every plan starts from a real document, {individual.name}'s current or previous plan,
               or one from the case manager, behavior therapist, or nurse. Upload it and the AI will
               read it, fully understand it, and extract the goals, strategies, and outcomes to build
               the implementable plan. Text is extracted in your browser; the file is never uploaded.
@@ -131,7 +131,7 @@ export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoo
                 className="px-4 py-2 rounded-[9px] text-[13px] font-semibold text-ink2 hover:bg-muted transition-colors"
                 title="Start now and attach the document later"
               >
-                Skip — document not available yet →
+                Skip, document not available yet →
               </button>
             </div>
           </div>
@@ -144,12 +144,12 @@ export function ManualOrAIDialog({ open, onOpenChange, agent, individual, onChoo
                   <div className="flex items-center gap-2 rounded-xl bg-[var(--success-bg)] border border-[color-mix(in_oklab,var(--green)_30%,transparent)] px-3 py-2 text-[12px] text-green font-semibold">
                     <Check className="h-3.5 w-3.5" />
                     <FileText className="h-3.5 w-3.5" />
-                    {uploaded.name} — {uploaded.text.length.toLocaleString()} characters extracted
+                    {uploaded.name}, {uploaded.text.length.toLocaleString()} characters extracted
                     locally. The AI will build from it.
                   </div>
                 ) : (
                   <div className="flex items-center justify-between rounded-xl bg-[var(--warning-bg)] border border-[color-mix(in_oklab,var(--amber)_30%,transparent)] px-3 py-2 text-[12px] text-amber font-semibold">
-                    <span>No {docLabel} yet — plan will be flagged “awaiting source document.”</span>
+                    <span>No {docLabel} yet. Plan will be flagged “awaiting source document.”</span>
                     <button onClick={() => setStep("upload")} className="underline hover:no-underline">
                       Upload now
                     </button>

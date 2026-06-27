@@ -119,7 +119,7 @@ export const buildAgent = createServerFn({ method: "POST" })
         profile_fields: data.currentConfig?.profile_fields ?? toToggles(PROFILE_FIELDS),
         output_fields: data.currentConfig?.output_fields ?? toToggles(OUTPUT_FIELDS),
         instructions: data.currentConfig?.instructions ?? "",
-        summary: "AI is disabled in this preview — design-only mode.",
+        summary: "AI is disabled in this preview (design-only mode).",
       };
     }
 

@@ -86,7 +86,7 @@ export function exportPlanPdf(input: PlanPdfInput) {
     : `<pre class="md">${esc(input.markdownFallback ?? "No plan content.")}</pre>`;
 
   const html = `<!doctype html><html><head><meta charset="utf-8"/>
-  <title>${esc(input.planTypeLabel)} — ${esc(input.individualName)}</title>
+  <title>${esc(input.planTypeLabel)} · ${esc(input.individualName)}</title>
   <style>
     @page { margin: 22mm 18mm; }
     * { box-sizing: border-box; }

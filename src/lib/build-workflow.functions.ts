@@ -53,7 +53,7 @@ export const buildWorkflow = createServerFn({ method: "POST" })
           sort_order: j,
         })),
       }));
-      return { phases, summary: "AI is disabled in this preview — design-only mode." };
+      return { phases, summary: "AI is disabled in this preview (design-only mode)." };
     }
 
     const { withModelFallback } = await import("./gemini.server");

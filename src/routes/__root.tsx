@@ -79,9 +79,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "LifePlan — iCareManager" },
+      { title: "LifePlan · iCareManager" },
       { name: "description", content: "AI-assisted person-centered planning inside iCareManager." },
-      { property: "og:title", content: "LifePlan — iCareManager" },
+      { property: "og:title", content: "LifePlan · iCareManager" },
       { property: "og:description", content: "AI-assisted person-centered planning inside iCareManager." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

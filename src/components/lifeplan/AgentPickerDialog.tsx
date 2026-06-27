@@ -74,7 +74,7 @@ export function AgentPickerDialog({
 
           <div className="mt-4 flex items-start gap-2 text-[11.5px] text-ink3">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            <span>Need a new plan type? Create the agent on the LifePlan dashboard — it's shared across the organization.</span>
+            <span>Need a new plan type? Create the agent on the LifePlan dashboard. It's shared across the organization.</span>
           </div>
         </div>
       </DialogContent>

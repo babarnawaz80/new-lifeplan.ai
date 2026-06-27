@@ -59,7 +59,7 @@ export function RestrictionPanel({
       </div>
       <div className="p-3 space-y-3">
         {items.length === 0 && (
-          <p className="text-[12.5px] text-ink3">No restrictions on this plan. Add one only if a right is being restricted — it requires full justification and review.</p>
+          <p className="text-[12.5px] text-ink3">No restrictions on this plan. Add one only if a right is being restricted. It requires full justification and review.</p>
         )}
         {items.map((r) => {
           const complete = restrictionComplete(r, committeeRequired);

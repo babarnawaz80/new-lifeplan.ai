@@ -77,7 +77,7 @@ export function SubFieldEditor({ subFields, optionSets, onChange }: Props) {
               }
               className="w-full h-8 px-2 rounded-md border border-line bg-card text-[11px] text-ink focus:outline-none focus:border-navy"
             >
-              <option value="">— Option set —</option>
+              <option value="">Option set</option>
               {optionSets.map((os) => (
                 <option key={os.id} value={os.id}>
                   {os.name}

@@ -32,7 +32,7 @@ const editSearchSchema = z.object({
 });
 
 export const Route = createFileRoute("/agents/$id/edit")({
-  head: () => ({ meta: [{ title: "Edit agent — LifePlan" }] }),
+  head: () => ({ meta: [{ title: "Edit agent · LifePlan" }] }),
   validateSearch: editSearchSchema,
   component: AgentEditor,
   notFoundComponent: () => (

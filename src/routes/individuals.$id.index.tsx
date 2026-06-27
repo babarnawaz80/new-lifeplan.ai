@@ -18,7 +18,7 @@ import {
 import { individualAgents, type Agent } from "@/data/mock";
 
 export const Route = createFileRoute("/individuals/$id/")({
-  head: () => ({ meta: [{ title: "e-Chart — LifePlan" }] }),
+  head: () => ({ meta: [{ title: "e-Chart · LifePlan" }] }),
   component: IndividualEChart,
   notFoundComponent: () => (
     <AppShell>

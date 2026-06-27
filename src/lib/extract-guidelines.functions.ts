@@ -32,10 +32,10 @@ export const extractGuidelines = createServerFn({ method: "POST" })
           required_phases: [],
           required_tasks: [],
           required_fields: [],
-          notes: "AI is disabled in this preview — design-only mode.",
+          notes: "AI is disabled in this preview (design-only mode).",
         },
         services_extracted: 0,
-        summary: "AI is disabled in this preview — design-only mode.",
+        summary: "AI is disabled in this preview (design-only mode).",
       };
     }
 

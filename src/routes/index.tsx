@@ -11,7 +11,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Ring, SegmentDonut } from "@/components/dashboard/Charts";
 
 export const Route = createFileRoute("/")({
-  head: () => ({ meta: [{ title: "Dashboard — iCareManager" }] }),
+  head: () => ({ meta: [{ title: "Dashboard · iCareManager" }] }),
   component: DashboardPage,
 });
 

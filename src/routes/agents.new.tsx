@@ -28,7 +28,7 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/agents/new")({
-  head: () => ({ meta: [{ title: "New plan agent — LifePlan" }] }),
+  head: () => ({ meta: [{ title: "New plan agent · LifePlan" }] }),
   validateSearch: searchSchema,
   component: NewAgentPage,
 });
@@ -70,7 +70,7 @@ function NewAgentPage() {
       } else {
         setSampleText(text);
         toast.success(
-          `Loaded ${file.name} — ${text.trim().length.toLocaleString()} characters extracted locally`,
+          `Loaded ${file.name}, ${text.trim().length.toLocaleString()} characters extracted locally`,
         );
       }
     } catch (err) {
@@ -181,7 +181,7 @@ function NewAgentPage() {
                 <option value="none">None (non-state-specific)</option>
                 {guidelines.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.name} — {g.state} (v{g.version})
+                    {g.name}, {g.state} (v{g.version})
                   </option>
                 ))}
               </select>

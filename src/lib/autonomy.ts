@@ -218,7 +218,7 @@ function inputChaser(agent: Agent, plan: Plan, cfg: AutonomyConfig, bump: (s: st
   const hasSource = !!plan.source_document_text?.trim();
   if (hasSource) return;
   if (hasRecentActivity({ agentId: agent.id, planId: plan.id, actionType: "input_missing", withinDays: cfg.notify_backoff_days })) return;
-  logAgentActivity({ agent_id: agent.id, individual_id: plan.individual_id, plan_id: plan.id, action_type: "input_missing", status: "blocked", summary: `Source plan missing — reminded the responsible role. Drafting is blocked until it is attached.` });
+  logAgentActivity({ agent_id: agent.id, individual_id: plan.individual_id, plan_id: plan.id, action_type: "input_missing", status: "blocked", summary: `Source plan missing. Reminded the responsible role. Drafting is blocked until it is attached.` });
   bump("blocked");
 }
 
@@ -245,7 +245,7 @@ function earlyDrafter(agent: Agent, plan: Plan, cfg: AutonomyConfig, bump: (s: s
   if (content?.markdown) return; // already has a draft
   void cfg;
   if (hasRecentActivity({ agentId: agent.id, planId: plan.id, actionType: "early_draft", withinDays: 30 })) return;
-  logAgentActivity({ agent_id: agent.id, individual_id: plan.individual_id, plan_id: plan.id, action_type: "early_draft", status: "action_taken", summary: `Source plan and pre-planning are in — early draft is ready to generate for review.` });
+  logAgentActivity({ agent_id: agent.id, individual_id: plan.individual_id, plan_id: plan.id, action_type: "early_draft", status: "action_taken", summary: `Source plan and pre-planning are in. Early draft is ready to generate for review.` });
   bump("action_taken");
 }
 
@@ -281,7 +281,7 @@ function trainingAdvocate(agent: Agent, plan: Plan, cfg: AutonomyConfig, bump: (
   if (slipping.length < 2) return;
   if (hasRecentActivity({ agentId: agent.id, planId: plan.id, actionType: "auto_training", withinDays: cfg.no_progress_days })) return;
 
-  const reason = `${slipping.length} services slipping — declining engagement / missed documentation`;
+  const reason = `${slipping.length} services slipping (declining engagement, missed documentation)`;
   // Create a NEW training (a fresh version in the plan's history), flag it for
   // regeneration with the trend context, and drop it into the staff queue now.
   const training = createPendingTraining({
@@ -299,7 +299,7 @@ function trainingAdvocate(agent: Agent, plan: Plan, cfg: AutonomyConfig, bump: (
     plan_id: plan.id,
     action_type: "auto_training",
     status: "action_taken",
-    summary: `Staff engagement on this ${planTypeInfo(agent.plan_type).label} is slipping (${slipping.length} services) — refreshed the staff training and dropped it into the staff queue.`,
+    summary: `Staff engagement on this ${planTypeInfo(agent.plan_type).label} is slipping (${slipping.length} services). Refreshed the staff training and dropped it into the staff queue.`,
     payload: { services: slipping.map((s) => s.serviceTitle), reason },
   });
   bump("action_taken");
@@ -338,7 +338,7 @@ function guidelineDrift(agent: Agent, plan: Plan, bump: (s: string) => void) {
   bump("flagged");
 }
 
-// 7) Source-plan drift — for provider plans that implement a care-manager
+// 7) Source-plan drift — for provider plans that implement a case-manager
 // source plan (Life Plan / ISP). The source has its OWN clocks, separate from
 // the provider plan's annual date: an upstream version, a review/annual date,
 // and a functional-assessment date. This flags when the provider plan is built

@@ -129,7 +129,7 @@ export function PlanComparison({
         </div>
         <div className="hidden md:block w-5" />
         <div className="text-[11px] font-bold uppercase tracking-wider text-indigo">
-          AI proposal — new {meta.planTypeLabel}
+          AI proposal, new {meta.planTypeLabel}
         </div>
       </div>
 
@@ -148,7 +148,7 @@ export function PlanComparison({
                   <GoalSummary goal={row.previous} muted />
                 ) : (
                   <div className="h-full flex items-center justify-center text-[12.5px] text-ink3 italic py-6">
-                    No matching goal — newly added
+                    No matching goal, newly added
                   </div>
                 )}
               </div>

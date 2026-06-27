@@ -423,13 +423,13 @@ function OutcomeEditor({
                   <input
                     value={g.outcome_statement}
                     onChange={(e) => setGoal(i, { outcome_statement: e.target.value })}
-                    placeholder="Outcome statement — e.g. 'To have a healthy lifestyle'"
+                    placeholder="Outcome statement, e.g. 'To have a healthy lifestyle'"
                     className={inputCls}
                   />
                   <input
                     value={g.goal_statement}
                     onChange={(e) => setGoal(i, { goal_statement: e.target.value })}
-                    placeholder="Goal statement — e.g. 'Will exercise 3 times weekly'"
+                    placeholder="Goal statement, e.g. 'Will exercise 3 times weekly'"
                     className={inputCls}
                   />
                   <div className="grid grid-cols-2 gap-1.5">

@@ -5,7 +5,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { listGuidelines } from "@/integrations/icm";
 
 export const Route = createFileRoute("/guidelines/")({
-  head: () => ({ meta: [{ title: "State Guidelines — LifePlan" }] }),
+  head: () => ({ meta: [{ title: "State Guidelines · LifePlan" }] }),
   component: GuidelinesIndex,
 });
 

@@ -1,5 +1,5 @@
 // Section 2 — Implementation signatures, approvals, and consent.
-// The provider's signature duty (distinct from the care manager's): staff
+// The provider's signature duty (distinct from the case manager's): staff
 // sign-offs, individual/guardian acknowledgment, clinical/supervisory approval,
 // and restrictive-intervention consent — required before the Implement gate.
 // Required signer roles are driven by agent config + the guidelines brief
@@ -109,7 +109,7 @@ export function SignaturesPanel({
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] font-semibold text-ink">{s.name} <span className="text-ink3 font-normal">· {s.role}</span></div>
                   <div className="text-[11.5px] text-ink3">
-                    {s.status === "signed" ? `Signed ${s.date}` : s.status === "unable" ? `Could not obtain${s.note ? ` — ${s.note}` : ""}` : `Declined${s.note ? ` — ${s.note}` : ""}`}
+                    {s.status === "signed" ? `Signed ${s.date}` : s.status === "unable" ? `Could not obtain${s.note ? `: ${s.note}` : ""}` : `Declined${s.note ? `: ${s.note}` : ""}`}
                   </div>
                 </div>
                 {!locked && (

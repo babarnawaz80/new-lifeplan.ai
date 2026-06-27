@@ -175,7 +175,7 @@ export function SecondaryTabs({
               <p className="text-[11px] text-ink3">
                 Placeholders in double braces (e.g. <code className="text-ink2">{"{{individual_first_name}}"}</code>,{" "}
                 <code className="text-ink2">{"{{plan_content}}"}</code>) are filled at generation time. Narration uses the
-                individual's first name only — never full name or date of birth.
+                individual's first name only, never full name or date of birth.
               </p>
             </div>
           </div>

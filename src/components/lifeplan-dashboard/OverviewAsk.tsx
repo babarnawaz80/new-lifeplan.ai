@@ -54,7 +54,7 @@ export function OverviewAsk({
           : "";
       const answer =
         count === 0
-          ? `No plans are ${meta.label.toLowerCase()} right now${f.program ? ` in ${f.program}` : ""} — all clear.`
+          ? `No plans are ${meta.label.toLowerCase()} right now${f.program ? ` in ${f.program}` : ""}. All clear.`
           : `${count} ${count === 1 ? "plan is" : "plans are"} ${meta.label.toLowerCase()}${where}.`;
       onResult(f.category, answer);
     } catch {
@@ -76,7 +76,7 @@ export function OverviewAsk({
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") run(q); }}
-                  placeholder="Ask about the portfolio — e.g. which plans are missing a source document?"
+                  placeholder="Ask about the portfolio, e.g. which plans are missing a source document?"
                   style={{ flex: 1, minWidth: 0, width: "100%", border: "none", outline: "none", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--fg1)", background: "transparent" }}
                 />
               </div>

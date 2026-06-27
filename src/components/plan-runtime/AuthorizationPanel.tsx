@@ -75,9 +75,9 @@ export function AuthorizationPanel({
                 <div className="flex items-center gap-1.5 mt-1.5 text-[11.5px] font-semibold" style={{ color: over || expired ? "#b91c1c" : "#b9760a" }}>
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {over
-                    ? `Over authorization by ${delivered - auth.authorized_units} ${auth.unit_type}s — billing blocked.`
+                    ? `Over authorization by ${delivered - auth.authorized_units} ${auth.unit_type}s. Billing blocked.`
                     : expired
-                      ? "Authorization period expired — billing blocked."
+                      ? "Authorization period expired. Billing blocked."
                       : expiring
                         ? `Authorization expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`
                         : `${remaining} ${auth.unit_type}s remaining (${pct}% used).`}

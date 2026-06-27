@@ -99,10 +99,10 @@ export const generateTraining = createServerFn({ method: "POST" })
         explanation: "Connect AI to generate the real certification quiz.",
       });
       return {
-        title: `${data.planTypeLabel} — Staff Training for ${firstName}`,
+        title: `${data.planTypeLabel}: Staff Training for ${firstName}`,
         subtitle: data.planDate ? `Effective ${data.planDate}` : "",
         slides: [
-          slide(`Welcome — supporting ${firstName}`, [`${data.planTypeLabel}`, data.planDate ? `Effective ${data.planDate}` : "Implemented plan", "For everyone who supports " + firstName], `Hi team, I'm Alex. Today we'll walk through ${firstName}'s plan.`, `And I'm Jamie. By the end you'll know exactly how to support ${firstName} day to day.`),
+          slide(`Welcome, supporting ${firstName}`, [`${data.planTypeLabel}`, data.planDate ? `Effective ${data.planDate}` : "Implemented plan", "For everyone who supports " + firstName], `Hi team, I'm Alex. Today we'll walk through ${firstName}'s plan.`, `And I'm Jamie. By the end you'll know exactly how to support ${firstName} day to day.`),
           slide("What this plan covers", ["Goals and outcomes", "How to support each goal", "What to document"], "This is a design-only preview.", "Connect AI to generate the full narrated training."),
           slide("Your role", ["Follow the strategies", "Use the listed prompts", "Document every shift"], "Each goal has concrete steps.", "We'll keep it practical and specific."),
           slide("Health and safety", ["Know the protocols", "Report concerns", "Stay person-centered"], "Safety first, always.", "When in doubt, ask and document."),

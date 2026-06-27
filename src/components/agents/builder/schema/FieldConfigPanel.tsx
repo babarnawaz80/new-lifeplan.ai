@@ -196,7 +196,7 @@ export function FieldConfigPanel({
             }
             className="w-full h-9 px-2 rounded-[8px] border border-line bg-card text-[13px] text-ink focus:outline-none focus:border-navy"
           >
-            <option value="">— Choose option set —</option>
+            <option value="">Choose option set</option>
             {optionSets.map((os) => (
               <option key={os.id} value={os.id}>
                 {os.name}

@@ -607,7 +607,7 @@ export function getUnitsDelivered(individualId: string, serviceRef: string, _per
   return Math.round((auth.authorized_units * pct) / 100);
 }
 
-// Source plan status (Section 7) — the care-manager-authored source plan
+// Source plan status (Section 7) — the case-manager-authored source plan
 // (Life Plan / ISP) lives upstream in iCM. The provider plan references a
 // specific version + carries its own review/annual clock and assessment date.
 // This read surfaces the CURRENT upstream version + the source review/annual
