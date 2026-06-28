@@ -45,6 +45,7 @@ import { generateTraining } from "@/lib/generate-training.functions";
 import { detectPlanDrift } from "@/lib/autonomy";
 import {
   planTypeInfo,
+  planTrainingSpine,
   resolveTrainingTemplate,
   resolveTrainingConfig,
   resolveRetrainingTemplate,
@@ -191,6 +192,9 @@ function IndividualTrainingsPage() {
         // not the cycle label — so each plan's training is titled for what it is.
         planTypeLabel: planTypeInfo(agent?.plan_type ?? "").label,
         planDate: planDate || "",
+        agentName: agent?.name ?? "",
+        agentPurpose: agent?.instructions ?? agent?.description ?? "",
+        planSpine: planTrainingSpine(agent?.plan_type ?? ""),
         trainingTemplate: resolveTrainingTemplate(agent ?? {}),
         quizQuestionCount: cfg.quiz_question_count,
         videoLengthTarget: cfg.video_length_target,
@@ -280,6 +284,9 @@ function IndividualTrainingsPage() {
           individualFirstName: individual.name.split(/\s+/)[0] ?? individual.name,
           planTypeLabel: planTypeInfo(ag?.plan_type ?? "").label,
           planDate: planDate || "",
+          agentName: ag?.name ?? "",
+          agentPurpose: ag?.instructions ?? ag?.description ?? "",
+          planSpine: planTrainingSpine(ag?.plan_type ?? ""),
           trainingTemplate: resolveRetrainingTemplate(ag ?? {}),
           quizQuestionCount: rcfg.quiz_question_count,
           videoLengthTarget: rcfg.video_length_target,
@@ -435,7 +442,12 @@ function IndividualTrainingsPage() {
               {/* Video */}
               <div className="space-y-3">
                 <h2 className="text-[20px] font-extrabold text-ink tracking-tight">{content.title}</h2>
-                <TrainingPlayer training={content} onFinish={() => setWatched(true)} />
+                <TrainingPlayer
+                  training={content}
+                  planType={sourcePlan ? getAgent(sourcePlan.agent_id)?.plan_type : undefined}
+                  planLabel={planTypeName}
+                  onFinish={() => setWatched(true)}
+                />
                 {sourcePlan && (
                   <div className="flex items-center gap-2 text-[12.5px] text-ink3">
                     <FileText className="h-3.5 w-3.5" />

@@ -419,9 +419,14 @@ export type Training = {
 // are filled at generation time. An agent works great with zero edits.
 export const DEFAULT_TRAINING_TEMPLATE = `You are scripting a staff training video for direct support professionals and other team members who will carry out a support plan for a specific person. The goal is that anyone who watches comes away knowing exactly what this plan asks them to do, why it matters for this person, and how to document it. Warm, clear, practical. Never clinical jargon without plain-language explanation.
 
+THIS PLAN AND THE AGENT BEHIND IT
+- Agent: {{agent_name}}
+- Plan type: {{plan_type_label}}
+- What this agent and plan are for (use this to set the focus and priorities of the video):
+{{agent_purpose}}
+
 PERSON AND PLAN
 - First name: {{individual_first_name}}
-- Plan type: {{plan_type_label}}
 - Plan content to teach from (authoritative, do not invent beyond it):
 {{plan_content}}
 
@@ -431,14 +436,13 @@ FORMAT
 - Use {{individual_first_name}} throughout. First name only. Never state date of birth or full name.
 - Plain language. When a clinical or regulatory term appears, say it, then immediately explain it in everyday words.
 
-WHAT THE VIDEO MUST COVER, IN THIS ORDER
-1. Warm intro: who this training is for, and that it is about supporting {{individual_first_name}} specifically. Set a respectful, person-first tone.
-2. The big picture: what this plan is trying to achieve for {{individual_first_name}}, in one or two sentences a new staff member would remember.
-3. The outcomes and goals: walk through each outcome and its goals in plain language. For each, say what success looks like for {{individual_first_name}}.
-4. The strategies and activities staff actually do: for each key strategy, describe the concrete action staff take, any prompts to use, and the protocol or safety steps they must not skip. This is the heart of the video. Be specific and practical.
-5. Health, safety, and protocol must-knows: call out anything where getting it wrong could harm or distress {{individual_first_name}}. Make these memorable.
-6. How to document it: explain what staff record in CareTracker for these services, including any readings to capture, so the documentation actually reflects the support given.
-7. Short recap: the three or four things every staff member must remember about supporting {{individual_first_name}}.
+WHAT THE VIDEO MUST COVER
+- Open with a warm, person-first intro: who this training is for, and that it is about supporting {{individual_first_name}} specifically with their {{plan_type_label}}.
+- Then teach the plan following the structure below. This structure is specific to this kind of plan, so the video should genuinely reflect what a {{plan_type_label}} requires, not a generic walkthrough. Draw every detail from the plan content above; where a section has no matching content, cover it briefly and honestly rather than inventing.
+
+{{plan_spine}}
+
+- Close with a short recap: the three or four things every staff member must remember about supporting {{individual_first_name}}.
 
 TONE AND VALUES
 - Person-centered and strengths-based. {{individual_first_name}} is a person, not a case. Lead with respect and dignity.
@@ -481,6 +485,7 @@ WHY THIS RETRAINING
 - Focus areas to re-teach: {{focus_areas}}
 
 PERSON AND PLAN
+- Agent: {{agent_name}}
 - First name: {{individual_first_name}}
 - Plan type: {{plan_type_label}}
 - Plan content for reference (authoritative, do not invent beyond it):
@@ -998,6 +1003,102 @@ export function planTypeInfo(planType: string): {
       : (words[0] ?? "").slice(0, 4)
     ).toUpperCase() || "PLAN";
   return { label, short, strategy_label: "Activity" };
+}
+
+// ---- Per-plan-type training "spine" --------------------------------------
+// The single DEFAULT_TRAINING_TEMPLATE stays generic, but the SHAPE of each
+// video comes from the plan type's spine: the domain-specific sections a staff
+// video for THIS kind of plan must cover, in order. This is what makes a
+// Nursing Care training look and flow differently from a Behavior Support
+// training instead of every video using one identical skeleton. Injected at
+// generation as {{plan_spine}}. Sections are written about "the person"
+// generically; the individual's first name is filled in elsewhere.
+const PLAN_TRAINING_SPINE: Record<string, string[]> = {
+  person_centered: [
+    "Who this person is: their strengths, preferences, and what a good day looks like for them.",
+    "The outcomes this person is working toward, and why each one matters to them personally.",
+    "For each goal, what staff actually do day to day: the choices to offer, the prompts to use, the routines to honor.",
+    "Honoring choice, dignity, and this person's own voice in every interaction.",
+    "The natural supports and important people in this person's life, and how staff fit alongside them.",
+    "What to document so progress toward this person's outcomes is visible and accurate.",
+  ],
+  behavior_support: [
+    "The behaviors this plan addresses, in plain terms, and what those behaviors may be communicating.",
+    "Triggers and antecedents: what tends to happen right before, and the proactive steps that prevent escalation.",
+    "The replacement skills and coping strategies staff teach, model, and prompt.",
+    "Step by step, how staff respond when behavior escalates, including what NOT to do.",
+    "De-escalation and any crisis or safety protocol, and exactly when to call for help.",
+    "Recording the behavior data staff must capture (what came before, the behavior, what followed) and where it goes.",
+  ],
+  nursing_care: [
+    "This person's health conditions in plain language, and why this nursing plan exists.",
+    "The clinical tasks and routines staff carry out, and precisely how to perform each one.",
+    "The vitals, parameters, and readings staff take, with the normal range versus the values to report.",
+    "Warning signs and symptoms to watch for, and when to call the nurse or emergency services.",
+    "Safety, infection control, and the correct use of any equipment involved.",
+    "Documenting readings, observations, and any change in condition accurately and on time.",
+  ],
+  medication: [
+    "The medications being monitored, what each is for, in plain terms.",
+    "The administration schedule and the correct way to give or observe each dose.",
+    "Side effects and reactions to watch for, and what to do if they appear.",
+    "The refusal, missed-dose, and medication-error protocol, step by step.",
+    "Storage, counts, and any special handling rules for the medications.",
+    "Documenting each administration and reporting concerns promptly.",
+  ],
+  high_risk: [
+    "The specific risks this plan manages for this person, stated plainly.",
+    "Prevention: the daily practices and conditions that keep this person safe.",
+    "The early warning signs that risk is rising and needs a response.",
+    "Step by step emergency response, including who to contact and in what order.",
+    "Any restrictions or heightened supervision, why they exist, and how to apply them respectfully.",
+    "Documenting incidents, near-misses, and the circumstances around them.",
+  ],
+  staff_action_plan: [
+    "The purpose of this plan and the situation it is meant to address.",
+    "The specific actions each staff member is responsible for carrying out.",
+    "How and when to perform each action, step by step.",
+    "Coordination across the team: who does what, and hand-offs between shifts.",
+    "Safety and escalation steps if the situation changes.",
+    "What to document so the actions taken and their outcomes are on record.",
+  ],
+};
+
+// Generic spine for agents whose plan type has no tailored spine yet. Still
+// organized around the plan's own goals, so it adapts to the content.
+const DEFAULT_TRAINING_SPINE: string[] = [
+  "The big picture: what this plan is trying to achieve for the person, in one or two memorable sentences.",
+  "Each goal or outcome in the plan, in plain language, and what success looks like for the person.",
+  "For each goal, the concrete actions staff take, including any prompts and the order of steps.",
+  "The health, safety, and protocol must-knows where getting it wrong could harm or distress the person.",
+  "How to support the person's choices and dignity throughout.",
+  "What staff document so the support actually given is reflected in the record.",
+];
+
+// Returns the ordered, domain-specific sections for a plan type as a numbered
+// block ready to drop into {{plan_spine}}.
+export function planTrainingSpine(planType: string): string {
+  const sections = PLAN_TRAINING_SPINE[planType] ?? DEFAULT_TRAINING_SPINE;
+  return sections.map((s, i) => `${i + 1}. ${s}`).join("\n");
+}
+
+// ---- Per-plan-type video theme (thumbnail / title-slide colors) -----------
+// The training stage and thumbnail are tinted by plan type so a Behavior
+// Support video does not look identical to a Nursing Care video. Mirrors the
+// plan card accents; darkened into a video-stage gradient.
+export type PlanTypeTheme = { from: string; mid: string; to: string };
+const PLAN_TYPE_THEME: Record<string, PlanTypeTheme> = {
+  person_centered:  { from: "#1e1b4b", mid: "#4338ca", to: "#6366f1" },
+  behavior_support: { from: "#2e1065", mid: "#6d28d9", to: "#a855f7" },
+  nursing_care:     { from: "#053330", mid: "#047857", to: "#10b981" },
+  medication:       { from: "#0c2a4d", mid: "#0369a1", to: "#0ea5e9" },
+  high_risk:        { from: "#450a0a", mid: "#b91c1c", to: "#ef4444" },
+  staff_action_plan:{ from: "#0f172a", mid: "#334155", to: "#64748b" },
+};
+const DEFAULT_THEME: PlanTypeTheme = { from: "#1a1140", mid: "#4c1d95", to: "#9d2c6e" };
+
+export function planTypeTheme(planType: string): PlanTypeTheme {
+  return PLAN_TYPE_THEME[planType] ?? DEFAULT_THEME;
 }
 
 // ---------- Org agents (cloned from templates so the hexagon is populated) ----------

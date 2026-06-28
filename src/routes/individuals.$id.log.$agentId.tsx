@@ -21,7 +21,7 @@ import {
   createPlan,
   deletePlan,
 } from "@/integrations/icm";
-import { planTypeInfo, type Plan } from "@/data/mock";
+import { planTypeInfo, planTypeTheme, type Plan } from "@/data/mock";
 
 export const Route = createFileRoute("/individuals/$id/log/$agentId")({
   head: () => ({ meta: [{ title: "Plan log · LifePlan" }] }),
@@ -206,6 +206,7 @@ function PlanLogPage() {
                 key={p.id}
                 plan={p}
                 planTypeLabel={planTypeLabel}
+                planType={agent.plan_type}
                 firstName={firstName}
                 hasTraining={!!getTrainingForPlan(p.id)?.content}
                 trainings={listTrainingsForPlan(p.id)}
@@ -334,8 +335,10 @@ function fmt(iso?: string) {
 
 // Mini training-video thumbnail with play affordance. "Watch training" links to
 // the full Staff Training page when a training has been generated for the plan.
-function TrainingThumb({ firstName, published, id, planId }: { firstName: string; published: boolean; id: string; planId: string }) {
+function TrainingThumb({ firstName, published, id, planId, planType, planLabel }: { firstName: string; published: boolean; id: string; planId: string; planType: string; planLabel: string }) {
   const navigate = useNavigate();
+  const theme = planTypeTheme(planType);
+  const thumbGradient = `linear-gradient(135deg, ${theme.from}, ${theme.mid} 55%, ${theme.to})`;
   return (
     <div
       className="w-[188px] shrink-0 group/thumb"
@@ -353,11 +356,11 @@ function TrainingThumb({ firstName, published, id, planId }: { firstName: string
     >
       <div
         className="relative w-[188px] h-[106px] rounded-xl overflow-hidden transition-transform group-hover/thumb:scale-[1.015]"
-        style={{ background: "var(--ai-gradient)", boxShadow: "0 6px 16px color-mix(in oklab, #7C3AED 22%, transparent)" }}
+        style={{ background: thumbGradient, boxShadow: `0 6px 16px color-mix(in oklab, ${theme.mid} 28%, transparent)` }}
       >
         <div className="absolute inset-0 p-3">
           <div className="text-white font-extrabold text-[15px] leading-tight tracking-tight">
-            Welcome!<br />Supporting {firstName}
+            Supporting {firstName}<br />{planLabel}
           </div>
           <div className="absolute left-3 bottom-3 flex gap-1">
             {[0, 1, 2].map((i) => (
@@ -391,6 +394,7 @@ function TrainingThumb({ firstName, published, id, planId }: { firstName: string
 function PlanLogRow({
   plan,
   planTypeLabel,
+  planType,
   firstName,
   hasTraining,
   trainings,
@@ -400,6 +404,7 @@ function PlanLogRow({
 }: {
   plan: Plan;
   planTypeLabel: string;
+  planType: string;
   firstName: string;
   hasTraining: boolean;
   trainings: import("@/data/mock").Training[];
@@ -422,7 +427,7 @@ function PlanLogRow({
     >
       <span className="absolute left-0 top-0 bottom-0 w-[5px]" style={{ background: accent }} />
 
-      <TrainingThumb firstName={firstName} published={hasTraining} id={id} planId={plan.id} />
+      <TrainingThumb firstName={firstName} published={hasTraining} id={id} planId={plan.id} planType={planType} planLabel={planTypeLabel} />
 
       <div className="flex-1 min-w-0">
         <span

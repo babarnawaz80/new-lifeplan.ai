@@ -20,6 +20,13 @@ const InputSchema = z.object({
   individualFirstName: z.string().default(""),
   planTypeLabel: z.string(),
   planDate: z.string().default(""),
+  // Agent identity + the plan-type-specific section spine. These make every
+  // plan type produce a structurally distinct video (a Behavior Support video
+  // is shaped differently from a Nursing Care video) and let the script reflect
+  // what THIS agent is for, rather than one generic skeleton for all plans.
+  agentName: z.string().default(""),
+  agentPurpose: z.string().default(""),
+  planSpine: z.string().default(""),
   // The agent's editable recipe + config (resolved by the caller).
   trainingTemplate: z.string().default(""),
   quizQuestionCount: z.number().min(4).max(20).default(12),
@@ -77,6 +84,9 @@ function fillTemplate(
     planTypeLabel: string;
     planContent: string;
     lengthTarget: string;
+    agentName?: string;
+    agentPurpose?: string;
+    planSpine?: string;
     // Retraining placeholders (empty for first-time training).
     retrainingReason?: string;
     driftSummary?: string;
@@ -84,6 +94,11 @@ function fillTemplate(
   },
 ): string {
   return (template && template.trim() ? template : FALLBACK_RECIPE)
+    // Fill the spine first so any placeholders inside it are still resolved by
+    // the passes below.
+    .replaceAll("{{plan_spine}}", vars.planSpine || "")
+    .replaceAll("{{agent_name}}", vars.agentName || vars.planTypeLabel)
+    .replaceAll("{{agent_purpose}}", vars.agentPurpose || "(no extra description provided; teach directly from the plan content)")
     .replaceAll("{{individual_first_name}}", vars.firstName)
     .replaceAll("{{plan_type_label}}", vars.planTypeLabel)
     .replaceAll("{{plan_content}}", vars.planContent)
@@ -116,19 +131,41 @@ export const generateTraining = createServerFn({ method: "POST" })
         correct_index: 0,
         explanation: "Connect AI to generate the real certification quiz.",
       });
+      // Build the demo slides from the plan-type spine so the preview is shaped
+      // by the kind of plan (Behavior Support looks different from Nursing Care),
+      // not one identical skeleton for every plan.
+      const spineLines = data.planSpine
+        .split("\n")
+        .map((l) => l.replace(/^\s*\d+\.\s*/, "").trim())
+        .filter(Boolean);
+      const headingFor = (line: string) => {
+        const firstClause = line.split(/[:.]/)[0].trim();
+        const words = firstClause.split(/\s+/);
+        return words.length <= 7 ? firstClause : words.slice(0, 7).join(" ");
+      };
+      const bulletsFor = (line: string) =>
+        line.split(/[;,]/).map((p) => p.trim()).filter(Boolean).slice(0, 3);
       const intro = data.isRetraining
-        ? slide(`Retraining: supporting ${firstName}`, [data.retrainingReason || "What slipped", data.focusAreas ? `Focus: ${data.focusAreas}` : "Focus areas", "A short refresher, not the whole plan"], `Hi team, I'm Alex. This is a quick retraining on ${firstName}'s plan because something slipped: ${data.driftSummary || data.retrainingReason || "the plan was not followed as written"}.`, `And I'm Jamie. We'll keep it short and focus on exactly what to do differently from here.`)
-        : slide(`Welcome, supporting ${firstName}`, [`${data.planTypeLabel}`, data.planDate ? `Effective ${data.planDate}` : "Implemented plan", "For everyone who supports " + firstName], `Hi team, I'm Alex. Today we'll walk through ${firstName}'s plan.`, `And I'm Jamie. By the end you'll know exactly how to support ${firstName} day to day.`);
+        ? slide(`Retraining: supporting ${firstName}`, [data.retrainingReason || "What slipped", data.focusAreas ? `Focus: ${data.focusAreas}` : "Focus areas", "A short refresher, not the whole plan"], `Hi team, I'm Alex. This is a quick retraining on ${firstName}'s ${data.planTypeLabel} because something slipped: ${data.driftSummary || data.retrainingReason || "the plan was not followed as written"}.`, `And I'm Jamie. We'll keep it short and focus on exactly what to do differently from here.`)
+        : slide(`Welcome, supporting ${firstName}`, [`${data.planTypeLabel}`, data.planDate ? `Effective ${data.planDate}` : "Implemented plan", "For everyone who supports " + firstName], `Hi team, I'm Alex. Today we'll walk through ${firstName}'s ${data.planTypeLabel}.`, `And I'm Jamie. By the end you'll know exactly how to support ${firstName} day to day.`);
+      const bodySlides = (spineLines.length
+        ? spineLines
+        : ["What this plan covers", "Your role and the strategies to follow", "Health, safety, and protocol must-knows", "What to document in CareTracker"]
+      ).map((line) =>
+        slide(
+          headingFor(line),
+          bulletsFor(line).length ? bulletsFor(line) : [line],
+          `For ${firstName}'s ${data.planTypeLabel}: ${line}`,
+          `This is a design-only preview. Connect AI to generate the full narrated section.`,
+        ),
+      );
       return {
         title: data.isRetraining ? `${data.planTypeLabel}: Retraining for ${firstName}` : `${data.planTypeLabel}: Staff Training for ${firstName}`,
         subtitle: data.planDate ? `Effective ${data.planDate}` : "",
         slides: [
           intro,
-          slide("What this plan covers", ["Goals and outcomes", "How to support each goal", "What to document"], "This is a design-only preview.", "Connect AI to generate the full narrated training."),
-          slide("Your role", ["Follow the strategies", "Use the listed prompts", "Document every shift"], "Each goal has concrete steps.", "We'll keep it practical and specific."),
-          slide("Health and safety", ["Know the protocols", "Report concerns", "Stay person-centered"], "Safety first, always.", "When in doubt, ask and document."),
-          slide("Documentation", ["Log in CareTracker", "Capture the readings", "Note refusals"], "Good documentation protects everyone.", "It's how progress gets seen."),
-          slide("Wrap up", ["Pass the quiz to certify", "Ask questions anytime", "Thank you"], "That's the overview.", `Now take the quiz to certify on ${firstName}'s plan.`),
+          ...bodySlides,
+          slide("Wrap up", ["Pass the quiz to certify", "Ask questions anytime", "Thank you"], `That's the overview of ${firstName}'s ${data.planTypeLabel}.`, `Now take the quiz to certify on ${firstName}'s plan.`),
         ],
         quiz: Array.from({ length: Math.max(8, Math.min(20, quizCount)) }, (_, i) => stubQuestion(i)),
       };
@@ -139,6 +176,9 @@ export const generateTraining = createServerFn({ method: "POST" })
       planTypeLabel: data.planTypeLabel,
       planContent: data.planContent.slice(0, 16000),
       lengthTarget: data.videoLengthTarget,
+      agentName: data.agentName,
+      agentPurpose: data.agentPurpose,
+      planSpine: data.planSpine,
       retrainingReason: data.retrainingReason,
       driftSummary: data.driftSummary,
       focusAreas: data.focusAreas,
@@ -155,6 +195,13 @@ export const generateTraining = createServerFn({ method: "POST" })
           system: [
             // The agent's recipe is the authoritative brief for WHAT to say and HOW.
             recipe,
+            ``,
+            // Plan-type spine: anchors the video's shape to THIS kind of plan so a
+            // Behavior Support video is organized differently from a Nursing Care
+            // one, instead of every plan producing the same generic skeleton.
+            data.planSpine
+              ? `=== HOW TO STRUCTURE THIS ${data.planTypeLabel.toUpperCase()} (follow this order; it is specific to this kind of plan) ===\nAfter a warm person-first intro, build the body of the video around these sections, in order, drawing every detail from the plan content. This shape is what makes this video specific to a ${data.planTypeLabel}; do not flatten it into a generic walkthrough:\n${data.planSpine}\n${data.agentPurpose ? `This agent's purpose, to keep the focus right: ${data.agentPurpose}\n` : ""}`
+              : "",
             ``,
             `=== STRUCTURAL OUTPUT REQUIREMENTS (in addition to the brief above) ===`,
             `Render the brief above as an on-screen training "video": a deck of 8 to 12 slides. This is a ${data.videoLengthTarget} video, so each slide carries roughly 30-45 seconds of narration across 2-4 lines. For each slide give:`,

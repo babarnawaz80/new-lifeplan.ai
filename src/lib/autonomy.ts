@@ -33,6 +33,7 @@ import {
 import { prePlanningPhases } from "@/lib/plan-runtime";
 import {
   planTypeInfo,
+  planTrainingSpine,
   resolveTrainingTemplate,
   resolveTrainingConfig,
   resolveRetrainingTemplate,
@@ -185,6 +186,9 @@ export async function processAutoTrainingQueue(
           individualFirstName: firstName,
           planTypeLabel: typeLabel,
           planDate,
+          agentName: agent?.name ?? "",
+          agentPurpose: agent?.instructions ?? agent?.description ?? "",
+          planSpine: planTrainingSpine(agent?.plan_type ?? ""),
           trainingTemplate: recipe,
           quizQuestionCount: cfg.quiz_question_count,
           videoLengthTarget: cfg.video_length_target,

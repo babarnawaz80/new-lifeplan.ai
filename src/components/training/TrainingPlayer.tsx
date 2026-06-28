@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, Loader2 } from "lucide-react";
 import type { TrainingContent } from "@/data/mock";
+import { planTypeTheme } from "@/data/mock";
 import { synthesizeTrainingAudio } from "@/lib/generate-training-audio.functions";
 
 type Line = { speaker: "Alex" | "Jamie"; text: string };
@@ -28,12 +29,21 @@ function useVoices() {
 
 export function TrainingPlayer({
   training,
+  planType,
+  planLabel,
   onFinish,
 }: {
   training: TrainingContent;
+  // Plan type key + label, so the stage/thumbnail is tinted and labeled for the
+  // specific plan (a Behavior Support video does not look identical to Nursing
+  // Care). Optional: falls back to the default purple theme when not provided.
+  planType?: string;
+  planLabel?: string;
   onFinish?: () => void;
 }) {
   const slides = training.slides;
+  const theme = planTypeTheme(planType ?? "");
+  const stageGradient = `linear-gradient(135deg, ${theme.from}, ${theme.mid} 55%, ${theme.to})`;
   const voices = useVoices();
   const ttsFn = useServerFn(synthesizeTrainingAudio);
 
@@ -209,10 +219,17 @@ export function TrainingPlayer({
     <div className="rounded-2xl border border-line overflow-hidden shadow-soft bg-card">
       <audio ref={audioElRef} className="hidden" />
       {/* Stage */}
-      <div className="relative aspect-video flex flex-col" style={{ background: "linear-gradient(135deg, #1a1140, #4c1d95 55%, #9d2c6e)" }}>
+      <div className="relative aspect-video flex flex-col" style={{ background: stageGradient }}>
         <div className="absolute inset-0 opacity-25" style={{ backgroundImage: "radial-gradient(circle at 22% 28%, rgba(255,255,255,0.22), transparent 42%), radial-gradient(circle at 82% 80%, rgba(255,255,255,0.12), transparent 45%)" }} />
-        <div className="absolute left-4 top-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur text-white text-[10px] font-bold uppercase tracking-wider">
-          AI-generated · Alex & Jamie
+        <div className="absolute left-4 top-4 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur text-white text-[10px] font-bold uppercase tracking-wider">
+            AI-generated · Alex & Jamie
+          </span>
+          {planLabel && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-white/90 text-[10px] font-bold uppercase tracking-wider" style={{ color: theme.from }}>
+              {planLabel}
+            </span>
+          )}
         </div>
         <div className="absolute right-4 top-4 text-white/80 text-[11px] font-semibold">
           {slide + 1} / {slides.length}

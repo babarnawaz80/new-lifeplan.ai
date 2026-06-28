@@ -59,6 +59,7 @@ import {
 } from "@/types/icmGoalOutcome";
 import {
   planTypeInfo,
+  planTrainingSpine,
   resolveTrainingTemplate,
   resolveTrainingConfig,
   type Plan,
@@ -458,6 +459,9 @@ function PlanRuntime() {
             individualFirstName: individual.name.split(/\s+/)[0] ?? individual.name,
             planTypeLabel: planTypeInfo(agent.plan_type).label,
             planDate,
+            agentName: agent.name,
+            agentPurpose: agent.instructions ?? agent.description ?? "",
+            planSpine: planTrainingSpine(agent.plan_type),
             trainingTemplate: resolveTrainingTemplate(agent),
             quizQuestionCount: cfg.quiz_question_count,
             videoLengthTarget: cfg.video_length_target,
