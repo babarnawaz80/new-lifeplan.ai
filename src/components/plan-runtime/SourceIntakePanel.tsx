@@ -13,11 +13,31 @@ import type { SourceIntake } from "@/data/mock";
 const inputCls = "w-full h-9 px-2.5 rounded-[8px] border border-line bg-card text-[13px] text-ink focus:outline-none focus:border-navy";
 const labelCls = "block text-[11px] font-bold uppercase tracking-wider text-ink3 mb-1";
 
+// A configurable verify item (from verify_source blocks). `key` maps to a
+// SourceIntake boolean; capture_date adds the optional date beside it.
+export type VerifyItem = { key: string; label: string; capture_date?: boolean };
+// Default verify checklist (PCP), used when no config-driven items are passed.
+const DEFAULT_VERIFY_ITEMS: VerifyItem[] = [
+  { key: "functional_assessment_present", label: "Functional assessment present", capture_date: true },
+  { key: "setting_choice_addressed", label: "Setting choice addressed in the plan" },
+  { key: "alternative_settings_addressed", label: "Alternative settings addressed" },
+  { key: "consent_present", label: "Individual's consent to the overarching plan present" },
+];
+// Short forms for the "missing from the plan" summary, so the existing copy is
+// preserved; unknown keys fall back to their label.
+const MISSING_LABEL: Record<string, string> = {
+  functional_assessment_present: "functional assessment",
+  setting_choice_addressed: "setting choice",
+  alternative_settings_addressed: "alternative settings",
+  consent_present: "consent to the plan",
+};
+
 export function SourceIntakePanel({
   planId,
   locked,
   defaultSourceType,
   basis = "none",
+  items,
 }: {
   planId: string;
   locked?: boolean;
@@ -30,7 +50,11 @@ export function SourceIntakePanel({
   // verify items and auto-filled fields stay inert (you cannot verify a
   // document that was never received).
   basis?: "document" | "previous_plan" | "none";
+  // Config-driven verify checklist (from verify_source blocks). Defaults to the
+  // seeded PCP items when not provided.
+  items?: VerifyItem[];
 }) {
+  const verifyItems = items && items.length > 0 ? items : DEFAULT_VERIFY_ITEMS;
   // Once the provider saves, the intake is "confirmed" (detected_by_ai set to
   // false). Use that as the completed signal so the panel reads as done and
   // collapses, and stays that way across reloads. Implemented plans are locked
@@ -80,11 +104,10 @@ export function SourceIntakePanel({
   };
 
   // Verify-and-reference items missing from the received source plan.
-  const missing: string[] = [];
-  if (!intake.functional_assessment_present) missing.push("functional assessment");
-  if (!intake.setting_choice_addressed) missing.push("setting choice");
-  if (!intake.alternative_settings_addressed) missing.push("alternative settings");
-  if (!intake.consent_present) missing.push("consent to the plan");
+  const intakeVal = (key: string) => (intake as Record<string, unknown>)[key];
+  const missing: string[] = verifyItems
+    .filter((it) => !intakeVal(it.key))
+    .map((it) => MISSING_LABEL[it.key] ?? it.label.toLowerCase());
 
   const Check = ({ k, label, children }: { k: keyof SourceIntake; label: string; children?: React.ReactNode }) => (
     <label className="flex items-start gap-2 text-[12.5px] text-ink2">
@@ -166,14 +189,22 @@ export function SourceIntakePanel({
 
           <div className={`rounded-xl bg-muted/40 border border-line p-3 space-y-2 ${inert ? "opacity-60" : ""}`}>
             <div className="text-[11px] font-bold uppercase tracking-wider text-ink3">{verifyHeading}</div>
-            <Check k="functional_assessment_present" label="Functional assessment present">
-              {intake.functional_assessment_present && (
-                <input type="date" className="ml-2 h-7 px-2 rounded-md border border-line bg-card text-[12px]" disabled={locked || inert} value={(intake.functional_assessment_date ?? "").slice(0, 10)} onChange={(e) => set("functional_assessment_date", e.target.value)} />
-              )}
-            </Check>
-            <Check k="setting_choice_addressed" label="Setting choice addressed in the plan" />
-            <Check k="alternative_settings_addressed" label="Alternative settings addressed" />
-            <Check k="consent_present" label="Individual's consent to the overarching plan present" />
+            {verifyItems.map((it) => {
+              const dateKey = it.key.replace(/_present$/, "_date");
+              return (
+                <Check key={it.key} k={it.key as keyof SourceIntake} label={it.label}>
+                  {it.capture_date && !!intakeVal(it.key) && (
+                    <input
+                      type="date"
+                      className="ml-2 h-7 px-2 rounded-md border border-line bg-card text-[12px]"
+                      disabled={locked || inert}
+                      value={String(intakeVal(dateKey) ?? "").slice(0, 10)}
+                      onChange={(e) => set(dateKey as keyof SourceIntake, e.target.value as never)}
+                    />
+                  )}
+                </Check>
+              );
+            })}
           </div>
 
           {!inert && missing.length > 0 && (

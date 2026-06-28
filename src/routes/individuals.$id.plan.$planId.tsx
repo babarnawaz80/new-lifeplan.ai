@@ -50,7 +50,7 @@ import { suggestTaskOutcome } from "@/lib/suggest-outcome.functions";
 import { analyzeSourceDocument } from "@/lib/analyze-source.functions";
 import { draftProviderElements } from "@/lib/draft-provider-elements.functions";
 import type { WorkflowTask } from "@/data/lifeplan-types";
-import { allCompulsoryComplete, prePlanningCompulsoryComplete, requiredSignerRoles, signaturesSatisfied } from "@/lib/plan-runtime";
+import { allCompulsoryComplete, prePlanningCompulsoryComplete, signaturesSatisfied } from "@/lib/plan-runtime";
 import {
   parseIcmPlanTree,
   treeFromLegacyCaretracker,
@@ -62,6 +62,12 @@ import {
   planTrainingSpine,
   resolveTrainingTemplate,
   resolveTrainingConfig,
+  resolveImplementationRequirements,
+  signOffBlocks,
+  verifySourceBlocks,
+  narrativeBlocks,
+  restrictionBlock,
+  hasAuthorizationBlock,
   type Plan,
 } from "@/data/mock";
 import { exportPlanPdf } from "@/lib/plan-pdf";
@@ -170,37 +176,55 @@ function PlanRuntime() {
     toast.success("Outcome saved.");
   };
 
-  // Provider signature duty (Section 2): required signer roles come from the
-  // agent's guideline briefs (per state / plan type), with a universal baseline.
+  // Implementation requirements: the configurable block set for this agent's
+  // plan type. The single source of truth for what the implementation rail
+  // shows and what the gates check. Resolves to the agent's stored set, or the
+  // seeded default built from plan type + guideline brief (so the PCP and every
+  // existing agent behave exactly as before).
   const [compTick, setCompTick] = useState(0);
-  const requiredSignerRolesList = useMemo(
-    () => requiredSignerRoles(getGuidelinesForAgent(agent).map((g) => g.compliance_brief)),
+  const implBlocks = useMemo(
+    () => resolveImplementationRequirements(agent, getGuidelinesForAgent(agent).map((g) => g.compliance_brief)),
     [agent],
+  );
+
+  // Section 2: sign-offs. Required signer roles now come from the sign_off
+  // blocks; a required role is satisfied by a signature or documented inability.
+  const requiredSignerRolesList = useMemo(
+    () => signOffBlocks(implBlocks).filter((b) => b.required).map((b) => b.role),
+    [implBlocks],
   );
   const signaturesOk = useMemo(
     () => signaturesSatisfied(requiredSignerRolesList, getPlanCompliance(planId).signatures ?? []),
     [requiredSignerRolesList, planId, compTick],
   );
 
-  // Restrictive interventions (Section 4): when this plan type requires the
-  // 8-part justification, every restriction present must be complete.
-  const restrictionReviewRequired = useMemo(
-    () =>
-      getGuidelinesForAgent(agent).some((g) => g.compliance_brief.restriction_review_required) ||
-      agent.category === "behavioral" ||
-      agent.category === "risk",
-    [agent],
-  );
+  // Section 4: restrictive interventions. Present (and gating) when the config
+  // carries a restriction sub-form block; committee approval from the block.
+  const restrictionBlk = useMemo(() => restrictionBlock(implBlocks), [implBlocks]);
+  const restrictionReviewRequired = !!restrictionBlk;
+  const restrictionCommitteeRequired = !!restrictionBlk?.committee_required;
   const restrictionsOk = useMemo(() => {
+    if (!restrictionBlk?.required) return true;
     const items = getPlanCompliance(planId).restrictions ?? [];
-    return items.every((r) => restrictionComplete(r, restrictionReviewRequired));
+    return items.every((r) => restrictionComplete(r, restrictionCommitteeRequired));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planId, compTick, restrictionReviewRequired]);
+  }, [planId, compTick, restrictionBlk, restrictionCommitteeRequired]);
 
-  // Provider-owned required fields (Section 5) — from the brief, surfaced/flagged.
+  // Section 5: provider-owned narrative fields, from the narrative blocks.
+  const providerFieldDefs = useMemo(
+    () => narrativeBlocks(implBlocks).map((b) => ({ key: b.key, label: b.label, rows: b.rows ?? 2, required: b.required, ai: b.ai_draftable })),
+    [implBlocks],
+  );
+  // Section 1: source-intake verify items, from the verify_source blocks.
+  const verifyItemDefs = useMemo(
+    () => verifySourceBlocks(implBlocks).map((b) => ({ key: b.key, label: b.label, capture_date: b.capture_date })),
+    [implBlocks],
+  );
+  const showAuthorization = useMemo(() => hasAuthorizationBlock(implBlocks), [implBlocks]);
+  // Required provider field labels, for the AI draft call and the panel.
   const providerRequiredFields = useMemo(
-    () => Array.from(new Set(getGuidelinesForAgent(agent).flatMap((g) => g.compliance_brief.provider_required_fields ?? []))),
-    [agent],
+    () => providerFieldDefs.filter((f) => f.required).map((f) => f.label),
+    [providerFieldDefs],
   );
 
   // Implement is gated on compulsory tasks, required signatures, and complete
@@ -812,13 +836,14 @@ function PlanRuntime() {
         <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:h-[calc(100vh-200px)]">
           <aside className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1 space-y-4">
             {/* Draft stage: only what is needed to draft. */}
-            {agent.content_origin === "source_plan" && (
+            {verifyItemDefs.length > 0 && (
               <SourceIntakePanel
                 key={`intake-${sourceTick}`}
                 planId={planId}
                 locked={locked}
                 defaultSourceType={derivedSourceType}
                 basis={intakeBasis}
+                items={verifyItemDefs}
               />
             )}
             <ChecklistPanel
@@ -846,13 +871,13 @@ function PlanRuntime() {
                   locked={locked}
                   onChange={() => setCompTick((t) => t + 1)}
                 />
-                {structuredTree && (
+                {showAuthorization && structuredTree && (
                   <AuthorizationPanel individualId={id} tree={structuredTree} effective={locked} />
                 )}
                 {restrictionReviewRequired && (
                   <RestrictionPanel
                     planId={planId}
-                    committeeRequired={restrictionReviewRequired}
+                    committeeRequired={restrictionCommitteeRequired}
                     locked={locked}
                     onChange={() => setCompTick((t) => t + 1)}
                   />
@@ -860,6 +885,7 @@ function PlanRuntime() {
                 <ProviderFieldsPanel
                   planId={planId}
                   requiredFields={providerRequiredFields}
+                  fields={providerFieldDefs}
                   locked={locked}
                   onChange={() => setCompTick((t) => t + 1)}
                   canDraft={hasDraft}

@@ -20,25 +20,32 @@ export type DraftableProviderFields = {
 const ta = "w-full p-2 rounded-[8px] border border-line bg-card text-[12.5px] text-ink focus:outline-none focus:border-navy";
 const labelCls = "block text-[11px] font-bold uppercase tracking-wider text-ink3 mb-1";
 
-type Key = "backup_plan" | "natural_supports" | "risk_mitigation" | "named_monitor" | "plain_language_summary";
-const FIELDS: { key: Key; label: string; rows: number }[] = [
-  { key: "named_monitor", label: "Named monitor (provider)", rows: 1 },
-  { key: "backup_plan", label: "Backup / coverage plan", rows: 2 },
-  { key: "natural_supports", label: "Natural & unpaid supports", rows: 2 },
-  { key: "risk_mitigation", label: "Risk factors & mitigation", rows: 2 },
-  { key: "plain_language_summary", label: "Plain-language summary", rows: 3 },
+// The narrative field definition. `key` maps to a PlanCompliance field, `ai`
+// marks fields the single AI draft fills (the named monitor stays manual).
+type FieldDef = { key: string; label: string; rows: number; required: boolean; ai: boolean };
+// Default set (PCP), used when the caller passes no config-driven `fields`.
+const DEFAULT_FIELDS: { key: string; label: string; rows: number; ai: boolean }[] = [
+  { key: "named_monitor", label: "Named monitor (provider)", rows: 1, ai: false },
+  { key: "backup_plan", label: "Backup / coverage plan", rows: 2, ai: true },
+  { key: "natural_supports", label: "Natural & unpaid supports", rows: 2, ai: true },
+  { key: "risk_mitigation", label: "Risk factors & mitigation", rows: 2, ai: true },
+  { key: "plain_language_summary", label: "Plain-language summary", rows: 3, ai: true },
 ];
 
 export function ProviderFieldsPanel({
   planId,
   requiredFields,
+  fields,
   locked,
   onChange,
   canDraft,
   onDraft,
 }: {
   planId: string;
-  requiredFields: string[]; // labels from the compliance brief
+  requiredFields: string[]; // labels from the compliance brief (default path)
+  // Config-driven field set (from narrative blocks). When provided it drives
+  // which fields render, their required flags, and which the AI may draft.
+  fields?: FieldDef[];
   locked?: boolean;
   onChange?: () => void;
   // Tier B: enabled only when a plan draft exists (the AI drafts from it).
@@ -48,7 +55,15 @@ export function ProviderFieldsPanel({
   const [val, setVal] = useState<PlanCompliance>(() => getPlanCompliance(planId));
   const [drafting, setDrafting] = useState(false);
   const [aiDrafted, setAiDrafted] = useState(false);
-  const isRequired = (label: string) => requiredFields.some((r) => r.toLowerCase() === label.toLowerCase()) || label.startsWith("Risk");
+  // Resolve the field set: config-driven when provided, else the default with
+  // requirement derived exactly as before (brief labels, plus risk factors).
+  const FIELDS: FieldDef[] =
+    fields ??
+    DEFAULT_FIELDS.map((f) => ({
+      ...f,
+      required: requiredFields.some((r) => r.toLowerCase() === f.label.toLowerCase()) || f.label.startsWith("Risk"),
+    }));
+  const isRequired = (f: FieldDef) => f.required;
 
   const runDraft = async () => {
     if (!onDraft) return;
@@ -72,24 +87,18 @@ export function ProviderFieldsPanel({
     }
   };
 
+  const valOf = (key: string) => String((val as Record<string, unknown>)[key] ?? "");
   const save = () => {
-    updatePlanCompliance(
-      planId,
-      {
-        named_monitor: val.named_monitor,
-        backup_plan: val.backup_plan,
-        natural_supports: val.natural_supports,
-        risk_mitigation: val.risk_mitigation,
-        plain_language_summary: val.plain_language_summary,
-      },
-      { what: "Updated provider-owned plan elements" },
-    );
+    // Persist each configured field's value by its key.
+    const patch: Record<string, unknown> = {};
+    for (const f of FIELDS) patch[f.key] = valOf(f.key);
+    updatePlanCompliance(planId, patch as Partial<PlanCompliance>, { what: "Updated provider-owned plan elements" });
     setAiDrafted(false);
     onChange?.();
     toast.success("Provider elements saved.");
   };
 
-  const missing = FIELDS.filter((f) => isRequired(f.label) && !String(val[f.key] ?? "").trim());
+  const missing = FIELDS.filter((f) => isRequired(f) && !valOf(f.key).trim());
 
   return (
     <div className="rounded-2xl border border-line bg-card shadow-soft overflow-hidden">
@@ -122,12 +131,12 @@ export function ProviderFieldsPanel({
           <div key={f.key}>
             <span className={labelCls}>
               {f.label}
-              {isRequired(f.label) && <span className="text-amber"> *</span>}
+              {isRequired(f) && <span className="text-amber"> *</span>}
             </span>
             {f.rows === 1 ? (
-              <input className={ta} disabled={locked} value={String(val[f.key] ?? "")} onChange={(e) => setVal((v) => ({ ...v, [f.key]: e.target.value }))} />
+              <input className={ta} disabled={locked} value={valOf(f.key)} onChange={(e) => setVal((v) => ({ ...v, [f.key]: e.target.value }))} />
             ) : (
-              <textarea className={ta} rows={f.rows} disabled={locked} value={String(val[f.key] ?? "")} onChange={(e) => setVal((v) => ({ ...v, [f.key]: e.target.value }))} />
+              <textarea className={ta} rows={f.rows} disabled={locked} value={valOf(f.key)} onChange={(e) => setVal((v) => ({ ...v, [f.key]: e.target.value }))} />
             )}
           </div>
         ))}

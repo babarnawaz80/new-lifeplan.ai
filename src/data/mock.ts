@@ -149,6 +149,15 @@ export type Agent = {
   // resolveRetrainingTemplate()/resolveRetrainingConfig().
   retraining_prompt_template?: string;
   retraining_config?: TrainingConfig;
+  // Configurable implementation requirements for this plan type: the ordered
+  // set of compliance blocks (sign-offs, verify items, sub-forms, narrative
+  // fields, authorization, system actions) that make up the plan workspace
+  // implementation rail and feed the draft/implement gates. When unset, the
+  // resolver builds the seeded default from the plan type + guideline brief, so
+  // agents persisted before this existed (and the PCP) behave unchanged.
+  // Resolve with resolveImplementationRequirements(). The single source of
+  // truth for per-plan-type implementation requirements.
+  implementation_requirements?: ImplementationBlock[];
   created_from_template_id: string | null;
   created_at: string;
   updated_at: string;
@@ -517,6 +526,251 @@ export function resolveRetrainingTemplate(agent: Pick<Agent, "retraining_prompt_
 
 export function resolveRetrainingConfig(agent: Pick<Agent, "retraining_config">): TrainingConfig {
   return { ...DEFAULT_RETRAINING_CONFIG, ...(agent.retraining_config ?? {}) };
+}
+
+// ---- Implementation requirements: configurable block library ----------------
+// Every implementation section around a plan (the left-rail compliance
+// scaffolding) is an instance of one of these reusable blocks. The set is
+// stored per agent (per plan type) and is the single source of truth for what
+// the rail shows and what the gates check. The universal plan spine (outcomes,
+// goals, strategies, service delivery) is NOT a block and never changes.
+//
+// Stage decides where a block lives and which gate it feeds:
+//  - "draft_basis": shown at draft stage; a required one feeds the DRAFT gate.
+//  - "implement_readiness": grouped under Implementation readiness once a draft
+//    exists; a required one feeds the IMPLEMENT gate.
+export type ImplBlockStage = "draft_basis" | "implement_readiness";
+// Where a block came from, so the setup surface can show provenance and the
+// provider can trust the set.
+export type ImplBlockOrigin = "default" | "guidelines" | "starter" | "custom";
+
+type ImplBlockBase = {
+  id: string;
+  label: string;
+  required: boolean;
+  stage: ImplBlockStage;
+  origin?: ImplBlockOrigin;
+};
+
+// Sign-off: a role that must sign or approve (generalizes Signatures and
+// approvals). allow_unable mirrors the documented "unable to obtain" path.
+export type SignOffBlock = ImplBlockBase & {
+  type: "sign_off";
+  role: string;
+  allow_unable: boolean;
+  committee?: boolean; // optional second / committee approval
+};
+// Verify-against-source: a checklist item confirmed against the received or
+// prior plan (generalizes the source-intake verify checklist). `key` maps to a
+// SourceIntake field so existing data is preserved.
+export type VerifySourceBlock = ImplBlockBase & {
+  type: "verify_source";
+  key: string;
+  capture_date?: boolean;
+};
+// Structured sub-form: a named multi-field form with completeness gating and a
+// review date (generalizes the restriction 8-part justification).
+export type SubFormBlock = ImplBlockBase & {
+  type: "sub_form";
+  form: "restriction_justification" | string;
+  committee_required?: boolean;
+};
+// Narrative field: a labeled text field (generalizes Provider plan elements).
+// `key` maps to a PlanCompliance field; ai_draftable joins the single AI draft.
+export type NarrativeBlock = ImplBlockBase & {
+  type: "narrative";
+  key: string;
+  ai_draftable: boolean;
+  rows?: number;
+};
+// Date or review field: a labeled date with optional required flag.
+export type DateFieldBlock = ImplBlockBase & {
+  type: "date_field";
+  key: string;
+};
+// Authorization and units: the service authorization block, on or off, read
+// from the adapter.
+export type AuthorizationBlock = ImplBlockBase & { type: "authorization" };
+// System action: a system step such as push goals to CareTracker, generate the
+// training video and quiz, or generate retraining.
+export type SystemActionBlock = ImplBlockBase & {
+  type: "system_action";
+  action: "push_caretracker" | "generate_training" | "generate_retraining";
+};
+
+export type ImplementationBlock =
+  | SignOffBlock
+  | VerifySourceBlock
+  | SubFormBlock
+  | NarrativeBlock
+  | DateFieldBlock
+  | AuthorizationBlock
+  | SystemActionBlock;
+
+// Minimal shape of the guideline brief the builder reads, declared inline to
+// avoid ordering the ComplianceBrief type before this block.
+type BriefForRequirements = {
+  required_signatures?: string[];
+  restriction_review_required?: boolean;
+  provider_required_fields?: string[];
+};
+
+// The provider's universal signer baseline when no brief specifies any. Matches
+// requiredSignerRoles() in plan-runtime, kept in lockstep for PCP parity.
+const BASELINE_SIGNER_ROLES = ["Implementing staff", "Individual / Guardian"];
+
+// The seeded provider-owned narrative fields (Section 5). Risk factors are
+// always flagged required, matching the current ProviderFieldsPanel.
+const PROVIDER_NARRATIVE_FIELDS: { key: string; label: string; rows: number; ai_draftable: boolean }[] = [
+  { key: "named_monitor", label: "Named monitor (provider)", rows: 1, ai_draftable: false },
+  { key: "backup_plan", label: "Backup / coverage plan", rows: 2, ai_draftable: true },
+  { key: "natural_supports", label: "Natural & unpaid supports", rows: 2, ai_draftable: true },
+  { key: "risk_mitigation", label: "Risk factors & mitigation", rows: 2, ai_draftable: true },
+  { key: "plain_language_summary", label: "Plain-language summary", rows: 3, ai_draftable: true },
+];
+
+// The seeded source-intake verify items (Section 1).
+const SOURCE_VERIFY_ITEMS: { key: string; label: string; capture_date?: boolean }[] = [
+  { key: "functional_assessment_present", label: "Functional assessment present", capture_date: true },
+  { key: "setting_choice_addressed", label: "Setting choice addressed in the plan" },
+  { key: "alternative_settings_addressed", label: "Alternative settings addressed" },
+  { key: "consent_present", label: "Individual's consent to the overarching plan present" },
+];
+
+// Build the seeded default block set for an agent from its plan type and the
+// linked guideline briefs. This encodes exactly the behavior the rail had when
+// it was hardcoded, so the PCP (and every existing agent) is unchanged when it
+// has no stored requirements. Order: source intake (draft basis), then the
+// implement-readiness blocks in their current rail order.
+export function buildDefaultImplementationRequirements(
+  agent: Pick<Agent, "content_origin" | "category">,
+  briefs: BriefForRequirements[] = [],
+): ImplementationBlock[] {
+  const blocks: ImplementationBlock[] = [];
+
+  // Section 1: source-intake verify items (only for source_plan agents, which is
+  // the only case the SourceIntakePanel renders today). Not gating.
+  if (agent.content_origin === "source_plan") {
+    for (const v of SOURCE_VERIFY_ITEMS) {
+      blocks.push({
+        id: `verify_${v.key}`,
+        type: "verify_source",
+        label: v.label,
+        key: v.key,
+        capture_date: v.capture_date,
+        required: false,
+        stage: "draft_basis",
+        origin: "default",
+      });
+    }
+  }
+
+  // Section 2: sign-offs from the brief, falling back to the universal baseline.
+  const roleSet = new Set<string>();
+  for (const b of briefs) for (const r of b.required_signatures ?? []) roleSet.add(r);
+  const roles = roleSet.size > 0 ? [...roleSet] : BASELINE_SIGNER_ROLES;
+  for (const role of roles) {
+    blocks.push({
+      id: `signoff_${role.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+      type: "sign_off",
+      label: role,
+      role,
+      allow_unable: true,
+      required: true,
+      stage: "implement_readiness",
+      origin: roleSet.size > 0 ? "guidelines" : "default",
+    });
+  }
+
+  // Section 3: service authorization and units (informational, not gating).
+  blocks.push({
+    id: "authorization",
+    type: "authorization",
+    label: "Service authorization & units",
+    required: false,
+    stage: "implement_readiness",
+    origin: "default",
+  });
+
+  // Section 4: restrictive interventions. Present (and gating) only when this
+  // plan type requires the review, matching restrictionReviewRequired today:
+  // a guideline flag, or a behavioral / risk agent.
+  const restrictionRequired =
+    briefs.some((b) => b.restriction_review_required) ||
+    agent.category === "behavioral" ||
+    agent.category === "risk";
+  if (restrictionRequired) {
+    blocks.push({
+      id: "restriction_justification",
+      type: "sub_form",
+      form: "restriction_justification",
+      label: "Restrictive interventions",
+      committee_required: true,
+      required: true,
+      stage: "implement_readiness",
+      origin: briefs.some((b) => b.restriction_review_required) ? "guidelines" : "default",
+    });
+  }
+
+  // Section 5: provider-owned narrative fields (informational; required flag
+  // drives the * badge only, matching ProviderFieldsPanel today).
+  const briefFields = new Set(briefs.flatMap((b) => b.provider_required_fields ?? []).map((f) => f.toLowerCase()));
+  for (const f of PROVIDER_NARRATIVE_FIELDS) {
+    const req = briefFields.has(f.label.toLowerCase()) || f.key === "risk_mitigation";
+    blocks.push({
+      id: `narrative_${f.key}`,
+      type: "narrative",
+      label: f.label,
+      key: f.key,
+      ai_draftable: f.ai_draftable,
+      rows: f.rows,
+      required: req,
+      stage: "implement_readiness",
+      origin: "default",
+    });
+  }
+
+  // System actions: push goals to CareTracker and generate the training video.
+  // Declarative for the config; the workspace header already drives them, so
+  // they do not add a rail section or a gate (parity).
+  blocks.push(
+    { id: "action_push_caretracker", type: "system_action", action: "push_caretracker", label: "Push goals to CareTracker", required: false, stage: "implement_readiness", origin: "default" },
+    { id: "action_generate_training", type: "system_action", action: "generate_training", label: "Generate training video and quiz", required: false, stage: "implement_readiness", origin: "default" },
+  );
+
+  return blocks;
+}
+
+// Resolve the implementation requirement set for an agent: its stored set when
+// present, otherwise the seeded default built from plan type + guideline brief.
+// This is the only place per-plan-type requirements are decided.
+export function resolveImplementationRequirements(
+  agent: Pick<Agent, "content_origin" | "category" | "implementation_requirements">,
+  briefs: BriefForRequirements[] = [],
+): ImplementationBlock[] {
+  const stored = agent.implementation_requirements;
+  if (stored && stored.length > 0) return stored;
+  return buildDefaultImplementationRequirements(agent, briefs);
+}
+
+// ---- Accessors: derive panel inputs + gate inputs from a block set ----------
+export function signOffBlocks(blocks: ImplementationBlock[]): SignOffBlock[] {
+  return blocks.filter((b): b is SignOffBlock => b.type === "sign_off");
+}
+export function verifySourceBlocks(blocks: ImplementationBlock[]): VerifySourceBlock[] {
+  return blocks.filter((b): b is VerifySourceBlock => b.type === "verify_source");
+}
+export function narrativeBlocks(blocks: ImplementationBlock[]): NarrativeBlock[] {
+  return blocks.filter((b): b is NarrativeBlock => b.type === "narrative");
+}
+export function restrictionBlock(blocks: ImplementationBlock[]): SubFormBlock | undefined {
+  return blocks.find((b): b is SubFormBlock => b.type === "sub_form" && b.form === "restriction_justification");
+}
+export function dateFieldBlocks(blocks: ImplementationBlock[]): DateFieldBlock[] {
+  return blocks.filter((b): b is DateFieldBlock => b.type === "date_field");
+}
+export function hasAuthorizationBlock(blocks: ImplementationBlock[]): boolean {
+  return blocks.some((b) => b.type === "authorization");
 }
 
 // ---- Training module distribution (staff to-do list) ----
