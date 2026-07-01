@@ -5,20 +5,26 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { listAgents, listGuidelines, countIndividualsForAgent, listAgentActivity } from "@/integrations/icm";
-import { planTypeInfo, type Agent } from "@/data/mock";
+import { planTypeInfo, planTypePalette, type Agent } from "@/data/mock";
 
-const APT: Record<string, { name: string; hue: string }> = {
-  PCP: { name: "Person-Centered Plan", hue: "#1B3D8F" },
-  BSP: { name: "Behavior Support Plan", hue: "#6D5BD0" },
-  NCP: { name: "Nursing Care Plan", hue: "#0E9C8A" },
-  Med: { name: "Medication Monitoring Plan", hue: "#2D87C9" },
-  HRP: { name: "High Risk Plan", hue: "#E85C2C" },
-  SAP: { name: "Staff Action Plan", hue: "#C026A6" },
+// Proper plan names by abbreviation. The hue is NOT stored here anymore; it
+// comes from the single source of truth (planTypePalette) so the agent button
+// matches the plan color everywhere else.
+const APT: Record<string, { name: string }> = {
+  PCP: { name: "Person-Centered Plan" },
+  BSP: { name: "Behavior Support Plan" },
+  NCP: { name: "Nursing Care Plan" },
+  Med: { name: "Medication Monitoring Plan" },
+  HRP: { name: "High Risk Plan" },
+  SAP: { name: "Staff Action Plan" },
 };
 const ABBR: Record<string, string> = {
   person_centered: "PCP", behavior_support: "BSP", nursing_care: "NCP",
   medication: "Med", high_risk: "HRP", staff_action_plan: "SAP",
 };
+// Reverse (short -> plan_type) so facet chips can read the palette hue.
+const TYPE_FOR_ABBR: Record<string, string> = Object.fromEntries(Object.entries(ABBR).map(([k, v]) => [v, k]));
+const hueForAbbr = (abbr: string) => planTypePalette(TYPE_FOR_ABBR[abbr] ?? "").accent;
 const APT_ORDER = ["PCP", "BSP", "NCP", "Med", "HRP", "SAP"];
 
 function tint(hex: string, a: number) {
@@ -36,7 +42,8 @@ type AgView = {
 
 function toView(a: Agent, engineName: (id: string) => string): AgView {
   const abbr = ABBR[a.plan_type] ?? planTypeInfo(a.plan_type).short;
-  const apt = APT[abbr] ?? { name: planTypeInfo(a.plan_type).label, hue: "#1B3D8F" };
+  const apt = APT[abbr] ?? { name: planTypeInfo(a.plan_type).label };
+  const hue = planTypePalette(a.plan_type).accent;
   const b = {
     g: a.guidelines_engine_ids.length > 0 ? 1 : 0,
     w: (a.workflow_data?.some((p) => (p.tasks?.length ?? 0) > 0) ? 1 : 0),
@@ -44,7 +51,7 @@ function toView(a: Agent, engineName: (id: string) => string): AgView {
     i: a.instructions?.trim() ? 1 : 0,
   };
   return {
-    id: a.id, name: a.name, abbr, hue: apt.hue, typeName: apt.name,
+    id: a.id, name: a.name, abbr, hue, typeName: apt.name,
     engine: a.guidelines_engine_ids[0] ? engineName(a.guidelines_engine_ids[0]) : null,
     b, using: countIndividualsForAgent(a.id), draft: a.status !== "active",
     edited: new Date(a.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
@@ -220,7 +227,7 @@ export function AgentsTab() {
           </div>
           <div style={{ fontFamily: "var(--font-text)", fontSize: 10.5, fontWeight: 700, color: "var(--fg4)", textTransform: "uppercase", letterSpacing: "0.06em", padding: "4px 10px 6px" }}>Plan type</div>
           <Facet active={type === "all"} onClick={() => setType("all")} label="All types" count={all.length} />
-          {typesPresent.map((t) => <Facet key={t} active={type === t} onClick={() => setType(t)} hue={APT[t].hue} label={APT[t].name} count={all.filter((a) => a.abbr === t).length} />)}
+          {typesPresent.map((t) => <Facet key={t} active={type === t} onClick={() => setType(t)} hue={hueForAbbr(t)} label={APT[t]?.name ?? t} count={all.filter((a) => a.abbr === t).length} />)}
           <div style={{ height: 1, background: "var(--border-soft)", margin: "10px 6px" }} />
           <div style={{ fontFamily: "var(--font-text)", fontSize: 10.5, fontWeight: 700, color: "var(--fg4)", textTransform: "uppercase", letterSpacing: "0.06em", padding: "4px 10px 6px" }}>Status</div>
           <Facet active={status === "all"} onClick={() => setStatus("all")} label="All" count={all.length} />

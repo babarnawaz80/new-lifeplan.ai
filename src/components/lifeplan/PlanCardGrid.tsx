@@ -3,7 +3,7 @@ import {
   ArrowRight, Plus, HeartHandshake, Brain, HeartPulse, Pill, ShieldAlert,
   ClipboardList, FileText, type LucideIcon,
 } from "lucide-react";
-import { planTypeInfo, type Agent, type Individual } from "@/data/mock";
+import { planTypeInfo, planTypePalette, type Agent, type Individual } from "@/data/mock";
 import eshaAvatar from "@/assets/esha-avatar.jpg";
 
 // ---------------------------------------------------------------------------
@@ -24,20 +24,21 @@ type PlanMeta = {
   accent: string;
 };
 
-const PLAN_META: Record<string, PlanMeta> = {
-  person_centered:  { Icon: HeartHandshake, from: "#4f46e5", to: "#6366f1", accent: "#4f46e5" },
-  behavior_support: { Icon: Brain,          from: "#7c3aed", to: "#a855f7", accent: "#7c3aed" },
-  nursing_care:     { Icon: HeartPulse,     from: "#059669", to: "#10b981", accent: "#059669" },
-  medication:       { Icon: Pill,           from: "#0284c7", to: "#0ea5e9", accent: "#0284c7" },
-  high_risk:        { Icon: ShieldAlert,    from: "#dc2626", to: "#ef4444", accent: "#dc2626" },
-  staff_action_plan:{ Icon: ClipboardList,  from: "#334155", to: "#475569", accent: "#334155" },
-};
-const DEFAULT_META: PlanMeta = {
-  Icon: FileText, from: "#475569", to: "#64748b", accent: "#475569",
+// Icon per plan type (structure, not color). Colors come from the single
+// source of truth (planTypePalette), so the card gradient + accent match the
+// plan everywhere else.
+const PLAN_ICON: Record<string, LucideIcon> = {
+  person_centered: HeartHandshake,
+  behavior_support: Brain,
+  nursing_care: HeartPulse,
+  medication: Pill,
+  high_risk: ShieldAlert,
+  staff_action_plan: ClipboardList,
 };
 
 function planMeta(agent: Agent): PlanMeta {
-  return PLAN_META[agent.plan_type] ?? DEFAULT_META;
+  const pal = planTypePalette(agent.plan_type);
+  return { Icon: PLAN_ICON[agent.plan_type] ?? FileText, from: pal.gradientFrom, to: pal.gradientTo, accent: pal.accent };
 }
 
 const STATUS_PILL: Record<StatusKey, { text: string; dot: string; label: string }> = {

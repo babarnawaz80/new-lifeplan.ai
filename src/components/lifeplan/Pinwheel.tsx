@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { planTypeInfo, type Agent, type Individual } from "@/data/mock";
+import { planTypeInfo, planTypePalette, type Agent, type Individual } from "@/data/mock";
 
 // ---------------------------------------------------------------------------
 // Pinwheel — radial "care plan wheel" (exact port of the Claw Design handoff).
@@ -21,17 +21,8 @@ const RO = 300;
 const GAP = 8;
 const RMID = (RI + RO) / 2; // 225
 
-// Plan color per plan_type (handoff "Plan colors" table).
-const PLAN_COLOR: Record<string, string> = {
-  person_centered: "#1B3D8F", // PCP
-  behavior_support: "#6D5BD0", // BSP
-  nursing_care: "#3CB54A", // NCP
-  medication: "#2D87C9", // Med Plan
-  high_risk: "#E85C2C", // HRP
-  individual_support: "#0E9C8A", // ISP
-  staff_action_plan: "#334155",
-};
-const DEFAULT_COLOR = "#64748B";
+// Plan color per plan_type now reads from the single source of truth
+// (planTypePalette) so the wheel segment matches the plan everywhere else.
 
 const STATUS: Record<StatusKey, { label: string; fg: string; bg: string; dot: string }> = {
   current: { label: "Current", fg: "#1E7B33", bg: "#E8F6EA", dot: "#3CB54A" },
@@ -63,7 +54,7 @@ function lvBlade(cx: number, cy: number, ri: number, ro: number, a0: number, a1:
 }
 
 function colorFor(agent: Agent): string {
-  return PLAN_COLOR[agent.plan_type] ?? DEFAULT_COLOR;
+  return planTypePalette(agent.plan_type).accent;
 }
 function statusKey(s: string): StatusKey {
   return s === "draft" ? "draft" : s === "review" ? "review" : "current";

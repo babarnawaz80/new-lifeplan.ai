@@ -13,7 +13,7 @@ import {
   FileText,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
-import { planTypeInfo, type Agent, type Individual } from "@/data/mock";
+import { planTypeInfo, planTypePalette, type Agent, type Individual } from "@/data/mock";
 
 // ---------------------------------------------------------------------------
 // Honeycomb hex-grid (flat-top, axial coordinates).
@@ -116,18 +116,19 @@ function roundedHexPath(cx: number, cy: number, r: number, cornerR: number) {
 // ---------- Plan-type identity (icon + accent) ----------
 type PlanMeta = { Icon: ComponentType<SVGProps<SVGSVGElement>>; accent: string };
 
-const PLAN_META: Record<string, PlanMeta> = {
-  person_centered: { Icon: HeartHandshake, accent: "#1B2A4A" },
-  behavior_support: { Icon: Brain, accent: "#7C5CFF" },
-  nursing_care: { Icon: HeartPulse, accent: "#0F8F74" },
-  medication: { Icon: Pill, accent: "#1AA6B7" },
-  high_risk: { Icon: ShieldAlert, accent: "#DC4C3E" },
-  staff_action_plan: { Icon: ClipboardList, accent: "#1B2A4A" },
+// Icon per plan type (structure only); the accent comes from the single
+// source of truth (planTypePalette) so it matches the plan elsewhere.
+const PLAN_ICON: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
+  person_centered: HeartHandshake,
+  behavior_support: Brain,
+  nursing_care: HeartPulse,
+  medication: Pill,
+  high_risk: ShieldAlert,
+  staff_action_plan: ClipboardList,
 };
-const DEFAULT_META: PlanMeta = { Icon: FileText, accent: "#8A8F99" };
 
 function planMeta(agent: Agent): PlanMeta {
-  return PLAN_META[agent.plan_type] ?? DEFAULT_META;
+  return { Icon: PLAN_ICON[agent.plan_type] ?? FileText, accent: planTypePalette(agent.plan_type).accent };
 }
 
 // ---------- Status (lifecycle only) ----------

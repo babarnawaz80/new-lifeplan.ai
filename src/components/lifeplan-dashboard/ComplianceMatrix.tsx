@@ -7,17 +7,19 @@
 import { useMemo, type CSSProperties } from "react";
 import { X } from "lucide-react";
 import { buildAllRows, type PortfolioRow } from "@/lib/lifeplan-aggregate";
+import { planTypePalette } from "@/data/mock";
 
-// Columns, left to right, keyed by the portfolio's plan-type short code. Each
-// carries the brand hue used for the header glyph.
+// Columns, left to right, keyed by the portfolio's plan-type short code. The
+// header-glyph hue reads from the single source of truth (planTypePalette) so
+// the matrix matches the plan color everywhere else.
 const COLS: { short: string; abbr: string; glyph: string; hue: string }[] = [
-  { short: "PCP", abbr: "PCP", glyph: "P", hue: "#1B3D8F" },
-  { short: "BSP", abbr: "BSP", glyph: "B", hue: "#6D5BD0" },
-  { short: "NCP", abbr: "NCP", glyph: "N", hue: "#0E9C8A" },
-  { short: "Med Plan", abbr: "Med", glyph: "M", hue: "#2D87C9" },
-  { short: "HRP", abbr: "HRP", glyph: "H", hue: "#E85C2C" },
-  { short: "SAP", abbr: "SAP", glyph: "S", hue: "#C026A6" },
-  { short: "TxP", abbr: "TxP", glyph: "T", hue: "#3CB54A" },
+  { short: "PCP", abbr: "PCP", glyph: "P", hue: planTypePalette("person_centered").accent },
+  { short: "BSP", abbr: "BSP", glyph: "B", hue: planTypePalette("behavior_support").accent },
+  { short: "NCP", abbr: "NCP", glyph: "N", hue: planTypePalette("nursing_care").accent },
+  { short: "Med Plan", abbr: "Med", glyph: "M", hue: planTypePalette("medication").accent },
+  { short: "HRP", abbr: "HRP", glyph: "H", hue: planTypePalette("high_risk").accent },
+  { short: "SAP", abbr: "SAP", glyph: "S", hue: planTypePalette("staff_action_plan").accent },
+  { short: "TxP", abbr: "TxP", glyph: "T", hue: planTypePalette("treatment").accent },
 ];
 
 type Lifecycle = "draft" | "in_progress" | "implementing" | "implemented";

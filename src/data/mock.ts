@@ -1336,23 +1336,52 @@ export function planTrainingSpine(planType: string): string {
   return sections.map((s, i) => `${i + 1}. ${s}`).join("\n");
 }
 
-// ---- Per-plan-type video theme (thumbnail / title-slide colors) -----------
-// The training stage and thumbnail are tinted by plan type so a Behavior
-// Support video does not look identical to a Nursing Care video. Mirrors the
-// plan card accents; darkened into a video-stage gradient.
-export type PlanTypeTheme = { from: string; mid: string; to: string };
-const PLAN_TYPE_THEME: Record<string, PlanTypeTheme> = {
-  person_centered:  { from: "#1e1b4b", mid: "#4338ca", to: "#6366f1" },
-  behavior_support: { from: "#2e1065", mid: "#6d28d9", to: "#a855f7" },
-  nursing_care:     { from: "#053330", mid: "#047857", to: "#10b981" },
-  medication:       { from: "#0c2a4d", mid: "#0369a1", to: "#0ea5e9" },
-  high_risk:        { from: "#450a0a", mid: "#b91c1c", to: "#ef4444" },
-  staff_action_plan:{ from: "#0f172a", mid: "#334155", to: "#64748b" },
+// ---- One color per plan type: the single source of truth ------------------
+// Every plan-type color, everywhere, reads from this map: the status dot, the
+// pale hexagon-segment tint in the e-chart orbit, the richer gradient on the
+// video / retraining cards and the agent button, and the in-plan accent. One
+// hue per plan, drawn from an AI-leaning family anchored on indigo and violet,
+// so a plan reads as the same color inside and outside, and each plan type is
+// distinct. Change a hue here and every surface for that plan updates together.
+export type PlanTypePalette = {
+  dot: string;         // status dot next to the plan name
+  segment: string;     // pale tint for the hexagon wedge
+  gradientFrom: string; // richer gradient start (video card, agent button)
+  gradientTo: string;   // richer gradient end
+  accent: string;       // mid tone: in-plan accents, headers, highlights
 };
-const DEFAULT_THEME: PlanTypeTheme = { from: "#1a1140", mid: "#4c1d95", to: "#9d2c6e" };
 
+const PLAN_TYPE_PALETTE: Record<string, PlanTypePalette> = {
+  // PCP — indigo (kept from today)
+  person_centered:   { dot: "#4F46E5", segment: "#EEEFFE", gradientFrom: "#4338CA", gradientTo: "#6366F1", accent: "#4F46E5" },
+  // BSP — violet (kept from today)
+  behavior_support:  { dot: "#7C3AED", segment: "#F2ECFE", gradientFrom: "#6D28D9", gradientTo: "#A855F7", accent: "#7C3AED" },
+  // NCP — green
+  nursing_care:      { dot: "#10B981", segment: "#E4F6EE", gradientFrom: "#047857", gradientTo: "#10B981", accent: "#059669" },
+  // Med Plan — blue
+  medication:        { dot: "#2563EB", segment: "#E6EFFE", gradientFrom: "#1D4ED8", gradientTo: "#3B82F6", accent: "#2563EB" },
+  // HRP — amber
+  high_risk:         { dot: "#F59E0B", segment: "#FCF0DA", gradientFrom: "#B45309", gradientTo: "#F59E0B", accent: "#D97706" },
+  // SAP — teal
+  staff_action_plan: { dot: "#14B8A6", segment: "#DFF4F1", gradientFrom: "#0F766E", gradientTo: "#14B8A6", accent: "#0D9488" },
+  // ISP — cyan (kept distinct from the six above)
+  individual_support:{ dot: "#0891B2", segment: "#DEF2F8", gradientFrom: "#0E7490", gradientTo: "#22D3EE", accent: "#0891B2" },
+};
+// Any new / unknown plan type: a neutral indigo from the same family.
+const DEFAULT_PALETTE: PlanTypePalette = { dot: "#6366F1", segment: "#EEEFFE", gradientFrom: "#4F46E5", gradientTo: "#818CF8", accent: "#6366F1" };
+
+export function planTypePalette(planType: string): PlanTypePalette {
+  return PLAN_TYPE_PALETTE[planType] ?? DEFAULT_PALETTE;
+}
+
+// Legacy video-stage theme, now DERIVED from the single palette so the training
+// / retraining cards, the plan-log thumbnail, and the in-plan accents all read
+// the same plan color as everything else. from = gradient start, mid = accent,
+// to = gradient end.
+export type PlanTypeTheme = { from: string; mid: string; to: string };
 export function planTypeTheme(planType: string): PlanTypeTheme {
-  return PLAN_TYPE_THEME[planType] ?? DEFAULT_THEME;
+  const p = planTypePalette(planType);
+  return { from: p.gradientFrom, mid: p.accent, to: p.gradientTo };
 }
 
 // ---------- Org agents (cloned from templates so the hexagon is populated) ----------
