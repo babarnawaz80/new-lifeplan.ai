@@ -1336,6 +1336,52 @@ export function planTrainingSpine(planType: string): string {
   return sections.map((s, i) => `${i + 1}. ${s}`).join("\n");
 }
 
+// A compact, plan-type-specific training built for SEEDED implemented plans, so
+// a plan that was implemented shows its "Watch training" play button and plays
+// real content across reloads (in-session generation replaces it). Shaped by
+// the plan-type spine, like the no-key generation stub.
+export function seededTrainingContent(planType: string, firstName: string): TrainingContent {
+  const label = planTypeInfo(planType).label;
+  const spineLines = planTrainingSpine(planType)
+    .split("\n")
+    .map((l) => l.replace(/^\s*\d+\.\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  const slide = (heading: string, bullets: string[], a: string, j: string): TrainingContent["slides"][number] => ({
+    heading,
+    bullets,
+    narration: [{ speaker: "Alex", text: a }, { speaker: "Jamie", text: j }],
+  });
+  const headingFor = (line: string) => {
+    const clause = line.split(/[:.]/)[0].trim();
+    const words = clause.split(/\s+/);
+    return words.length <= 7 ? clause : words.slice(0, 7).join(" ");
+  };
+  const body = spineLines.map((line) =>
+    slide(
+      headingFor(line),
+      line.split(/[;,]/).map((s) => s.trim()).filter(Boolean).slice(0, 3),
+      `For ${firstName}'s ${label}: ${line}`,
+      `Keep it practical and specific so every shift knows what to do.`,
+    ),
+  );
+  return {
+    title: `${label}: Staff Training for ${firstName}`,
+    subtitle: "",
+    slides: [
+      slide(`Welcome, supporting ${firstName}`, [label, `For everyone who supports ${firstName}`], `Hi team, I'm Alex. Today we'll walk through ${firstName}'s ${label}.`, `And I'm Jamie. By the end you'll know how to support ${firstName} day to day.`),
+      ...body,
+      slide("Wrap up", ["Pass the quiz to certify", "Ask questions anytime", "Thank you"], `That's the overview of ${firstName}'s ${label}.`, `Now take the quiz to certify on ${firstName}'s plan.`),
+    ],
+    quiz: Array.from({ length: 8 }, (_, i) => ({
+      question: `Question ${i + 1}: what does ${firstName}'s ${label} ask staff to do?`,
+      options: ["Follow the plan as written", "Skip documentation", "Improvise each shift", "Wait for the annual review"],
+      correct_index: 0,
+      explanation: "Staff follow the plan as written and document each shift.",
+    })),
+  };
+}
+
 // ---- One color per plan type: the single source of truth ------------------
 // Every plan-type color, everywhere, reads from this map: the status dot, the
 // pale hexagon-segment tint in the e-chart orbit, the richer gradient on the
@@ -1714,6 +1760,24 @@ export const accentColor: Record<Agent["accent"], string> = {
         updated_at: iso(-5),
       };
       plans.push(plan);
+      // An implemented plan has already gone through training generation, so
+      // seed a ready training with content — this is what makes the plan-log
+      // "Watch training" play button appear for implemented plans on load.
+      if (implemented) {
+        const firstName = ind.name.split(/\s+/)[0] ?? ind.name;
+        trainings.push({
+          id: `tr_seed_${key}`,
+          plan_id: plan.id,
+          individual_id: indId,
+          status: "ready",
+          video_status: "ready",
+          content: seededTrainingContent(ag.plan_type, firstName),
+          kind: "initial",
+          trigger: "manual",
+          published_at: iso(-18),
+          created_at: iso(-19),
+        });
+      }
     });
     void idx;
   });

@@ -97,9 +97,19 @@ function PlanLogPage() {
   };
 
   const firstName = individual.name.split(/\s+/)[0] ?? individual.name;
+  // A plan has a watchable training when a ready training record exists, or the
+  // plan is implemented (training is always built at implement). We do NOT
+  // require the persisted `content` blob: the trainings table's content column
+  // is optional, so content can be dropped on a persistence round-trip while the
+  // ready record survives. Requiring content is what made the play button vanish
+  // after a reload for already-implemented plans.
+  const planHasTraining = (p: Plan) => {
+    const t = getTrainingForPlan(p.id);
+    return !!t?.content || t?.status === "ready" || t?.video_status === "ready" || p.status === "implemented";
+  };
   const inProgressCount = plans.filter((p) => p.status === "in_progress" || p.status === "draft").length;
   const implementedCount = plans.filter((p) => p.status === "implemented").length;
-  const trainingCount = plans.filter((p) => getTrainingForPlan(p.id)?.content).length;
+  const trainingCount = plans.filter((p) => planHasTraining(p)).length;
 
   const summary: Array<{ n: number; label: string; fg: string; bg: string }> = [
     { n: plans.length, label: "plans on file", fg: "var(--navy)", bg: "var(--muted)" },
@@ -208,7 +218,7 @@ function PlanLogPage() {
                 planTypeLabel={planTypeLabel}
                 planType={agent.plan_type}
                 firstName={firstName}
-                hasTraining={!!getTrainingForPlan(p.id)?.content}
+                hasTraining={planHasTraining(p)}
                 trainings={listTrainingsForPlan(p.id)}
                 id={id}
                 onPrint={() => printPlan(p)}
