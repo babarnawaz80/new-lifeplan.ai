@@ -401,7 +401,7 @@ export function AiChatPane({
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-2 text-[12.5px] font-semibold" style={{ color: "#1a6d26" }}>
-                  <CheckCircle2 className="h-4 w-4" /> All steps complete — ready to generate.
+                  <CheckCircle2 className="h-4 w-4" /> Ready to generate.
                 </span>
               )}
             </div>

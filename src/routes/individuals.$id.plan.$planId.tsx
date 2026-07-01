@@ -50,7 +50,7 @@ import { suggestTaskOutcome } from "@/lib/suggest-outcome.functions";
 import { analyzeSourceDocument } from "@/lib/analyze-source.functions";
 import { draftProviderElements } from "@/lib/draft-provider-elements.functions";
 import type { WorkflowTask } from "@/data/lifeplan-types";
-import { allCompulsoryComplete, signaturesSatisfied } from "@/lib/plan-runtime";
+import { allCompulsoryComplete, prePlanningCompulsoryComplete, signaturesSatisfied } from "@/lib/plan-runtime";
 import { PlanWorkflowGate } from "@/components/plan-runtime/PlanWorkflowGate";
 import {
   parseIcmPlanTree,
@@ -305,17 +305,26 @@ function PlanRuntime() {
   // Implementation phase). The gate opens only when all steps are complete.
   const sourceStepApplies = agent.content_origin === "source_plan";
   const sourceMode: "file" | "previous" | null = sourceText ? "file" : proceedWithoutUpload ? "previous" : null;
+  // The stepper lists the source step plus every pre-generate workflow phase, so
+  // the case manager sees the whole path. But only the SOURCE + PRE-PLANNING
+  // steps gate Generate — the planning meeting and finalize steps show as the
+  // steps to come and are completed before Implement, not before drafting (this
+  // matches the original screen; the redesign is a relook, not a new gate).
   const preGeneratePhases = useMemo(
     () => (agent.workflow_data.length > 1 ? agent.workflow_data.slice(0, -1) : agent.workflow_data),
     [agent.workflow_data],
   );
-  const gateTotal = (sourceStepApplies ? 1 : 0) + preGeneratePhases.length;
-  const phasesDoneCount = preGeneratePhases.filter((p) => allCompulsoryComplete([p], isComplete)).length;
-  const gateDone = (sourceStepApplies ? (sourceMode !== null ? 1 : 0) : 0) + phasesDoneCount;
-  const canGenerate = gateDone >= gateTotal;
-  const draftBlockedReason = canGenerate
-    ? null
-    : `Complete the ${gateTotal} steps on the left to unlock. ${gateDone} of ${gateTotal} done.`;
+  const sourceResolved = !sourceStepApplies || sourceMode !== null;
+  const prePlanningDone = prePlanningCompulsoryComplete(agent.workflow_data, isComplete);
+  const canGenerate = sourceResolved && prePlanningDone;
+  const draftBlockedReason =
+    !sourceResolved && !prePlanningDone
+      ? "Attach the source plan (or choose to proceed without one) and complete pre-planning to unlock."
+      : !sourceResolved
+        ? "Attach the source plan, or choose to proceed without a new document, to unlock."
+        : !prePlanningDone
+          ? "Complete the pre-planning step to unlock."
+          : null;
 
   // Plan-type theme: the accent color/gradient for this plan type (navy for a
   // Person-Centered Plan, violet for a Behavior Support Plan, and so on), so the
