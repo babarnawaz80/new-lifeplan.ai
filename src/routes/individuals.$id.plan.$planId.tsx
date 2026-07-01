@@ -50,7 +50,8 @@ import { suggestTaskOutcome } from "@/lib/suggest-outcome.functions";
 import { analyzeSourceDocument } from "@/lib/analyze-source.functions";
 import { draftProviderElements } from "@/lib/draft-provider-elements.functions";
 import type { WorkflowTask } from "@/data/lifeplan-types";
-import { allCompulsoryComplete, prePlanningCompulsoryComplete, signaturesSatisfied } from "@/lib/plan-runtime";
+import { allCompulsoryComplete, signaturesSatisfied } from "@/lib/plan-runtime";
+import { PlanWorkflowGate } from "@/components/plan-runtime/PlanWorkflowGate";
 import {
   parseIcmPlanTree,
   treeFromLegacyCaretracker,
@@ -59,6 +60,7 @@ import {
 } from "@/types/icmGoalOutcome";
 import {
   planTypeInfo,
+  planTypeTheme,
   planTrainingSpine,
   resolveTrainingTemplate,
   resolveTrainingConfig,
@@ -295,15 +297,36 @@ function PlanRuntime() {
   // agents do not render the intake panel.
   const intakeBasis: "document" | "previous_plan" | "none" =
     sourceText ? "document" : proceedWithoutUpload ? "previous_plan" : "none";
-  const prePlanningDone = prePlanningCompulsoryComplete(agent.workflow_data, isComplete);
-  const draftBlockedReason =
-    sourceMissing && !prePlanningDone
-      ? "Attach the source plan (or choose to proceed without one) and complete pre-planning to draft."
-      : sourceMissing
-        ? "Attach the individual's source plan, or choose to proceed without a new document."
-        : !prePlanningDone
-          ? "Complete the compulsory pre-planning tasks to draft."
-          : null;
+
+  // ---- Generate gate (progressive unlock) ----
+  // The generate screen walks the case manager through a short workflow before
+  // an AI plan can be drafted: a Source document step (for source_plan agents)
+  // plus one step per pre-generate workflow phase (every phase before the final
+  // Implementation phase). The gate opens only when all steps are complete.
+  const sourceStepApplies = agent.content_origin === "source_plan";
+  const sourceMode: "file" | "previous" | null = sourceText ? "file" : proceedWithoutUpload ? "previous" : null;
+  const preGeneratePhases = useMemo(
+    () => (agent.workflow_data.length > 1 ? agent.workflow_data.slice(0, -1) : agent.workflow_data),
+    [agent.workflow_data],
+  );
+  const gateTotal = (sourceStepApplies ? 1 : 0) + preGeneratePhases.length;
+  const phasesDoneCount = preGeneratePhases.filter((p) => allCompulsoryComplete([p], isComplete)).length;
+  const gateDone = (sourceStepApplies ? (sourceMode !== null ? 1 : 0) : 0) + phasesDoneCount;
+  const canGenerate = gateDone >= gateTotal;
+  const draftBlockedReason = canGenerate
+    ? null
+    : `Complete the ${gateTotal} steps on the left to unlock. ${gateDone} of ${gateTotal} done.`;
+
+  // Plan-type theme: the accent color/gradient for this plan type (navy for a
+  // Person-Centered Plan, violet for a Behavior Support Plan, and so on), so the
+  // generate screen, buttons, and active steps read as the plan you're in,
+  // matching the dashboard and the training video.
+  const planTheme = planTypeTheme(agent.plan_type);
+  const accentGrad = `linear-gradient(118deg, ${planTheme.from} 0%, ${planTheme.mid} 42%, ${planTheme.to} 100%)`;
+  const gateTheme = { grad: accentGrad, solid: planTheme.mid, soft: `${planTheme.mid}33` };
+  const previousLabelStr = previousImplemented
+    ? new Date(previousImplemented.implementation_date ?? previousImplemented.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : "";
 
   // What the generator builds from: an uploaded document, the previous plan's
   // text (when opted in and available), or nothing (chart-only generation).
@@ -833,7 +856,30 @@ function PlanRuntime() {
         {/* Two-pane layout. On desktop the row is bounded to one screen and
             each column scrolls internally — so a 30-50 page plan never grows
             the page; you scroll within the plan pane. */}
-        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:h-[calc(100vh-200px)]">
+        <div className={`grid grid-cols-1 gap-5 lg:h-[calc(100vh-200px)] ${hasDraft ? "lg:grid-cols-[360px_1fr]" : "lg:grid-cols-[440px_1fr]"}`}>
+          {/* Pre-draft: the progressive-unlock workflow gate, themed by plan type.
+              Once a draft exists we switch to the compliance rail below. */}
+          {!hasDraft && plan.creation_mode === "ai" ? (
+            <aside className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1">
+              <PlanWorkflowGate
+                theme={gateTheme}
+                showSourceStep={sourceStepApplies}
+                docLabel={agent.source_document_label || planTypeInfo(agent.plan_type).label}
+                sourceMode={sourceMode}
+                attachedName={plan.source_document_name}
+                onAttach={handleAttachSource}
+                canUsePrevious={uploadedMissing}
+                usePrevious={proceedWithoutUpload}
+                onUsePrevious={setProceedWithoutUpload}
+                hasPrevious={hasPrevious}
+                previousLabel={previousLabelStr}
+                phases={preGeneratePhases}
+                isComplete={isComplete}
+                onToggle={onToggle}
+                locked={locked}
+              />
+            </aside>
+          ) : (
           <aside className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1 space-y-4">
             {/* Draft stage: only what is needed to draft. */}
             {verifyItemDefs.length > 0 && (
@@ -909,6 +955,7 @@ function PlanRuntime() {
             {/* Audit trail stays visible: informational, not a demand. */}
             <AuditTrailPanel planId={planId} tick={compTick} />
           </aside>
+          )}
 
           <section className="min-w-0 lg:h-full min-h-0 flex flex-col">
             {plan.creation_mode === "ai" ? (
@@ -961,6 +1008,8 @@ function PlanRuntime() {
                 locked={locked}
                 onPlanContent={handlePlanContent}
                 onImplement={requestImplement}
+                accentGrad={accentGrad}
+                accentSolid={planTheme.mid}
               />
             ) : planMarkdown ? (
               <div className="flex flex-col min-h-0 lg:h-full space-y-3">

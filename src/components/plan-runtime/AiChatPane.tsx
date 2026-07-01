@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { AlertCircle, Loader2, Sparkles, Send, Upload, User } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles, Send, Upload, User, Lock, CheckCircle2 } from "lucide-react";
 import { extractDocumentText } from "@/lib/docx-extract";
 import { PlanPreview } from "./PlanPreview";
 import { StructuredPlanView } from "./StructuredPlanView";
@@ -71,6 +71,10 @@ export interface AiChatPaneProps {
   locked?: boolean;
   onPlanContent: (markdown: string, caretrackerData: unknown, treeRaw?: unknown) => void;
   onImplement: () => void;
+  // Plan-type accent (gradient + solid), so the generate surface, buttons, and
+  // chat send read as the plan you're in. Defaults to the AI purple.
+  accentGrad?: string;
+  accentSolid?: string;
 }
 
 function textFromMessage(m: UIMessage): string {
@@ -194,6 +198,8 @@ export function AiChatPane({
   locked,
   onPlanContent,
   onImplement,
+  accentGrad = "var(--ai-gradient)",
+  accentSolid = "var(--navy)",
 }: AiChatPaneProps) {
   const transport = useMemo(
     () =>
@@ -338,39 +344,32 @@ export function AiChatPane({
         className="flex-1 min-h-0 overflow-y-auto px-1 py-2 space-y-4"
       >
         {messages.length === 0 && !locked && (
-          <div className="rounded-2xl bg-card border border-line p-6 shadow-soft">
-            <div className="flex items-center gap-2.5 mb-3">
-              <div
-                className="h-9 w-9 rounded-xl flex items-center justify-center"
-                style={{ background: "var(--ai-gradient)" }}
-              >
-                <Sparkles className="h-4 w-4 text-white" />
-              </div>
-              <div>
-                <h3 className="text-[15px] font-extrabold text-ink">
-                  Ready when you are
-                </h3>
-                <p className="text-[12.5px] text-ink2">
-                  I'll draft a {planType.toLowerCase()} for {individualName} using
-                  the linked guidelines and chart data.
-                </p>
-              </div>
+          <div className="min-h-full flex flex-col items-center justify-center text-center px-6 py-12">
+            <div
+              className="h-[60px] w-[60px] rounded-2xl flex items-center justify-center mb-5"
+              style={{ background: accentGrad, boxShadow: `0 12px 26px ${accentSolid}40` }}
+            >
+              <Sparkles className="h-6 w-6 text-white" />
             </div>
-            {/* Section 2: plan classification, chosen before Generate. */}
+            <h3 className="text-[22px] font-extrabold text-ink tracking-tight">Ready when you are</h3>
+            <p className="text-[13.5px] text-ink2 mt-2 max-w-[440px] leading-relaxed">
+              I'll draft a {planType.toLowerCase()} for {individualName} using the linked guidelines and chart data.
+            </p>
+
+            {/* Plan classification, chosen before Generate. */}
             {planClass && onPlanClassChange && (
-              <div className="mb-3">
-                <span className="block text-[11px] font-bold uppercase tracking-wider text-ink3 mb-1.5">
+              <div className="mt-7">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-ink3 mb-2">
                   Plan classification
                 </span>
-                <div className="inline-flex rounded-[9px] border border-line overflow-hidden">
+                <div className="inline-flex rounded-[10px] border border-line overflow-hidden">
                   {(["Initial", "Revised", "Emergency"] as const).map((c) => (
                     <button
                       key={c}
                       type="button"
                       onClick={() => onPlanClassChange(c)}
-                      className={`px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors ${
-                        planClass === c ? "bg-navy text-white" : "bg-card text-ink2 hover:bg-muted"
-                      }`}
+                      className={`px-4 py-2 text-[13px] font-semibold transition-colors ${planClass === c ? "text-white" : "bg-card text-ink2 hover:bg-muted"}`}
+                      style={planClass === c ? { background: accentSolid } : undefined}
                     >
                       {c}
                     </button>
@@ -378,55 +377,34 @@ export function AiChatPane({
                 </div>
               </div>
             )}
+
             <button
               type="button"
-              onClick={() =>
-                startGeneration(
-                  `Draft the ${planType} for ${individualName}.`,
-                )
-              }
+              onClick={() => startGeneration(`Draft the ${planType} for ${individualName}.`)}
               disabled={!!draftBlockedReason}
-              title={draftBlockedReason ?? ""}
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-[9px] text-white text-[13px] font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: "var(--ai-gradient)" }}
+              title={draftBlockedReason ?? "Generate the plan"}
+              className={`mt-7 inline-flex items-center gap-2 px-6 py-3 rounded-[12px] text-[14px] font-bold transition ${draftBlockedReason ? "cursor-not-allowed" : "hover:brightness-105"}`}
+              style={
+                draftBlockedReason
+                  ? { background: "#E2E8F0", color: "#94A3B8" }
+                  : { background: accentGrad, color: "#fff", boxShadow: `0 8px 22px ${accentSolid}45` }
+              }
             >
-              <Sparkles className="h-3.5 w-3.5" />
+              {draftBlockedReason ? <Lock className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
               Generate the plan
             </button>
-            {draftBlockedReason && (
-              <div className="mt-3 flex items-start gap-2 text-[11.5px] text-amber">
-                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>{draftBlockedReason}</span>
-              </div>
-            )}
-            {canUsePrevious && onUsePreviousChange && (
-              <label className="mt-3 flex items-start gap-2.5 rounded-xl border border-line bg-muted/30 px-3.5 py-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={!!usePrevious}
-                  onChange={(e) => onUsePreviousChange(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-[var(--indigo)] shrink-0"
-                />
-                <span className="text-[12.5px] text-ink2 leading-relaxed">
-                  <span className="font-semibold text-ink">No new document?</span>{" "}
-                  {hasPreviousPlan ? (
-                    <>
-                      Proceed without one. Base this plan on the previous implemented plan
-                      {previousLabel ? ` (${previousLabel.toLowerCase()})` : ""}. The AI carries it
-                      forward and you'll get a side-by-side comparison.
-                    </>
-                  ) : (
-                    <>
-                      Proceed without one. The AI will draft from {individualName}'s chart and
-                      assessment data. Review carefully before implementing.
-                    </>
-                  )}
+
+            <div className="mt-4 min-h-[20px]">
+              {draftBlockedReason ? (
+                <span className="inline-flex items-center gap-2 text-[12.5px] font-semibold" style={{ color: "#B45309" }}>
+                  <Lock className="h-3.5 w-3.5" /> {draftBlockedReason}
                 </span>
-              </label>
-            )}
-            {needsSourceAttach && onAttachSource && (
-              <AttachSourceInline docLabel={sourceDocLabel} onAttach={onAttachSource} />
-            )}
+              ) : (
+                <span className="inline-flex items-center gap-2 text-[12.5px] font-semibold" style={{ color: "#1a6d26" }}>
+                  <CheckCircle2 className="h-4 w-4" /> All steps complete — ready to generate.
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -564,21 +542,24 @@ export function AiChatPane({
               handleChatSend();
             }
           }}
-          disabled={isLoading || !!draftBlockedReason}
+          disabled={isLoading || !!draftBlockedReason || messages.length === 0}
           placeholder={
-            isLoading
-              ? "Generating…"
-              : draftBlockedReason
-                ? draftBlockedReason
-                : "Ask for a change or refinement…"
+            messages.length === 0
+              ? "Chat unlocks once the plan is drafted"
+              : isLoading
+                ? "Generating…"
+                : draftBlockedReason
+                  ? draftBlockedReason
+                  : "Ask for a change or refinement…"
           }
           className="flex-1 bg-transparent text-[13.5px] text-ink placeholder:text-ink3 focus:outline-none disabled:opacity-50"
         />
         <button
           type="button"
           onClick={handleChatSend}
-          disabled={!chatInput.trim() || isLoading || !!draftBlockedReason}
-          className="h-8 w-8 rounded-lg bg-navy text-white flex items-center justify-center disabled:opacity-40 hover:opacity-95"
+          disabled={!chatInput.trim() || isLoading || !!draftBlockedReason || messages.length === 0}
+          className="h-8 w-8 rounded-lg text-white flex items-center justify-center disabled:opacity-40 hover:brightness-105"
+          style={{ background: accentGrad }}
           aria-label="Send"
         >
           <Send className="h-3.5 w-3.5" />
