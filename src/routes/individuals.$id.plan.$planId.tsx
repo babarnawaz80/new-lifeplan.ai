@@ -29,7 +29,7 @@ import {
   listTrainingTodos,
   mayHaveLegacyPlan,
 } from "@/integrations/icm";
-import { ChecklistPanel } from "@/components/plan-runtime/ChecklistPanel";
+import { PhaseTaskList } from "@/components/plan-runtime/ChecklistPanel";
 import { AiChatPane } from "@/components/plan-runtime/AiChatPane";
 import { ManualEditor } from "@/components/plan-runtime/ManualEditor";
 import { ImplementDialog } from "@/components/plan-runtime/ImplementDialog";
@@ -39,7 +39,6 @@ import { SignaturesPanel } from "@/components/plan-runtime/SignaturesPanel";
 import { AuthorizationPanel } from "@/components/plan-runtime/AuthorizationPanel";
 import { RestrictionPanel, restrictionComplete } from "@/components/plan-runtime/RestrictionPanel";
 import { ProviderFieldsPanel } from "@/components/plan-runtime/ProviderFieldsPanel";
-import { ImplementationReadiness } from "@/components/plan-runtime/ImplementationReadiness";
 import { AuditTrailPanel } from "@/components/plan-runtime/AuditTrailPanel";
 import { CutoverWarningDialog } from "@/components/plan-runtime/CutoverWarningDialog";
 import { ActionRow } from "@/components/plan-runtime/ActionRow";
@@ -51,7 +50,7 @@ import { analyzeSourceDocument } from "@/lib/analyze-source.functions";
 import { draftProviderElements } from "@/lib/draft-provider-elements.functions";
 import type { WorkflowTask } from "@/data/lifeplan-types";
 import { allCompulsoryComplete, prePlanningCompulsoryComplete, signaturesSatisfied } from "@/lib/plan-runtime";
-import { PlanWorkflowGate } from "@/components/plan-runtime/PlanWorkflowGate";
+import { PlanWorkflowRail, SourceStepBody, type RailStep } from "@/components/plan-runtime/PlanWorkflowGate";
 import {
   parseIcmPlanTree,
   treeFromLegacyCaretracker,
@@ -752,6 +751,127 @@ function PlanRuntime() {
     if (!ok) toast.error("Allow pop-ups to export the PDF.");
   };
 
+  // ---- The single left rail: the plan-type-themed workflow stepper ----
+  // One design for every state. Before a draft: source + pre-generate phases
+  // (a gate). After a draft: source + all phases + implementation-readiness
+  // steps (signatures, authorization, restrictions, provider elements). Each
+  // step's body is the existing functional component, so nothing is lost.
+  const sourceDocLabelFull = agent.source_document_label || planTypeInfo(agent.plan_type).label;
+  const phasesForRail = hasDraft ? agent.workflow_data : preGeneratePhases;
+  const railSteps: RailStep[] = [];
+  if (sourceStepApplies) {
+    railSteps.push({
+      key: "source",
+      title: "Source document",
+      subtitle: "Attach the plan you're revising, or build from the last one.",
+      done: sourceMode !== null,
+      doneSummary: sourceMode === "file" ? `${plan.source_document_name ?? `Prior ${sourceDocLabelFull}`} attached` : "Building from the last implemented plan",
+      onEdit: () => setProceedWithoutUpload(false),
+      body: (
+        <div className="space-y-3">
+          <SourceStepBody
+            theme={gateTheme}
+            docLabel={sourceDocLabelFull}
+            onAttach={handleAttachSource}
+            canUsePrevious={uploadedMissing}
+            usePrevious={proceedWithoutUpload}
+            onUsePrevious={setProceedWithoutUpload}
+            hasPrevious={hasPrevious}
+            previousLabel={previousLabelStr}
+          />
+          {verifyItemDefs.length > 0 && (
+            <SourceIntakePanel embedded planId={planId} locked={locked} defaultSourceType={derivedSourceType} basis={intakeBasis} items={verifyItemDefs} />
+          )}
+        </div>
+      ),
+    });
+  }
+  phasesForRail.forEach((phase) => {
+    const compCount = phase.tasks.filter((t) => t.is_compulsory).length;
+    railSteps.push({
+      key: `phase-${phase.id}`,
+      title: phase.name,
+      subtitle: phase.description || "",
+      done: allCompulsoryComplete([phase], isComplete),
+      doneSummary: `${compCount} task${compCount === 1 ? "" : "s"} complete`,
+      body: (
+        <PhaseTaskList
+          phase={phase}
+          annualDate={plan.annual_plan_date}
+          taskInstructions={taskInstructions}
+          isComplete={isComplete}
+          onToggle={onToggle}
+          getOutcome={getOutcome}
+          onSaveOutcome={onSaveOutcome}
+          onAiDraft={handleAiDraftOutcome}
+          locked={locked}
+        />
+      ),
+    });
+  });
+  if (hasDraft) {
+    railSteps.push({
+      key: "signatures",
+      title: "Signatures & approvals",
+      subtitle: "Record the required sign-offs.",
+      done: signaturesOk,
+      variant: "bare",
+      body: <SignaturesPanel planId={planId} requiredRoles={requiredSignerRolesList} locked={locked} onChange={() => setCompTick((t) => t + 1)} />,
+    });
+    if (showAuthorization && structuredTree) {
+      railSteps.push({
+        key: "authorization",
+        title: "Service authorization & units",
+        subtitle: "",
+        done: true,
+        optional: true,
+        variant: "bare",
+        body: <AuthorizationPanel individualId={id} tree={structuredTree} effective={locked} />,
+      });
+    }
+    if (restrictionReviewRequired) {
+      railSteps.push({
+        key: "restrictions",
+        title: "Restrictive interventions",
+        subtitle: "",
+        done: restrictionsOk,
+        variant: "bare",
+        body: <RestrictionPanel planId={planId} committeeRequired={restrictionCommitteeRequired} locked={locked} onChange={() => setCompTick((t) => t + 1)} />,
+      });
+    }
+    railSteps.push({
+      key: "provider",
+      title: "Provider plan elements",
+      subtitle: "",
+      done: true,
+      optional: true,
+      variant: "bare",
+      body: (
+        <ProviderFieldsPanel
+          planId={planId}
+          requiredFields={providerRequiredFields}
+          fields={providerFieldDefs}
+          locked={locked}
+          onChange={() => setCompTick((t) => t + 1)}
+          canDraft={hasDraft}
+          onDraft={async () =>
+            draftProviderElementsFn({
+              data: {
+                planContent: planMarkdown,
+                individualName: individual.name,
+                serviceType: individual.service_type,
+                planTypeLabel: planTypeInfo(agent.plan_type).label,
+                profile: profileData,
+                briefRules: guidelinesBrief?.rules ?? [],
+                providerRequiredFields,
+              },
+            })
+          }
+        />
+      ),
+    });
+  }
+
   return (
     <AppShell>
       <div className="max-w-7xl mx-auto px-6 py-5">
@@ -864,107 +984,21 @@ function PlanRuntime() {
 
         {/* Two-pane layout. On desktop the row is bounded to one screen and
             each column scrolls internally — so a 30-50 page plan never grows
-            the page; you scroll within the plan pane. */}
-        <div className={`grid grid-cols-1 gap-5 lg:h-[calc(100vh-200px)] ${hasDraft ? "lg:grid-cols-[360px_1fr]" : "lg:grid-cols-[440px_1fr]"}`}>
-          {/* Pre-draft: the progressive-unlock workflow gate, themed by plan type.
-              Once a draft exists we switch to the compliance rail below. */}
-          {!hasDraft && plan.creation_mode === "ai" ? (
-            <aside className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1">
-              <PlanWorkflowGate
-                theme={gateTheme}
-                showSourceStep={sourceStepApplies}
-                docLabel={agent.source_document_label || planTypeInfo(agent.plan_type).label}
-                sourceMode={sourceMode}
-                attachedName={plan.source_document_name}
-                onAttach={handleAttachSource}
-                canUsePrevious={uploadedMissing}
-                usePrevious={proceedWithoutUpload}
-                onUsePrevious={setProceedWithoutUpload}
-                hasPrevious={hasPrevious}
-                previousLabel={previousLabelStr}
-                phases={preGeneratePhases}
-                isComplete={isComplete}
-                onToggle={onToggle}
-                locked={locked}
-              />
-            </aside>
-          ) : (
-          <aside className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1 space-y-4">
-            {/* Draft stage: only what is needed to draft. */}
-            {verifyItemDefs.length > 0 && (
-              <SourceIntakePanel
-                key={`intake-${sourceTick}`}
-                planId={planId}
-                locked={locked}
-                defaultSourceType={derivedSourceType}
-                basis={intakeBasis}
-                items={verifyItemDefs}
-              />
-            )}
-            <ChecklistPanel
-              phases={agent.workflow_data}
-              annualDate={plan.annual_plan_date}
-              taskInstructions={taskInstructions}
-              isComplete={isComplete}
-              onToggle={onToggle}
-              getOutcome={getOutcome}
-              onSaveOutcome={onSaveOutcome}
-              onAiDraft={handleAiDraftOutcome}
+            the page; you scroll within the plan pane. The left rail is one
+            themed workflow stepper for every state (gate before a draft, full
+            workflow + implementation readiness after). */}
+        <div className="grid grid-cols-1 gap-5 lg:h-[calc(100vh-200px)] lg:grid-cols-[440px_1fr]">
+          <aside key={`rail-${sourceTick}`} className="min-w-0 lg:h-full lg:overflow-y-auto lg:pr-1 space-y-4">
+            <PlanWorkflowRail
+              theme={gateTheme}
+              headerLabel={hasDraft ? "Plan workflow" : "Before you generate"}
+              steps={railSteps}
+              lockFuture={!hasDraft}
               locked={locked}
             />
-
-            {/* Implementation readiness: grouped, collapsed, and only available
-                once a draft exists. These flags count toward Implement. */}
-            {hasDraft && (
-              <ImplementationReadiness
-                ready={signaturesOk && restrictionsOk}
-                outstanding={readinessOutstanding}
-              >
-                <SignaturesPanel
-                  planId={planId}
-                  requiredRoles={requiredSignerRolesList}
-                  locked={locked}
-                  onChange={() => setCompTick((t) => t + 1)}
-                />
-                {showAuthorization && structuredTree && (
-                  <AuthorizationPanel individualId={id} tree={structuredTree} effective={locked} />
-                )}
-                {restrictionReviewRequired && (
-                  <RestrictionPanel
-                    planId={planId}
-                    committeeRequired={restrictionCommitteeRequired}
-                    locked={locked}
-                    onChange={() => setCompTick((t) => t + 1)}
-                  />
-                )}
-                <ProviderFieldsPanel
-                  planId={planId}
-                  requiredFields={providerRequiredFields}
-                  fields={providerFieldDefs}
-                  locked={locked}
-                  onChange={() => setCompTick((t) => t + 1)}
-                  canDraft={hasDraft}
-                  onDraft={async () =>
-                    draftProviderElementsFn({
-                      data: {
-                        planContent: planMarkdown,
-                        individualName: individual.name,
-                        serviceType: individual.service_type,
-                        planTypeLabel: planTypeInfo(agent.plan_type).label,
-                        profile: profileData,
-                        briefRules: guidelinesBrief?.rules ?? [],
-                        providerRequiredFields,
-                      },
-                    })
-                  }
-                />
-              </ImplementationReadiness>
-            )}
-
             {/* Audit trail stays visible: informational, not a demand. */}
             <AuditTrailPanel planId={planId} tick={compTick} />
           </aside>
-          )}
 
           <section className="min-w-0 lg:h-full min-h-0 flex flex-col">
             {plan.creation_mode === "ai" ? (

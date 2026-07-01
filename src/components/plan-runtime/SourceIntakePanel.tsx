@@ -38,9 +38,13 @@ export function SourceIntakePanel({
   defaultSourceType,
   basis = "none",
   items,
+  embedded,
 }: {
   planId: string;
   locked?: boolean;
+  // When embedded in the workflow rail's Source step, drop the outer card and
+  // the collapse header (the step provides both); the fields are always shown.
+  embedded?: boolean;
   // Best guess for the received upstream document type: from the extracted
   // document, the carried-forward previous plan, or the agent's configured
   // source-document label. Pre-filled, confirmable, never required.
@@ -123,7 +127,8 @@ export function SourceIntakePanel({
   );
 
   return (
-    <div className="rounded-2xl border border-line bg-card shadow-soft overflow-hidden">
+    <div className={embedded ? "" : "rounded-2xl border border-line bg-card shadow-soft overflow-hidden"}>
+      {!embedded && (
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -146,9 +151,10 @@ export function SourceIntakePanel({
         ) : null}
         {open ? <ChevronDown className="h-4 w-4 text-ink3" /> : <ChevronRight className="h-4 w-4 text-ink3" />}
       </button>
+      )}
 
-      {open && (
-        <div className="px-4 pb-4 space-y-3 border-t border-line pt-3">
+      {(embedded || open) && (
+        <div className={embedded ? "space-y-3 pt-1" : "px-4 pb-4 space-y-3 border-t border-line pt-3"}>
           {inert && (
             <div className="flex items-start gap-2 text-[12px] text-ink2 bg-muted/40 border border-line rounded-xl px-3 py-2">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber" />

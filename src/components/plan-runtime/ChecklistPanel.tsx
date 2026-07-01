@@ -124,6 +124,50 @@ export function ChecklistPanel({
   );
 }
 
+// The task rows for a single phase, extracted so the new stepper rail can
+// render one phase per step while keeping every per-task control (AI
+// instructions, outcome capture) identical.
+export function PhaseTaskList({
+  phase,
+  annualDate,
+  taskInstructions,
+  isComplete,
+  onToggle,
+  getOutcome,
+  onSaveOutcome,
+  onAiDraft,
+  locked,
+}: {
+  phase: WorkflowPhase;
+  annualDate: string;
+  taskInstructions: Record<string, string>;
+  isComplete: (taskId: string, role: string | null) => boolean;
+  onToggle: (taskId: string, role: string | null, complete: boolean) => void;
+  getOutcome?: (taskId: string) => TaskOutcomeValue;
+  onSaveOutcome?: (taskId: string, value: TaskOutcomeValue) => void;
+  onAiDraft?: (task: WorkflowTask) => Promise<TaskOutcomeValue>;
+  locked?: boolean;
+}) {
+  return (
+    <div className="divide-y divide-line">
+      {phase.tasks.map((task) => (
+        <TaskRow
+          key={task.id}
+          task={task}
+          annualDate={annualDate}
+          instruction={taskInstructions[task.id]}
+          isComplete={isComplete}
+          onToggle={onToggle}
+          outcome={getOutcome?.(task.id)}
+          onSaveOutcome={locked ? undefined : onSaveOutcome}
+          onAiDraft={locked ? undefined : onAiDraft}
+          locked={locked}
+        />
+      ))}
+    </div>
+  );
+}
+
 function TaskRow({
   task,
   annualDate,
