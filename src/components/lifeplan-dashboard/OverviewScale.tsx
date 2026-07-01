@@ -5,11 +5,12 @@
 // readiness rings), a scoped results area on demand, programs by risk, trends.
 // Every count drills into the existing scoped list + individual slide-out.
 import { useMemo, useState, type CSSProperties } from "react";
-import { ChevronDown, ChevronRight, X, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, X, Sparkles, LayoutGrid } from "lucide-react";
 import { ProgressDrawer } from "./ProgressDrawer";
 import { OverviewAsk } from "./OverviewAsk";
 import { OverviewTrends } from "./OverviewTrends";
 import { TrendsPanel } from "./TrendsPanel";
+import { ComplianceMatrixModal } from "./ComplianceMatrix";
 import { useLifeplanSummary, useLifeplanDistribution, useScopedPlans, SCOPE_PAGE_SIZE } from "@/lib/useLifeplanScale";
 import {
   EXCEPTION_CATEGORIES,
@@ -52,6 +53,13 @@ export function OverviewScale({
   const [scope, setScope] = useState<Scope>(null);
   const [slideIndividual, setSlideIndividual] = useState<string | null>(null);
   const [trendsOpen, setTrendsOpen] = useState(false);
+  const [matrixOpen, setMatrixOpen] = useState(false);
+  // Meter stats for the compliance-matrix entry point, from the same rows the
+  // matrix renders.
+  const matrixStats = useMemo(() => {
+    const rows = buildAllRows();
+    return { total: rows.length, overdue: rows.filter((r) => r.overdue).length };
+  }, []);
 
   const openCategory = (category: ExceptionCategory, answer?: string) => {
     setScope({ kind: "category", category, answer });
@@ -84,6 +92,35 @@ export function OverviewScale({
         <HealthDonut summary={summary} />
         <ProviderCoverage summary={summary} onMeter={openCategory} />
       </div>
+
+      {/* Compliance matrix meter: opens the full per-person, per-plan-type grid */}
+      <button
+        onClick={() => setMatrixOpen(true)}
+        className="lp-act"
+        style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", marginBottom: 18, background: "#fff", border: "1px solid var(--border-soft)", borderRadius: 16, boxShadow: "var(--shadow-sm)", cursor: "pointer" }}
+        title="Open the compliance matrix"
+      >
+        <span style={{ height: 38, width: 38, flex: "none", borderRadius: 10, background: "var(--icm-slate-100, #EEF2F7)", color: "var(--icm-navy, #1B3D8F)", display: "grid", placeItems: "center" }}>
+          <LayoutGrid className="h-4.5 w-4.5" />
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 14.5, fontWeight: 700, color: "var(--fg1)" }}>Compliance matrix</span>
+          <span style={{ display: "block", fontFamily: "var(--font-text)", fontSize: 12.5, color: "var(--fg4)", marginTop: 1 }}>Every plan's next deadline, by person and plan type</span>
+        </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 16, flex: "none" }}>
+          <span style={{ textAlign: "center" }}>
+            <span style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: "var(--fg1)", lineHeight: 1 }}>{matrixStats.total}</span>
+            <span style={{ fontFamily: "var(--font-text)", fontSize: 10.5, color: "var(--fg4)" }}>plans</span>
+          </span>
+          {matrixStats.overdue > 0 && (
+            <span style={{ textAlign: "center" }}>
+              <span style={{ display: "block", fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: RED, lineHeight: 1 }}>{matrixStats.overdue}</span>
+              <span style={{ fontFamily: "var(--font-text)", fontSize: 10.5, color: "var(--fg4)" }}>overdue</span>
+            </span>
+          )}
+          <ChevronRight className="h-5 w-5" style={{ color: "var(--fg4)" }} />
+        </span>
+      </button>
 
       {/* Needs attention, grouped by meaning */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "6px 2px 14px" }}>
@@ -133,6 +170,9 @@ export function OverviewScale({
 
       {/* Trends results in a right-side slide-in panel */}
       <TrendsPanel open={trendsOpen} onClose={() => setTrendsOpen(false)} />
+
+      {/* Compliance matrix, opened from the meter above */}
+      <ComplianceMatrixModal open={matrixOpen} onClose={() => setMatrixOpen(false)} />
     </>
   );
 }
