@@ -1,7 +1,13 @@
 // Streaming SSE plan generator. Streams from Gemini (OpenAI-compatible endpoint).
 import { createFileRoute } from "@tanstack/react-router";
 import { createGeminiProvider, DEFAULT_GEMINI_MODEL } from "@/lib/gemini.server";
-import { streamText, convertToModelMessages, type UIMessage } from "ai";
+import {
+  streamText,
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type UIMessage,
+} from "ai";
 
 type CapturedGoalInput = {
   outcome_statement: string;
@@ -157,6 +163,130 @@ function buildSystemPrompt(b: Body) {
   ].join("\n");
 }
 
+function addMonths(date: string, months: number) {
+  const value = new Date(`${date.slice(0, 10)}T12:00:00Z`);
+  value.setUTCMonth(value.getUTCMonth() + months);
+  return value.toISOString().slice(0, 10);
+}
+
+function buildDemoPlan(b: Body) {
+  const startDate = (b.annualPlanDate || new Date().toISOString()).slice(0, 10);
+  const targetDate = addMonths(startDate, 12);
+  const strategyLabel = b.strategyLabel || "Strategy";
+  const captured = b.taskOutcomes?.capturedGoals?.filter((goal) => goal.goal_statement.trim()) || [];
+  const goals = captured.length
+    ? captured
+    : [
+        {
+          outcome_statement: `${b.individualName} is supported to build independence and participate in daily life.`,
+          goal_statement: `${b.individualName} will complete a preferred daily-living activity with consistent support.`,
+          target_date: targetDate,
+          person_responsible: "Direct Support Professional and planning team",
+          notes: "Use person-centered choices, encouragement, and the least intrusive prompts.",
+        },
+      ];
+
+  const outcomes = goals.map((goal, index) => {
+    const completionDate = goal.target_date || targetDate;
+    const responsible = goal.person_responsible || "Direct Support Professional and planning team";
+    return {
+      outcome_statement:
+        goal.outcome_statement || `${b.individualName} has meaningful choice, independence, and community participation.`,
+      sort_order: index,
+      goals: [
+        {
+          goal_statement: goal.goal_statement,
+          target_implementation_date: startDate,
+          target_completion_date: completionDate,
+          who_will_help: responsible,
+          frequency_worked_on: "Weekly and during naturally occurring opportunities",
+          who_reviews_progress: "Planning team",
+          review_frequency: "Monthly",
+          family_or_responsible_person: null,
+          person_responsible: responsible,
+          description: goal.notes || "Support progress through choice, practice, and positive reinforcement.",
+          progress: null,
+          status: "Pending",
+          strategies: [
+            {
+              title: `Practice and document progress toward goal ${index + 1}`,
+              target_date: completionDate,
+              person_responsible: responsible,
+              description: `Offer ${b.individualName} choices, provide only the support needed, and document the response.`,
+              progress: null,
+              service_delivery: {
+                services_and_expected_outcomes: ["Completed independently", "Completed with support", "Declined", "Not offered"],
+                capture_readings: [{ label: "Level of support", units: "Prompt level" }],
+                prompts: ["Independent", "Verbal prompt", "Gesture prompt", "Physical assistance"],
+                protocol: `Ask ${b.individualName} for their preference, allow time to respond, and use the least intrusive prompt necessary.`,
+                show_on_care_tracker: true,
+                funding_stream: null,
+                notify_when_documented: false,
+                status: "Pending",
+              },
+              schedule: [{ schedule_date: null, shift_time: "Day Shift", days: "Every Week" }],
+              service_provided_by: ["DSP"],
+              comments: null,
+            },
+          ],
+        },
+      ],
+    };
+  });
+
+  const sections = outcomes
+    .map((outcome, index) => {
+      const goal = outcome.goals[0];
+      const strategy = goal.strategies[0];
+      return [
+        `## Outcome ${index + 1}`,
+        outcome.outcome_statement,
+        `### Goal`,
+        goal.goal_statement,
+        `- **Timeline:** ${goal.target_implementation_date} to ${goal.target_completion_date}`,
+        `- **Responsible parties:** ${goal.person_responsible}`,
+        `- **Review:** ${goal.review_frequency} by the ${goal.who_reviews_progress}`,
+        `### ${strategyLabel}`,
+        `**${strategy.title}** — ${strategy.description}`,
+        `- **Frequency:** ${goal.frequency_worked_on}`,
+        `- **Evaluation:** Track independence and prompt level after each opportunity.`,
+      ].join("\n\n");
+    })
+    .join("\n\n");
+
+  const tree = { plan_type: b.planType, outcomes };
+  return [
+    `# ${b.planType}`,
+    `**Individual:** ${b.individualName}  \n**Service:** ${b.serviceType}  \n**Plan date:** ${startDate}  \n**Status:** Draft for team review`,
+    `This person-centered draft highlights ${b.individualName}'s choices, strengths, and opportunities for greater independence. The team should review and confirm all details before implementation.`,
+    sections,
+    `## Health, Safety, Rights & Preferences`,
+    `Support ${b.individualName}'s informed choices, privacy, dignity, communication preferences, and right to decline. Follow current health and safety protocols while using the least restrictive support.`,
+    `## Review Schedule`,
+    `The planning team will review progress monthly and revise supports when ${b.individualName}'s preferences, needs, or circumstances change.`,
+    "```ICM_PLAN_TREE",
+    JSON.stringify(tree),
+    "```",
+  ].join("\n\n");
+}
+
+function demoPlanResponse(body: Body) {
+  const text = buildDemoPlan(body);
+  const stream = createUIMessageStream({
+    originalMessages: body.messages,
+    execute: async ({ writer }) => {
+      const id = `demo-${Date.now()}`;
+      writer.write({ type: "text-start", id });
+      for (let offset = 0; offset < text.length; offset += 220) {
+        writer.write({ type: "text-delta", id, delta: text.slice(offset, offset + 220) });
+        await new Promise((resolve) => setTimeout(resolve, 35));
+      }
+      writer.write({ type: "text-end", id });
+    },
+  });
+  return createUIMessageStreamResponse({ stream });
+}
+
 export const Route = createFileRoute("/api/generate-plan")({
   server: {
     handlers: {
@@ -166,7 +296,7 @@ export const Route = createFileRoute("/api/generate-plan")({
           return new Response("messages required", { status: 400 });
         }
         const key = process.env.GEMINI_API_KEY;
-        if (!key) return new Response("GEMINI_API_KEY missing", { status: 500 });
+        if (!key) return demoPlanResponse(body);
 
         const gemini = createGeminiProvider(key);
         const model = gemini(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL);
