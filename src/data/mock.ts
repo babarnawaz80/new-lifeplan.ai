@@ -1781,4 +1781,381 @@ export const accentColor: Record<Agent["accent"], string> = {
     });
     void idx;
   });
+
+  // ── Esha's showcase Person-Centered Plan ────────────────────────────────
+  // Deterministic, rich, IMPLEMENTED PCP (3 outcomes → 6 goals → 8 strategies)
+  // so the demo always opens on a complete, realistic plan with deep-linked
+  // CareTracker-ready strategies and a ready training video.
+  (() => {
+    const pcpAgent = agents.find((a) => a.id === "pcp");
+    if (!pcpAgent) return;
+    const start = iso(-20).slice(0, 10);
+    const mid = iso(160).slice(0, 10);
+    const end = iso(345).slice(0, 10);
+    type Tree = import("@/types/icmGoalOutcome").IcmPlanTree;
+    type Strat = import("@/types/icmGoalOutcome").IcmStrategy;
+    type GoalT = import("@/types/icmGoalOutcome").IcmGoal;
+    const sd = (
+      outcomes: string[],
+      readings: Array<{ label: string; units: string }>,
+      prompts: string[],
+      protocol: string,
+    ): Strat["service_delivery"] => ({
+      services_and_expected_outcomes: outcomes,
+      capture_readings: readings,
+      prompts,
+      protocol,
+      show_on_care_tracker: true,
+      funding_stream: null,
+      notify_when_documented: false,
+      status: "Active",
+    });
+    const strat = (
+      id: string,
+      title: string,
+      target: string,
+      responsible: string,
+      description: string,
+      delivery: Strat["service_delivery"],
+      days: string,
+      shift = "Day Shift",
+    ): Strat => ({
+      id,
+      title,
+      target_date: target,
+      person_responsible: responsible,
+      description,
+      progress: null,
+      service_delivery: delivery,
+      schedule: [{ schedule_date: null, shift_time: shift, days }],
+      service_provided_by: ["DSP"],
+      comments: null,
+    });
+    const goal = (
+      id: string,
+      statement: string,
+      completion: string,
+      frequency: string,
+      description: string,
+      strategies: Strat[],
+    ): GoalT => ({
+      id,
+      goal_statement: statement,
+      target_implementation_date: start,
+      target_completion_date: completion,
+      who_will_help: "Direct Support Professionals and the planning team",
+      frequency_worked_on: frequency,
+      who_reviews_progress: "Program Coordinator",
+      review_frequency: "Monthly",
+      family_or_responsible_person: null,
+      person_responsible: "Program Coordinator",
+      description,
+      progress: null,
+      status: "Active",
+      strategies,
+    });
+    const eshaTree: Tree = {
+      plan_type: pcpAgent.plan_type,
+      outcomes: [
+        {
+          id: "o_esha_1",
+          outcome_statement: "Esha is connected to her community and spends time doing the things she enjoys.",
+          sort_order: 0,
+          goals: [
+            goal(
+              "g_esha_1",
+              `Esha will join two community activities of her choosing each week — such as art class, library visits, or the rec-center swim program — by ${end}.`,
+              end,
+              "Twice per week",
+              "Community participation builds Esha's confidence, friendships, and sense of belonging. Activities are always her choice, offered through her visual choice board.",
+              [
+                strat(
+                  "s_esha_1",
+                  "Weekly community outing of Esha's choice",
+                  end,
+                  "DSP",
+                  "Offer Esha two or three activity options from her visual choice board, support the outing she picks, and document the experience.",
+                  sd(
+                    ["Participated independently", "Participated with support", "Chose not to go", "Activity unavailable"],
+                    [{ label: "Outings this week", units: "Simple Count" }],
+                    ["Offer choices from the visual board", "Allow extra time to decide", "Provide only the support she needs", "Celebrate participation"],
+                    "Present choices at Esha's communication level. Bring her supports (sensory items, device, water). Document which activity she chose and her level of engagement.",
+                  ),
+                  "Tue, Thu",
+                ),
+                strat(
+                  "s_esha_2",
+                  "Saturday peer social time",
+                  end,
+                  "DSP",
+                  "Support Esha to spend time with peers at the rec center or a preferred community spot each weekend.",
+                  sd(
+                    ["Initiated interaction", "Responded to peers", "Observed comfortably", "Preferred quiet time"],
+                    [{ label: "Minutes engaged", units: "Simple Count" }],
+                    ["Model a greeting", "Introduce a shared activity", "Step back and allow natural interaction"],
+                    "Support but do not direct the interaction. Follow Esha's lead and comfort level.",
+                  ),
+                  "Sat",
+                ),
+              ],
+            ),
+            goal(
+              "g_esha_2",
+              `Esha will help plan one outing each month using her visual planner — choosing the activity, the time, and who goes along — by ${mid}.`,
+              mid,
+              "Monthly",
+              "Self-directed planning builds Esha's decision-making skills and ensures outings reflect what she actually wants to do.",
+              [
+                strat(
+                  "s_esha_3",
+                  "Monthly outing planning session",
+                  mid,
+                  "Program Coordinator",
+                  "Sit with Esha and her visual planner to pick next month's outing: the activity, the day, and who goes along.",
+                  sd(
+                    ["Planned independently", "Planned with support", "Needed full support", "Declined to plan"],
+                    [{ label: "Choices made", units: "Simple Count" }],
+                    ["Review last month's photos together", "Offer a short list of options", "Write her choice on the planner together"],
+                    "Keep the session short and positive. Record exactly what Esha chose.",
+                  ),
+                  "First Monday of the month",
+                ),
+              ],
+            ),
+          ],
+        },
+        {
+          id: "o_esha_2",
+          outcome_statement: "Esha builds independence in her daily routines at home and at the program.",
+          sort_order: 1,
+          goals: [
+            goal(
+              "g_esha_3",
+              `Esha will complete her morning routine — washing up, brushing her teeth, and getting dressed — with no more than one verbal prompt on 4 of 5 weekdays, by ${mid}.`,
+              mid,
+              "Every weekday morning",
+              "Mastering her morning routine grows Esha's independence and self-esteem. Use the least intrusive prompt and fade prompts as she progresses.",
+              [
+                strat(
+                  "s_esha_4",
+                  "Morning routine with visual schedule",
+                  mid,
+                  "DSP",
+                  "Use the visual schedule posted in the bathroom and bedroom. Walk Esha through each step, fading prompts as her independence grows.",
+                  sd(
+                    ["Independent", "Verbal prompt", "Gesture prompt", "Physical assistance", "Refused"],
+                    [{ label: "Level of support", units: "Prompt level" }],
+                    ["Point to the visual schedule", "Give one verbal cue", "Wait 10 seconds before prompting again", "Praise each completed step"],
+                    "Never rush the routine. If a step is refused, move on and come back to it. Record the highest prompt level needed.",
+                  ),
+                  "Mon, Tue, Wed, Thu, Fri",
+                  "07:00 AM - 08:30 AM",
+                ),
+              ],
+            ),
+            goal(
+              "g_esha_4",
+              `Esha will prepare a simple snack of her choice, such as a fruit cup or sandwich, with staff supervision twice a week, by ${end}.`,
+              end,
+              "Twice per week",
+              "Snack preparation builds practical life skills and gives Esha natural choices at every step.",
+              [
+                strat(
+                  "s_esha_5",
+                  "Snack prep with picture recipe",
+                  end,
+                  "DSP",
+                  "Use the step-by-step picture recipe cards. Esha chooses the snack, gathers ingredients with support, and follows each pictured step.",
+                  sd(
+                    ["Completed all steps", "Completed most steps", "Needed hand-over-hand", "Chose not to participate"],
+                    [{ label: "Steps completed independently", units: "Simple Count" }],
+                    ["Offer two snack choices", "Read each picture step aloud", "Assist only with sharp or hot items"],
+                    "Staff handle knives and appliances. Esha does everything else, with fading prompts.",
+                  ),
+                  "Wed, Sat",
+                  "03:00 PM - 04:00 PM",
+                ),
+              ],
+            ),
+          ],
+        },
+        {
+          id: "o_esha_3",
+          outcome_statement: "Esha stays healthy, active, and comfortable every day.",
+          sort_order: 2,
+          goals: [
+            goal(
+              "g_esha_5",
+              `Esha will take part in at least 20 minutes of physical activity she enjoys — walks, dance videos, or swimming — five days a week, by ${mid}.`,
+              mid,
+              "Five days per week",
+              "Regular, enjoyable movement supports Esha's physical health, sleep, and mood. The activity is always her choice.",
+              [
+                strat(
+                  "s_esha_6",
+                  "20-minute movement break",
+                  mid,
+                  "DSP",
+                  "Offer Esha a choice of a walk, a dance video, or a swim. Join in and keep it fun — the goal is enjoyment, not exercise compliance.",
+                  sd(
+                    ["20+ minutes", "10–19 minutes", "Under 10 minutes", "Declined"],
+                    [{ label: "Minutes active", units: "Simple Count" }],
+                    ["Offer the activity choices", "Start together", "Follow Esha's pace"],
+                    "Stop at any sign of discomfort or fatigue. Note the activity she chose and minutes completed.",
+                  ),
+                  "Every Day",
+                ),
+              ],
+            ),
+            goal(
+              "g_esha_6",
+              `Esha will let staff know when she is in pain or not feeling well, using her words, gestures, or her communication device, by ${end}.`,
+              end,
+              "Daily check-ins",
+              "Early communication of pain or illness prevents escalation and gets Esha care quickly.",
+              [
+                strat(
+                  "s_esha_7",
+                  "Wellness check-in each shift",
+                  end,
+                  "DSP",
+                  "At the start of each shift, ask Esha how she feels using her feelings chart or device. Model the vocabulary and honor every response.",
+                  sd(
+                    ["Communicated independently", "Responded with support", "No response", "Reported discomfort — followed protocol"],
+                    [{ label: "Check-ins completed", units: "Simple Count" }],
+                    ["Show the feelings chart", "Ask and wait 10 seconds", "Model an answer if needed", "Act on any report of pain immediately"],
+                    "Any report of pain or illness is documented and escalated to the nurse per the health protocol. Never dismiss a self-report.",
+                  ),
+                  "Every Day",
+                ),
+              ],
+            ),
+          ],
+        },
+      ],
+    };
+
+    const eshaMarkdown = [
+      "# Person-Centered Plan",
+      "",
+      "**Individual:** Esha  ",
+      "**Service:** Residential — Columbia House  ",
+      `**Plan date:** ${start}  `,
+      "**Status:** Implemented",
+      "",
+      "This plan is built around Esha's choices, strengths, and goals for greater independence and community connection.",
+      "",
+      "## Outcome 1: Esha is connected to her community and spends time doing the things she enjoys.",
+      "",
+      "### Goal 1.1",
+      eshaTree.outcomes[0].goals[0].goal_statement,
+      "",
+      "**Strategies:** Weekly community outing of Esha's choice (Tue, Thu) · Saturday peer social time (Sat)",
+      "",
+      "### Goal 1.2",
+      eshaTree.outcomes[0].goals[1].goal_statement,
+      "",
+      "**Strategy:** Monthly outing planning session with her visual planner",
+      "",
+      "## Outcome 2: Esha builds independence in her daily routines at home and at the program.",
+      "",
+      "### Goal 2.1",
+      eshaTree.outcomes[1].goals[0].goal_statement,
+      "",
+      "**Strategy:** Morning routine with visual schedule (weekday mornings)",
+      "",
+      "### Goal 2.2",
+      eshaTree.outcomes[1].goals[1].goal_statement,
+      "",
+      "**Strategy:** Snack prep with picture recipe (Wed, Sat)",
+      "",
+      "## Outcome 3: Esha stays healthy, active, and comfortable every day.",
+      "",
+      "### Goal 3.1",
+      eshaTree.outcomes[2].goals[0].goal_statement,
+      "",
+      "**Strategy:** 20-minute movement break (daily)",
+      "",
+      "### Goal 3.2",
+      eshaTree.outcomes[2].goals[1].goal_statement,
+      "",
+      "**Strategy:** Wellness check-in each shift (daily)",
+      "",
+      "## Health, Safety, Rights & Preferences",
+      "Support Esha's informed choices, privacy, dignity, and communication preferences. She has the right to decline any activity; always use the least restrictive support.",
+      "",
+      "## Review Schedule",
+      "The planning team reviews progress monthly and revises supports whenever Esha's preferences, needs, or circumstances change.",
+    ].join("\n");
+
+    const existing = plans.find((p) => p.individual_id === "esha" && p.agent_id === "pcp");
+    if (existing) {
+      existing.status = "implemented";
+      existing.creation_mode = "ai";
+      existing.plan_type_label = "Annual";
+      existing.plan_mode = "annual";
+      existing.structured_tree = eshaTree;
+      existing.plan_content = {
+        markdown: eshaMarkdown,
+        structured_tree: eshaTree,
+        implementation_date: iso(-20),
+        implemented_by: "Babar Nawaz",
+      };
+      existing.implementation_date = iso(-20);
+      existing.annual_plan_date = iso(300);
+      existing.awaiting_source_document = false;
+      existing.updated_at = iso(-3);
+      if (!trainings.some((t) => t.plan_id === existing.id)) {
+        trainings.push({
+          id: `tr_seed_esha_pcp`,
+          plan_id: existing.id,
+          individual_id: "esha",
+          status: "ready",
+          video_status: "ready",
+          content: seededTrainingContent(pcpAgent.plan_type, "Esha"),
+          kind: "initial",
+          trigger: "manual",
+          published_at: iso(-18),
+          created_at: iso(-19),
+        });
+      }
+    } else {
+      const plan: Plan = {
+        id: "seed_plan_esha_pcp",
+        agent_id: "pcp",
+        individual_id: "esha",
+        individual_name: "Esha",
+        creation_mode: "ai",
+        plan_type_label: "Annual",
+        plan_mode: "annual",
+        status: "implemented",
+        plan_content: {
+          markdown: eshaMarkdown,
+          structured_tree: eshaTree,
+          implementation_date: iso(-20),
+          implemented_by: "Babar Nawaz",
+        },
+        field_values: {},
+        structured_tree: eshaTree,
+        auto_renew: false,
+        annual_plan_date: iso(300),
+        implementation_date: iso(-20),
+        created_at: iso(-40),
+        updated_at: iso(-3),
+      };
+      plans.push(plan);
+      trainings.push({
+        id: "tr_seed_esha_pcp",
+        plan_id: plan.id,
+        individual_id: "esha",
+        status: "ready",
+        video_status: "ready",
+        content: seededTrainingContent(pcpAgent.plan_type, "Esha"),
+        kind: "initial",
+        trigger: "manual",
+        published_at: iso(-18),
+        created_at: iso(-19),
+      });
+    }
+  })();
 })();
