@@ -541,9 +541,11 @@ function demoPlanResponse(body: Body) {
     execute: async ({ writer }) => {
       const id = `demo-${Date.now()}`;
       writer.write({ type: "text-start", id });
-      for (let offset = 0; offset < text.length; offset += 220) {
-        writer.write({ type: "text-delta", id, delta: text.slice(offset, offset + 220) });
-        await new Promise((resolve) => setTimeout(resolve, 35));
+      // Slower, smaller chunks so the streamed draft visibly types out and the
+      // processing panel has time to breathe in demo mode.
+      for (let offset = 0; offset < text.length; offset += 140) {
+        writer.write({ type: "text-delta", id, delta: text.slice(offset, offset + 140) });
+        await new Promise((resolve) => setTimeout(resolve, 70));
       }
       writer.write({ type: "text-end", id });
     },

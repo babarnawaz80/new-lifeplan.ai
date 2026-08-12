@@ -251,6 +251,8 @@ export function AiChatPane({
   const [savedMarkdown, setSavedMarkdown] = useState(initialMarkdown || "");
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastFinalizedIdRef = useRef<string | null>(null);
+  const genStartRef = useRef(0);
+  const finalizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isLoading = status === "submitted" || status === "streaming";
 
@@ -259,32 +261,49 @@ export function AiChatPane({
   const latestAssistantText = latestAssistant ? textFromMessage(latestAssistant) : "";
   const { visible: liveMarkdown } = extractMachineBlocks(latestAssistantText);
 
-  // Step animation while streaming
+  // Step animation while generating. Keeps marching through the steps until
+  // finalization hides them (finalization itself waits for the minimum
+  // processing window below), so the progress panel never flashes by.
   useEffect(() => {
     if (!showSteps) return;
-    if (status === "ready" || status === "error") return;
+    if (status === "error") return;
     const interval = setInterval(() => {
       setActiveStepIndex((i) => {
         if (i >= processingSteps.length - 1) return i;
         return i + 1;
       });
-    }, 1400);
+    }, 900);
     return () => clearInterval(interval);
   }, [showSteps, status, processingSteps.length]);
 
-  // When streaming finishes, finalize once per assistant message
+  // When streaming finishes, finalize once per assistant message — but never
+  // before a minimum processing window has elapsed, so the steps panel is
+  // visible long enough to read (demo-friendly pacing; the design is unchanged).
   useEffect(() => {
     if (!latestAssistant) return;
     if (status !== "ready") return;
     if (lastFinalizedIdRef.current === latestAssistant.id) return;
     lastFinalizedIdRef.current = latestAssistant.id;
 
-    const full = textFromMessage(latestAssistant);
-    const { visible, caretracker, tree } = extractMachineBlocks(full);
-    setSavedMarkdown(visible);
-    setShowSteps(false);
-    setActiveStepIndex(processingSteps.length);
-    onPlanContent(visible, caretracker, tree);
+    const finalize = () => {
+      const full = textFromMessage(latestAssistant);
+      const { visible, caretracker, tree } = extractMachineBlocks(full);
+      setSavedMarkdown(visible);
+      setShowSteps(false);
+      setActiveStepIndex(processingSteps.length);
+      onPlanContent(visible, caretracker, tree);
+    };
+
+    const MIN_PROCESSING_MS = 9000;
+    const remaining = Math.max(0, MIN_PROCESSING_MS - (Date.now() - genStartRef.current));
+    if (remaining === 0) {
+      finalize();
+      return;
+    }
+    finalizeTimerRef.current = setTimeout(finalize, remaining);
+    return () => {
+      if (finalizeTimerRef.current) clearTimeout(finalizeTimerRef.current);
+    };
   }, [latestAssistant, status, onPlanContent, processingSteps.length]);
 
   // Auto-scroll
@@ -299,6 +318,8 @@ export function AiChatPane({
     // Implemented plans are locked; never call the model. Draft gate also
     // blocks generation when a source/pre-planning isn't met.
     if (locked || draftBlockedReason) return;
+    if (finalizeTimerRef.current) clearTimeout(finalizeTimerRef.current);
+    genStartRef.current = Date.now();
     const steps = buildProcessingSteps(enabledProfileFieldNames);
     setProcessingSteps(steps);
     setActiveStepIndex(0);
