@@ -318,6 +318,8 @@ export function AiChatPane({
     // Implemented plans are locked; never call the model. Draft gate also
     // blocks generation when a source/pre-planning isn't met.
     if (locked || draftBlockedReason) return;
+    if (finalizeTimerRef.current) clearTimeout(finalizeTimerRef.current);
+    genStartRef.current = Date.now();
     const steps = buildProcessingSteps(enabledProfileFieldNames);
     setProcessingSteps(steps);
     setActiveStepIndex(0);
