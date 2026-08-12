@@ -169,101 +169,365 @@ function addMonths(date: string, months: number) {
   return value.toISOString().slice(0, 10);
 }
 
+type DemoServiceDelivery = {
+  services_and_expected_outcomes: string[];
+  capture_readings: Array<{ label: string; units: string }>;
+  prompts: string[];
+  protocol: string;
+  show_on_care_tracker: boolean;
+  funding_stream: string | null;
+  notify_when_documented: boolean;
+  status: "Pending" | "Active" | "Discontinued";
+};
+type DemoStrategy = {
+  title: string;
+  target_date: string;
+  person_responsible: string;
+  description: string;
+  progress: string | null;
+  service_delivery: DemoServiceDelivery;
+  schedule: Array<{ schedule_date: string | null; shift_time: string; days: string }>;
+  service_provided_by: string[];
+  comments: string | null;
+};
+type DemoGoal = {
+  goal_statement: string;
+  target_implementation_date: string;
+  target_completion_date: string;
+  who_will_help: string;
+  frequency_worked_on: string;
+  who_reviews_progress: string;
+  review_frequency: string;
+  family_or_responsible_person: string | null;
+  person_responsible: string;
+  description: string;
+  progress: string | null;
+  status: "Pending" | "Active" | "Discontinued";
+  strategies: DemoStrategy[];
+};
+
+function demoDelivery(
+  outcomes: string[],
+  readings: Array<{ label: string; units: string }>,
+  prompts: string[],
+  protocol: string,
+): DemoServiceDelivery {
+  return {
+    services_and_expected_outcomes: outcomes,
+    capture_readings: readings,
+    prompts,
+    protocol,
+    show_on_care_tracker: true,
+    funding_stream: null,
+    notify_when_documented: false,
+    status: "Pending",
+  };
+}
+
+function demoStrategy(
+  title: string,
+  targetDate: string,
+  responsible: string,
+  description: string,
+  delivery: DemoServiceDelivery,
+  days: string,
+  shift = "Day Shift",
+): DemoStrategy {
+  return {
+    title,
+    target_date: targetDate,
+    person_responsible: responsible,
+    description,
+    progress: null,
+    service_delivery: delivery,
+    schedule: [{ schedule_date: null, shift_time: shift, days }],
+    service_provided_by: ["DSP"],
+    comments: null,
+  };
+}
+
+// Rich, realistic person-centered default used when no team-captured goals
+// exist. Multi-outcome, multi-goal, multi-strategy so the demo runtime shows
+// the full Outcomes → Goals → Strategies tree exactly like a real plan.
+function richDemoOutcomes(name: string, startDate: string, targetDate: string) {
+  const midDate = addMonths(startDate, 6);
+  const dsp = "Direct Support Professional";
+  const pc = "Program Coordinator";
+
+  const goal = (
+    statement: string,
+    completion: string,
+    frequency: string,
+    description: string,
+    strategies: DemoStrategy[],
+  ): DemoGoal => ({
+    goal_statement: statement,
+    target_implementation_date: startDate,
+    target_completion_date: completion,
+    who_will_help: `${dsp}s and the planning team`,
+    frequency_worked_on: frequency,
+    who_reviews_progress: pc,
+    review_frequency: "Monthly",
+    family_or_responsible_person: null,
+    person_responsible: pc,
+    description,
+    progress: null,
+    status: "Pending",
+    strategies,
+  });
+
+  return [
+    {
+      outcome_statement: `${name} is connected to the community and spends time doing things they enjoy.`,
+      sort_order: 0,
+      goals: [
+        goal(
+          `${name} will join two community activities of their choosing each week — such as art class, library visits, or the rec-center swim program — by ${targetDate}.`,
+          targetDate,
+          "Twice per week",
+          "Community participation builds confidence, friendships, and a sense of belonging. Activities are always chosen by the individual.",
+          [
+            demoStrategy(
+              "Weekly community outing of choice",
+              targetDate,
+              dsp,
+              `Offer ${name} two or three activity options from the visual choice board, support the chosen outing, and document the experience.`,
+              demoDelivery(
+                ["Participated independently", "Participated with support", "Chose not to go", "Activity unavailable"],
+                [{ label: "Outings this week", units: "Simple Count" }],
+                ["Offer choices from the visual board", "Allow extra time to decide", "Provide only the support needed", "Celebrate participation"],
+                `Present choices at ${name}'s communication level. Bring any needed supports (sensory items, device, water). Document which activity was chosen and the level of engagement.`,
+                "Tue, Thu",
+              ),
+            ),
+            demoStrategy(
+              "Saturday peer social time",
+              targetDate,
+              dsp,
+              `Support ${name} to spend time with peers at the rec center or a preferred community spot each weekend.`,
+              demoDelivery(
+                ["Initiated interaction", "Responded to peers", "Observed comfortably", "Preferred quiet time"],
+                [{ label: "Minutes engaged", units: "Simple Count" }],
+                ["Model a greeting", "Introduce a shared activity", "Step back and allow natural interaction"],
+                "Support but do not direct the interaction. Follow the individual's lead and comfort level.",
+                "Sat",
+              ),
+            ),
+          ],
+        ),
+        goal(
+          `${name} will help plan one outing each month using the visual planner — choosing the activity, the time, and who goes along — by ${midDate}.`,
+          midDate,
+          "Monthly",
+          "Self-directed planning builds decision-making skills and ensures outings reflect real preferences.",
+          [
+            demoStrategy(
+              "Monthly outing planning session",
+              midDate,
+              pc,
+              `Sit with ${name} and the visual planner to pick next month's outing: activity, day, and companions.`,
+              demoDelivery(
+                ["Planned independently", "Planned with support", "Needed full support", "Declined to plan"],
+                [{ label: "Choices made", units: "Simple Count" }],
+                ["Review last month's photos", "Offer a short list of options", "Write the choice on the planner together"],
+                "Keep the session short and positive. Record exactly what the individual chose.",
+                "First Monday of the month",
+              ),
+            ),
+          ],
+        ),
+      ],
+    },
+    {
+      outcome_statement: `${name} builds independence in daily routines at home and at the program.`,
+      sort_order: 1,
+      goals: [
+        goal(
+          `${name} will complete the morning routine — washing up, brushing teeth, and getting dressed — with no more than one verbal prompt on 4 of 5 weekdays, by ${midDate}.`,
+          midDate,
+          "Every weekday morning",
+          "Mastering the morning routine increases independence and self-esteem. Use the least intrusive prompt and fade prompts over time.",
+          [
+            demoStrategy(
+              "Morning routine with visual schedule",
+              midDate,
+              dsp,
+              `Post the visual schedule in the bathroom and bedroom. Walk ${name} through each step, fading prompts as independence grows.`,
+              demoDelivery(
+                ["Independent", "Verbal prompt", "Gesture prompt", "Physical assistance", "Refused"],
+                [{ label: "Level of support", units: "Prompt level" }],
+                ["Point to the visual schedule", "Give one verbal cue", "Wait 10 seconds before prompting again", "Praise each completed step"],
+                "Never rush the routine. If a step is refused, move on and return to it. Record the highest prompt level needed.",
+                "Mon, Tue, Wed, Thu, Fri",
+                "07:00 AM - 08:30 AM",
+              ),
+            ),
+          ],
+        ),
+        goal(
+          `${name} will prepare a simple snack of their choice, such as a fruit cup or sandwich, with staff supervision twice a week, by ${targetDate}.`,
+          targetDate,
+          "Twice per week",
+          "Cooking and snack preparation build practical life skills and offer natural choices throughout the steps.",
+          [
+            demoStrategy(
+              "Snack prep with picture recipe",
+              targetDate,
+              dsp,
+              `Use the step-by-step picture recipe cards. ${name} chooses the snack, gathers ingredients with support, and follows each pictured step.`,
+              demoDelivery(
+                ["Completed all steps", "Completed most steps", "Needed hand-over-hand", "Chose not to participate"],
+                [{ label: "Steps completed independently", units: "Simple Count" }],
+                ["Offer two snack choices", "Read each picture step aloud", "Assist only with sharp or hot items"],
+                "Staff handle knives and appliances. Everything else is done by the individual with fading prompts.",
+                "Wed, Sat",
+                "03:00 PM - 04:00 PM",
+              ),
+            ),
+          ],
+        ),
+      ],
+    },
+    {
+      outcome_statement: `${name} stays healthy, active, and comfortable every day.`,
+      sort_order: 2,
+      goals: [
+        goal(
+          `${name} will take part in at least 20 minutes of physical activity they enjoy — walks, dance videos, or swimming — five days a week, by ${midDate}.`,
+          midDate,
+          "Five days per week",
+          "Regular enjoyable movement supports physical health, sleep, and mood. The activity is always the individual's choice.",
+          [
+            demoStrategy(
+              "20-minute movement break",
+              midDate,
+              dsp,
+              `Offer a choice of walk, dance video, or swim. Join in and keep it fun — the goal is enjoyment, not exercise compliance.`,
+              demoDelivery(
+                ["20+ minutes", "10–19 minutes", "Under 10 minutes", "Declined"],
+                [{ label: "Minutes active", units: "Simple Count" }],
+                ["Offer the activity choices", "Start together", "Follow the individual's pace"],
+                "Stop if there are signs of discomfort or fatigue. Note the activity chosen and minutes completed.",
+                "Every Day",
+              ),
+            ),
+          ],
+        ),
+        goal(
+          `${name} will let staff know when in pain or not feeling well, using words, gestures, or the communication device, by ${targetDate}.`,
+          targetDate,
+          "Daily check-ins",
+          "Early communication of pain or illness prevents escalation and supports prompt care.",
+          [
+            demoStrategy(
+              "Wellness check-in each shift",
+              targetDate,
+              dsp,
+              `At the start of each shift, ask ${name} how they feel using the feelings chart or device. Model the vocabulary and honor every response.`,
+              demoDelivery(
+                ["Communicated independently", "Responded with support", "No response", "Reported discomfort — followed protocol"],
+                [{ label: "Check-ins completed", units: "Simple Count" }],
+                ["Show the feelings chart", "Ask and wait 10 seconds", "Model an answer if needed", "Act on any report of pain immediately"],
+                "Any report of pain or illness is documented and escalated to the nurse per the health protocol. Never dismiss a self-report.",
+                "Every Day",
+              ),
+            ),
+          ],
+        ),
+      ],
+    },
+  ];
+}
+
 function buildDemoPlan(b: Body) {
   const startDate = (b.annualPlanDate || new Date().toISOString()).slice(0, 10);
   const targetDate = addMonths(startDate, 12);
   const strategyLabel = b.strategyLabel || "Strategy";
+  const strategyPlural = strategyLabel === "Strategy" ? "Strategies" : "Activities";
+  const name = b.individualName || "The individual";
   const captured = b.taskOutcomes?.capturedGoals?.filter((goal) => goal.goal_statement.trim()) || [];
-  const goals = captured.length
-    ? captured
-    : [
-        {
-          outcome_statement: `${b.individualName} is supported to build independence and participate in daily life.`,
-          goal_statement: `${b.individualName} will complete a preferred daily-living activity with consistent support.`,
-          target_date: targetDate,
-          person_responsible: "Direct Support Professional and planning team",
-          notes: "Use person-centered choices, encouragement, and the least intrusive prompts.",
-        },
-      ];
 
-  const outcomes = goals.map((goal, index) => {
-    const completionDate = goal.target_date || targetDate;
-    const responsible = goal.person_responsible || "Direct Support Professional and planning team";
-    return {
-      outcome_statement:
-        goal.outcome_statement || `${b.individualName} has meaningful choice, independence, and community participation.`,
-      sort_order: index,
-      goals: [
-        {
-          goal_statement: goal.goal_statement,
-          target_implementation_date: startDate,
-          target_completion_date: completionDate,
-          who_will_help: responsible,
-          frequency_worked_on: "Weekly and during naturally occurring opportunities",
-          who_reviews_progress: "Planning team",
-          review_frequency: "Monthly",
-          family_or_responsible_person: null,
-          person_responsible: responsible,
-          description: goal.notes || "Support progress through choice, practice, and positive reinforcement.",
-          progress: null,
-          status: "Pending",
-          strategies: [
+  const outcomes = captured.length
+    ? captured.map((goal, index) => {
+        const completionDate = goal.target_date || targetDate;
+        const responsible = goal.person_responsible || "Direct Support Professional and planning team";
+        return {
+          outcome_statement:
+            goal.outcome_statement || `${name} has meaningful choice, independence, and community participation.`,
+          sort_order: index,
+          goals: [
             {
-              title: `Practice and document progress toward goal ${index + 1}`,
-              target_date: completionDate,
+              goal_statement: goal.goal_statement,
+              target_implementation_date: startDate,
+              target_completion_date: completionDate,
+              who_will_help: responsible,
+              frequency_worked_on: "Weekly and during naturally occurring opportunities",
+              who_reviews_progress: "Planning team",
+              review_frequency: "Monthly",
+              family_or_responsible_person: null,
               person_responsible: responsible,
-              description: `Offer ${b.individualName} choices, provide only the support needed, and document the response.`,
+              description: goal.notes || "Support progress through choice, practice, and positive reinforcement.",
               progress: null,
-              service_delivery: {
-                services_and_expected_outcomes: ["Completed independently", "Completed with support", "Declined", "Not offered"],
-                capture_readings: [{ label: "Level of support", units: "Prompt level" }],
-                prompts: ["Independent", "Verbal prompt", "Gesture prompt", "Physical assistance"],
-                protocol: `Ask ${b.individualName} for their preference, allow time to respond, and use the least intrusive prompt necessary.`,
-                show_on_care_tracker: true,
-                funding_stream: null,
-                notify_when_documented: false,
-                status: "Pending",
-              },
-              schedule: [{ schedule_date: null, shift_time: "Day Shift", days: "Every Week" }],
-              service_provided_by: ["DSP"],
-              comments: null,
+              status: "Pending" as const,
+              strategies: [
+                demoStrategy(
+                  `Practice and document progress toward goal ${index + 1}`,
+                  completionDate,
+                  responsible,
+                  `Offer ${name} choices, provide only the support needed, and document the response.`,
+                  demoDelivery(
+                    ["Completed independently", "Completed with support", "Declined", "Not offered"],
+                    [{ label: "Level of support", units: "Prompt level" }],
+                    ["Independent", "Verbal prompt", "Gesture prompt", "Physical assistance"],
+                    `Ask ${name} for their preference, allow time to respond, and use the least intrusive prompt necessary.`,
+                  ),
+                  "Every Week",
+                ),
+              ],
             },
           ],
-        },
-      ],
-    };
-  });
+        };
+      })
+    : richDemoOutcomes(name, startDate, targetDate);
 
   const sections = outcomes
-    .map((outcome, index) => {
-      const goal = outcome.goals[0];
-      const strategy = goal.strategies[0];
-      return [
-        `## Outcome ${index + 1}`,
-        outcome.outcome_statement,
-        `### Goal`,
-        goal.goal_statement,
-        `- **Timeline:** ${goal.target_implementation_date} to ${goal.target_completion_date}`,
-        `- **Responsible parties:** ${goal.person_responsible}`,
-        `- **Review:** ${goal.review_frequency} by the ${goal.who_reviews_progress}`,
-        `### ${strategyLabel}`,
-        `**${strategy.title}** — ${strategy.description}`,
-        `- **Frequency:** ${goal.frequency_worked_on}`,
-        `- **Evaluation:** Track independence and prompt level after each opportunity.`,
-      ].join("\n\n");
-    })
+    .map((outcome, index) =>
+      [
+        `## Outcome ${index + 1}: ${outcome.outcome_statement}`,
+        ...outcome.goals.flatMap((goal, gi) => [
+          [
+            `### Goal ${index + 1}.${gi + 1}`,
+            goal.goal_statement,
+            goal.description,
+            `- **Timeline:** ${goal.target_implementation_date} → ${goal.target_completion_date}`,
+            `- **Frequency:** ${goal.frequency_worked_on}`,
+            `- **Responsible:** ${goal.person_responsible}`,
+            `- **Review:** ${goal.review_frequency} by the ${goal.who_reviews_progress}`,
+          ].join("\n\n"),
+          ...goal.strategies.map((s, si) =>
+            [
+              `#### ${strategyLabel} ${index + 1}.${gi + 1}.${si + 1} — ${s.title}`,
+              s.description,
+              `- **Target:** ${s.target_date} · **Schedule:** ${s.schedule.map((sc) => sc.days).join(", ")}`,
+              `- **Documentation options:** ${s.service_delivery.services_and_expected_outcomes.join(" / ")}`,
+              `- **Protocol:** ${s.service_delivery.protocol}`,
+            ].join("\n\n"),
+          ),
+        ]),
+      ].join("\n\n"),
+    )
     .join("\n\n");
 
   const tree = { plan_type: b.planType, outcomes };
   return [
     `# ${b.planType}`,
-    `**Individual:** ${b.individualName}  \n**Service:** ${b.serviceType}  \n**Plan date:** ${startDate}  \n**Status:** Draft for team review`,
-    `This person-centered draft highlights ${b.individualName}'s choices, strengths, and opportunities for greater independence. The team should review and confirm all details before implementation.`,
+    `**Individual:** ${name}  \n**Service:** ${b.serviceType}  \n**Plan date:** ${startDate}  \n**Status:** Draft for team review`,
+    `This person-centered draft is built around ${name}'s choices, strengths, and goals for greater independence and community connection. The planning team should review and confirm all details before implementation.`,
     sections,
     `## Health, Safety, Rights & Preferences`,
-    `Support ${b.individualName}'s informed choices, privacy, dignity, communication preferences, and right to decline. Follow current health and safety protocols while using the least restrictive support.`,
+    `Support ${name}'s informed choices, privacy, dignity, communication preferences, and the right to decline any activity. Follow current health and safety protocols while always using the least restrictive support.`,
     `## Review Schedule`,
-    `The planning team will review progress monthly and revise supports when ${b.individualName}'s preferences, needs, or circumstances change.`,
+    `The planning team will review progress monthly and revise supports whenever ${name}'s preferences, needs, or circumstances change.`,
     "```ICM_PLAN_TREE",
     JSON.stringify(tree),
     "```",
