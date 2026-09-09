@@ -10,7 +10,6 @@ import {
   FileText,
   Shield,
   Library,
-  ClipboardCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -18,7 +17,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 const navItems = [
   { label: "Dashboard", icon: Home, to: "/" },
   { label: "Individuals", icon: Users, to: "/individuals" },
-  { label: "Care Tracker", icon: ClipboardCheck, to: "/care-tracker" },
   { label: "Guidelines", icon: Shield, to: "/guidelines" },
   { label: "Libraries", icon: Library, to: "/settings/libraries" },
   { label: "Staff", icon: UserCog, to: "#staff" },

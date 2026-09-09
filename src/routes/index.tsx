@@ -52,6 +52,7 @@ function greeting() {
 function DashboardPage() {
   const navigate = useNavigate();
   const openLifeplan = () => navigate({ to: "/lifeplan" });
+  const openCareTracker = () => navigate({ to: "/care-tracker" });
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
@@ -128,9 +129,11 @@ function DashboardPage() {
               {QUICK_ACTIONS.map((a, i) => {
                 const color = COLS[i % 4];
                 const Icon = a.icon;
+                const isCareTracker = a.label === "Care Tracker";
                 return (
                   <button
                     key={`${a.label}-${i}`}
+                    onClick={isCareTracker ? openCareTracker : undefined}
                     className="flex items-center gap-3 rounded-2xl px-4 py-3.5 text-left text-white font-semibold text-[14px] hover:opacity-95 hover:-translate-y-0.5 transition-all shadow-soft"
                     style={{ background: color }}
                   >
