@@ -52,6 +52,7 @@ function greeting() {
 function DashboardPage() {
   const navigate = useNavigate();
   const openLifeplan = () => navigate({ to: "/lifeplan" });
+  const openCareTracker = () => navigate({ to: "/care-tracker" });
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
