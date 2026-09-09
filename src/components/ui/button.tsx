@@ -16,6 +16,15 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        success: "bg-success text-success-foreground shadow-sm hover:bg-success/90",
+        "primary-action":
+          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md active:scale-[0.98]",
+        "secondary-action":
+          "border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 hover:border-primary/50",
+        "tertiary-action": "bg-tertiary text-tertiary-foreground shadow-sm hover:bg-tertiary/90",
+        clinical: "bg-card border border-border text-foreground hover:border-primary hover:shadow-md",
+        "nav-icon":
+          "size-9 rounded-full bg-transparent hover:bg-muted text-muted-foreground hover:text-foreground",
       },
       size: {
         default: "h-9 px-4 py-2",
