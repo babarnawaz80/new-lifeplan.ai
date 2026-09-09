@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ServiceNoteReportRouteImport } from './routes/service-note-report'
 import { Route as LifeplanRouteImport } from './routes/lifeplan'
+import { Route as CareTrackerRouteImport } from './routes/care-tracker'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as IndividualsIndexRouteImport } from './routes/individuals.index'
 import { Route as GuidelinesIndexRouteImport } from './routes/guidelines.index'
@@ -25,9 +27,19 @@ import { Route as AgentsIdEditRouteImport } from './routes/agents.$id.edit'
 import { Route as IndividualsIdPlanPlanIdRouteImport } from './routes/individuals.$id.plan.$planId'
 import { Route as IndividualsIdLogAgentIdRouteImport } from './routes/individuals.$id.log.$agentId'
 
+const ServiceNoteReportRoute = ServiceNoteReportRouteImport.update({
+  id: '/service-note-report',
+  path: '/service-note-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LifeplanRoute = LifeplanRouteImport.update({
   id: '/lifeplan',
   path: '/lifeplan',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CareTrackerRoute = CareTrackerRouteImport.update({
+  id: '/care-tracker',
+  path: '/care-tracker',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -103,7 +115,9 @@ const IndividualsIdLogAgentIdRoute = IndividualsIdLogAgentIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/care-tracker': typeof CareTrackerRoute
   '/lifeplan': typeof LifeplanRoute
+  '/service-note-report': typeof ServiceNoteReportRoute
   '/agents/new': typeof AgentsNewRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
@@ -120,7 +134,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/care-tracker': typeof CareTrackerRoute
   '/lifeplan': typeof LifeplanRoute
+  '/service-note-report': typeof ServiceNoteReportRoute
   '/agents/new': typeof AgentsNewRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
@@ -137,7 +153,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/care-tracker': typeof CareTrackerRoute
   '/lifeplan': typeof LifeplanRoute
+  '/service-note-report': typeof ServiceNoteReportRoute
   '/agents/new': typeof AgentsNewRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
@@ -156,7 +174,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/care-tracker'
     | '/lifeplan'
+    | '/service-note-report'
     | '/agents/new'
     | '/api/generate-plan'
     | '/guidelines/$id'
@@ -173,7 +193,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/care-tracker'
     | '/lifeplan'
+    | '/service-note-report'
     | '/agents/new'
     | '/api/generate-plan'
     | '/guidelines/$id'
@@ -189,7 +211,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/care-tracker'
     | '/lifeplan'
+    | '/service-note-report'
     | '/agents/new'
     | '/api/generate-plan'
     | '/guidelines/$id'
@@ -207,7 +231,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CareTrackerRoute: typeof CareTrackerRoute
   LifeplanRoute: typeof LifeplanRoute
+  ServiceNoteReportRoute: typeof ServiceNoteReportRoute
   AgentsNewRoute: typeof AgentsNewRoute
   ApiGeneratePlanRoute: typeof ApiGeneratePlanRoute
   GuidelinesIdRoute: typeof GuidelinesIdRoute
@@ -221,11 +247,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/service-note-report': {
+      id: '/service-note-report'
+      path: '/service-note-report'
+      fullPath: '/service-note-report'
+      preLoaderRoute: typeof ServiceNoteReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lifeplan': {
       id: '/lifeplan'
       path: '/lifeplan'
       fullPath: '/lifeplan'
       preLoaderRoute: typeof LifeplanRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/care-tracker': {
+      id: '/care-tracker'
+      path: '/care-tracker'
+      fullPath: '/care-tracker'
+      preLoaderRoute: typeof CareTrackerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -349,7 +389,9 @@ const IndividualsIdRouteWithChildren = IndividualsIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CareTrackerRoute: CareTrackerRoute,
   LifeplanRoute: LifeplanRoute,
+  ServiceNoteReportRoute: ServiceNoteReportRoute,
   AgentsNewRoute: AgentsNewRoute,
   ApiGeneratePlanRoute: ApiGeneratePlanRoute,
   GuidelinesIdRoute: GuidelinesIdRoute,
