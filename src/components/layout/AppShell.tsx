@@ -10,7 +10,6 @@ import {
   FileText,
   Shield,
   Library,
-  ClipboardCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
