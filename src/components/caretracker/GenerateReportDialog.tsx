@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Dialog,
   DialogContent,
@@ -62,7 +62,7 @@ export function GenerateReportDialog({ open, onOpenChange }: GenerateReportDialo
   const handleGenerate = () => {
     if (selectedIndividual) {
       const individual = individuals.find(i => i.value === selectedIndividual);
-      navigate(`/person-service-report?individual=${selectedIndividual}&name=${encodeURIComponent(individual?.label || "")}&year=${selectedYear}&month=${selectedMonth}`);
+      navigate({ to: "/service-note-report", search: { individual: selectedIndividual, name: individual?.label || "", year: selectedYear, month: selectedMonth } });
       onOpenChange(false);
     }
   };

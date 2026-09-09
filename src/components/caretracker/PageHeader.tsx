@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { ChevronDown, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,18 +79,18 @@ export function PageHeader({
             <DropdownMenuItem onSelect={() => setServiceNotesOpen(true)}>
               Service Notes
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/service-note-report")}>
+            <DropdownMenuItem onSelect={() => navigate({ to: "/service-note-report" })}>
               Service Notes (Report)
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setGenerateReportOpen(true)}>
               Generate Monthly Report
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/service-delivery-log")}>
+            <DropdownMenuItem onSelect={() => toast("Coming soon in this demo")}>
               Service Logs (BETA)
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/shifts")}>Shifts</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => toast("Coming soon in this demo")}>Shifts</DropdownMenuItem>
             <DropdownMenuItem>Attendance</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/compliance-report")}>Compliance Report</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => toast("Coming soon in this demo")}>Compliance Report</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
