@@ -1,5 +1,5 @@
 import { ChevronDown, Clock, RotateCcw, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { cn } from "@/lib/utils";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -497,7 +497,7 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
                   </td>
                 </tr>
               )}
-            </>
+            </Fragment>
           ))}
         </tbody>
       </table>
