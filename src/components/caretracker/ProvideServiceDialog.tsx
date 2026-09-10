@@ -16,6 +16,10 @@ interface ProvideServiceDialogProps {
   location?: string;
   address?: string;
   servicesProvided?: string[];
+  // Carried over from the implemented plan's service delivery block.
+  prompts?: string[];
+  readings?: Array<{ label: string; units: string }>;
+  onSubmit?: (result: { selections: string[]; notes: string }) => void;
 }
 
 const defaultServices = [
