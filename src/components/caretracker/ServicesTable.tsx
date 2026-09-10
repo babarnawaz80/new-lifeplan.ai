@@ -18,6 +18,10 @@ interface ScheduleRow {
   chartedDate?: string;
   serviceDate?: string;
   description?: string;
+  // Present when the row came from an implemented LifePlan strategy.
+  servicesProvided?: string[];
+  prompts?: string[];
+  readings?: Array<{ label: string; units: string }>;
 }
 
 const mockScheduleRows: ScheduleRow[] = [
