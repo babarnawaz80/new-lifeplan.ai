@@ -379,7 +379,7 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
     setExpandedRows(newExpanded);
   };
 
-  if (mockScheduleRows.length === 0) {
+  if (dataRows.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
         <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
@@ -414,7 +414,7 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {mockScheduleRows.map((row) => (
+          {dataRows.map((row) => (
             <>
               <tr key={row.id} className="border-b border-border">
                 <td className="py-4 px-6 align-middle">
