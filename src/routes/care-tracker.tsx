@@ -71,7 +71,7 @@ function CareTrackerPage() {
   const handleFilterChange = (key: string, value: string) =>
     setFilters((prev) => ({ ...prev, [key]: value }));
 
-  const selectedDetails = selectedIndividual ? getIndividualDetails(selectedIndividual) : null;
+  const selectedDetails = individuals.find((i) => i.id === activeId) ?? null;
 
   return (
     <AppShell>
@@ -92,8 +92,8 @@ function CareTrackerPage() {
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 lg:col-span-3 xl:col-span-2">
             <IndividualsList
-              individuals={mockIndividuals}
-              selectedId={selectedIndividual}
+              individuals={visibleIndividuals}
+              selectedId={activeId}
               onSelect={setSelectedIndividual}
             />
           </div>
