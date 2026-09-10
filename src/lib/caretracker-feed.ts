@@ -342,3 +342,79 @@ export function listCareTrackerIndividuals(isoDate: string): CareTrackerIndividu
     };
   });
 }
+
+// ---------------------------------------------------------------------------
+// Shift briefing — everything due across the whole house, for the AI companion
+// ---------------------------------------------------------------------------
+export type BriefingItem = {
+  rowId: string;
+  individualId: string;
+  individualName: string;
+  title: string;
+  time: string;
+  shiftId: Exclude<ShiftId, "all">;
+  shiftName: string;
+  location: string;
+  date: string;
+  status: "charted" | "not-able" | "pending";
+  servicesProvided: string[];
+  prompts: string[];
+  goalStatement?: string;
+  planTypeLabel?: string;
+};
+
+const SHIFT_ORDER: Record<Exclude<ShiftId, "all">, number> = {
+  day: 0,
+  afternoon: 1,
+  evening: 2,
+  overnight: 3,
+};
+
+// Every scheduled service for every individual on a date, optionally one shift.
+export function buildShiftBriefing(isoDate: string, shift: ShiftId = "all"): BriefingItem[] {
+  const items: BriefingItem[] = [];
+  for (const ind of listIndividuals()) {
+    const rows = filterByShift(rowsForIndividual(ind.id, isoDate), shift);
+    for (const r of rows) {
+      items.push({
+        rowId: r.id,
+        individualId: ind.id,
+        individualName: ind.name,
+        title: r.title,
+        time: r.time,
+        shiftId: r.shiftId,
+        shiftName: r.shiftName,
+        location: r.location,
+        date: r.date,
+        status: r.status ?? "pending",
+        servicesProvided: r.servicesProvided,
+        prompts: r.prompts,
+        goalStatement: r.goalStatement,
+        planTypeLabel: r.planTypeLabel,
+      });
+    }
+  }
+  return items.sort(
+    (a, b) =>
+      SHIFT_ORDER[a.shiftId] - SHIFT_ORDER[b.shiftId] ||
+      a.individualName.localeCompare(b.individualName) ||
+      a.title.localeCompare(b.title),
+  );
+}
+
+// Chart one item straight from the companion.
+export function chartFromCompanion(
+  rowId: string,
+  isoDate: string,
+  opts?: { status?: "charted" | "not-able"; notes?: string; selections?: string[] },
+): boolean {
+  const item = buildShiftBriefing(isoDate).find((i) => i.rowId === rowId);
+  if (!item) return false;
+  recordDocumentation(rowId, item.date, {
+    status: opts?.status ?? "charted",
+    serviceDate: item.date,
+    selections: opts?.selections ?? item.servicesProvided.slice(0, 1),
+    notes: opts?.notes ?? "Documented by voice with the Care Companion.",
+  });
+  return true;
+}

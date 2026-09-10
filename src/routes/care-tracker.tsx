@@ -15,6 +15,7 @@ import { FilterBar } from "@/components/caretracker/FilterBar";
 import { ShiftSelector } from "@/components/caretracker/ShiftSelector";
 import { IndividualsList } from "@/components/caretracker/IndividualsList";
 import { IndividualDetails } from "@/components/caretracker/IndividualDetails";
+import { CareCompanion } from "@/components/caretracker/CareCompanion";
 
 export const Route = createFileRoute("/care-tracker")({
   head: () => ({
@@ -113,6 +114,8 @@ function CareTrackerPage() {
           </div>
         </div>
       </main>
+
+      <CareCompanion date={date} shift={selectedShift as ShiftId} />
     </AppShell>
   );
 }
