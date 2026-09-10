@@ -89,6 +89,7 @@ function CareTrackerPage() {
           onDateChange={setDate}
           groupByIndividual={groupByIndividual}
           onGroupByChange={setGroupByIndividual}
+          onOpenCompanion={() => setCompanionOpen(true)}
         />
 
         <FilterBar filters={filters} onFilterChange={handleFilterChange} />
@@ -116,7 +117,12 @@ function CareTrackerPage() {
         </div>
       </main>
 
-      <CareCompanion date={date} shift={selectedShift as ShiftId} />
+      <CareCompanion
+        date={date}
+        shift={selectedShift as ShiftId}
+        open={companionOpen}
+        onClose={() => setCompanionOpen(false)}
+      />
     </AppShell>
   );
 }
