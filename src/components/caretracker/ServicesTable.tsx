@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { ProvideServiceDialog } from "./ProvideServiceDialog";
+import { recordDocumentation } from "@/lib/caretracker-feed";
 
 interface ScheduleRow {
   id: string;
@@ -508,6 +509,23 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
         shiftLabel={serviceDialog.row?.shiftName}
         date={serviceDialog.row?.date}
         location={serviceDialog.row?.location}
+        servicesProvided={
+          serviceDialog.row?.servicesProvided?.length
+            ? serviceDialog.row.servicesProvided
+            : undefined
+        }
+        prompts={serviceDialog.row?.prompts}
+        readings={serviceDialog.row?.readings}
+        onSubmit={({ selections, notes }) => {
+          const row = serviceDialog.row;
+          if (!row) return;
+          recordDocumentation(row.id, row.date, {
+            status: selections.length ? "charted" : "not-able",
+            serviceDate: row.date,
+            selections,
+            notes,
+          });
+        }}
       />
     </div>
   );
