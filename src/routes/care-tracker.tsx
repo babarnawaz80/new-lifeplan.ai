@@ -73,6 +73,12 @@ function CareTrackerPage() {
 
   const selectedDetails = individuals.find((i) => i.id === activeId) ?? null;
 
+  // The name filter narrows the roster; other filters are display-only.
+  const visibleIndividuals = useMemo(() => {
+    const q = filters.individual.trim().toLowerCase();
+    return q ? individuals.filter((i) => i.name.toLowerCase().includes(q)) : individuals;
+  }, [individuals, filters.individual]);
+
   return (
     <AppShell>
       <main className="p-6">
