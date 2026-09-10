@@ -1,6 +1,13 @@
 // Care Tracker — ported from the iCM screens design project. Shift-based
 // service documentation for individuals. Independent of LifePlan.
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import {
+  listCareTrackerIndividuals,
+  rowsForIndividual,
+  filterByShift,
+  useCareTrackerVersion,
+  type ShiftId,
+} from "@/lib/caretracker-feed";
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageHeader } from "@/components/caretracker/PageHeader";
