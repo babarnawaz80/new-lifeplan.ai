@@ -205,7 +205,7 @@ export const VoicePoweredOrb: FC<VoicePoweredOrbProps> = ({
       let audioCtx: AudioContext | null = null;
       let analyser: AnalyserNode | null = null;
       let source: MediaStreamAudioSourceNode | null = null;
-      let data: Uint8Array | null = null;
+      let data: Uint8Array<ArrayBuffer> | null = null;
       let stream: MediaStream | null = null;
 
       const stopMic = () => {
@@ -234,7 +234,7 @@ export const VoicePoweredOrb: FC<VoicePoweredOrbProps> = ({
           analyser.smoothingTimeConstant = 0.3;
           source = audioCtx.createMediaStreamSource(stream);
           source.connect(analyser);
-          data = new Uint8Array(analyser.frequencyBinCount);
+          data = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
           return true;
         } catch {
           return false;
