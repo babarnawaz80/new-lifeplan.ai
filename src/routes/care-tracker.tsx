@@ -108,6 +108,7 @@ function CareTrackerPage() {
               individual={selectedDetails}
               selectedShift={detailShift}
               onShiftChange={setDetailShift}
+              rows={rows}
             />
           </div>
         </div>
