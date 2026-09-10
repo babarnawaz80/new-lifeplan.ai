@@ -416,8 +416,8 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
         </thead>
         <tbody>
           {dataRows.map((row) => (
-            <>
-              <tr key={row.id} className="border-b border-border">
+            <Fragment key={row.id}>
+              <tr className="border-b border-border">
                 <td className="py-4 px-6 align-middle">
                   <div>
                     <p className="font-medium text-[13px] text-foreground">{row.title}</p>
