@@ -31,29 +31,27 @@ export const Route = createFileRoute("/care-tracker")({
   component: CareTrackerPage,
 });
 
-const mockIndividuals = [
-  { id: "1", name: "Abbey, Thomas", gender: "M", age: 38, dob: "03/31/1987", completed: 0, total: 5, avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face" },
-  { id: "2", name: "Adams, John", gender: "M", age: 15, dob: "09/10/2010", completed: 0, total: 2, avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop&crop=face" },
-  { id: "3", name: "Adams, Alisha", gender: "F", age: 37, dob: "07/08/1988", completed: 0, total: 0, avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face" },
-  { id: "4", name: "Banning, Mike", gender: "M", age: 40, dob: "09/27/1985", completed: 0, total: 8, avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face" },
-  { id: "5", name: "Barnes, Alice", gender: "F", age: 41, dob: "08/12/1984", completed: 0, total: 1, avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face" },
-  { id: "6", name: "Barrow, Charles", gender: "M", age: 39, dob: "01/06/1987", completed: 1, total: 23, avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" },
-  { id: "7", name: "Bell, Katherine", gender: "F", age: 55, dob: "02/10/1970", completed: 0, total: 7, avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop&crop=face" },
-  { id: "8", name: "Carter, James", gender: "M", age: 28, dob: "05/15/1997", completed: 3, total: 5, avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop&crop=face" },
-];
-
-function getIndividualDetails(id: string) {
-  const individual = mockIndividuals.find((i) => i.id === id);
-  if (!individual) return null;
-  return { ...individual, location: "Community Integration East", servicesCount: 1, scheduledCount: 5 };
-}
-
 function CareTrackerPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [groupByIndividual, setGroupByIndividual] = useState(true);
-  const [selectedShift, setSelectedShift] = useState("afternoon");
-  const [selectedIndividual, setSelectedIndividual] = useState<string | null>("1");
-  const [detailShift, setDetailShift] = useState("afternoon");
+  const [selectedShift, setSelectedShift] = useState("all");
+  const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
+  const [detailShift, setDetailShift] = useState("all");
+
+  // Live data: individuals from iCM, schedule rows from the services that
+  // implemented LifePlans pushed into CareTracker.
+  useCareTrackerVersion();
+  const individuals = useMemo(() => listCareTrackerIndividuals(date), [date]);
+  const activeId = selectedIndividual ?? individuals[0]?.id ?? null;
+
+  const allRows = useMemo(
+    () => (activeId ? rowsForIndividual(activeId, date) : []),
+    [activeId, date],
+  );
+  const rows = useMemo(
+    () => filterByShift(allRows, detailShift as ShiftId),
+    [allRows, detailShift],
+  );
 
   const [filters, setFilters] = useState({
     location: "all",
