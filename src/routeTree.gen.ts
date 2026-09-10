@@ -20,6 +20,7 @@ import { Route as IndividualsIdRouteImport } from './routes/individuals.$id'
 import { Route as GuidelinesNewRouteImport } from './routes/guidelines.new'
 import { Route as GuidelinesIdRouteImport } from './routes/guidelines.$id'
 import { Route as ApiGeneratePlanRouteImport } from './routes/api/generate-plan'
+import { Route as ApiCareCompanionRouteImport } from './routes/api/care-companion'
 import { Route as AgentsNewRouteImport } from './routes/agents.new'
 import { Route as IndividualsIdIndexRouteImport } from './routes/individuals.$id.index'
 import { Route as IndividualsIdTrainingsRouteImport } from './routes/individuals.$id.trainings'
@@ -82,6 +83,11 @@ const ApiGeneratePlanRoute = ApiGeneratePlanRouteImport.update({
   path: '/api/generate-plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCareCompanionRoute = ApiCareCompanionRouteImport.update({
+  id: '/api/care-companion',
+  path: '/api/care-companion',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentsNewRoute = AgentsNewRouteImport.update({
   id: '/agents/new',
   path: '/agents/new',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/lifeplan': typeof LifeplanRoute
   '/service-note-report': typeof ServiceNoteReportRoute
   '/agents/new': typeof AgentsNewRoute
+  '/api/care-companion': typeof ApiCareCompanionRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/lifeplan': typeof LifeplanRoute
   '/service-note-report': typeof ServiceNoteReportRoute
   '/agents/new': typeof AgentsNewRoute
+  '/api/care-companion': typeof ApiCareCompanionRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
@@ -157,6 +165,7 @@ export interface FileRoutesById {
   '/lifeplan': typeof LifeplanRoute
   '/service-note-report': typeof ServiceNoteReportRoute
   '/agents/new': typeof AgentsNewRoute
+  '/api/care-companion': typeof ApiCareCompanionRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/lifeplan'
     | '/service-note-report'
     | '/agents/new'
+    | '/api/care-companion'
     | '/api/generate-plan'
     | '/guidelines/$id'
     | '/guidelines/new'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/lifeplan'
     | '/service-note-report'
     | '/agents/new'
+    | '/api/care-companion'
     | '/api/generate-plan'
     | '/guidelines/$id'
     | '/guidelines/new'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/lifeplan'
     | '/service-note-report'
     | '/agents/new'
+    | '/api/care-companion'
     | '/api/generate-plan'
     | '/guidelines/$id'
     | '/guidelines/new'
@@ -235,6 +247,7 @@ export interface RootRouteChildren {
   LifeplanRoute: typeof LifeplanRoute
   ServiceNoteReportRoute: typeof ServiceNoteReportRoute
   AgentsNewRoute: typeof AgentsNewRoute
+  ApiCareCompanionRoute: typeof ApiCareCompanionRoute
   ApiGeneratePlanRoute: typeof ApiGeneratePlanRoute
   GuidelinesIdRoute: typeof GuidelinesIdRoute
   GuidelinesNewRoute: typeof GuidelinesNewRoute
@@ -324,6 +337,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGeneratePlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/care-companion': {
+      id: '/api/care-companion'
+      path: '/api/care-companion'
+      fullPath: '/api/care-companion'
+      preLoaderRoute: typeof ApiCareCompanionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agents/new': {
       id: '/agents/new'
       path: '/agents/new'
@@ -393,6 +413,7 @@ const rootRouteChildren: RootRouteChildren = {
   LifeplanRoute: LifeplanRoute,
   ServiceNoteReportRoute: ServiceNoteReportRoute,
   AgentsNewRoute: AgentsNewRoute,
+  ApiCareCompanionRoute: ApiCareCompanionRoute,
   ApiGeneratePlanRoute: ApiGeneratePlanRoute,
   GuidelinesIdRoute: GuidelinesIdRoute,
   GuidelinesNewRoute: GuidelinesNewRoute,
