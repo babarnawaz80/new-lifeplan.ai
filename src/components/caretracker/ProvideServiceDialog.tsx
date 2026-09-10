@@ -206,7 +206,16 @@ export function ProvideServiceDialog({
         </div>
 
         <DialogFooter className="border-t border-border pt-4">
-          <Button onClick={() => onOpenChange(false)} className="bg-primary hover:bg-primary/90">
+          <Button
+            onClick={() => {
+              onSubmit?.({
+                selections: Object.keys(checked).filter((k) => checked[k]),
+                notes,
+              });
+              onOpenChange(false);
+            }}
+            className="bg-primary hover:bg-primary/90"
+          >
             Done
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
