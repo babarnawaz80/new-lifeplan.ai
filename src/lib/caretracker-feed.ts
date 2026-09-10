@@ -248,10 +248,57 @@ function isActiveOn(svc: CareTrackerService, isoDate: string): boolean {
   return true;
 }
 
+// Plans implemented before this session (seeded demo data) never went through
+// writeGoalOutcomeTree in-memory, so derive their CareTracker services from the
+// same structured tree using the identical rules.
+function derivedServices(individualId: string): CareTrackerService[] {
+  const out: CareTrackerService[] = [];
+  for (const plan of listAllPlans()) {
+    if (plan.individual_id !== individualId || plan.status !== "implemented") continue;
+    const tree = (plan.structured_tree ??
+      (plan.plan_content as { structured_tree?: IcmPlanTree } | undefined)?.structured_tree ??
+      null) as IcmPlanTree | null;
+    if (!tree) continue;
+    for (const outcome of tree.outcomes) {
+      for (const goal of outcome.goals) {
+        for (const strat of goal.strategies) {
+          if (!strat.service_delivery.show_on_care_tracker) continue;
+          out.push({
+            id: `cts_derived_${plan.id}_${strat.id}`,
+            individual_id: individualId,
+            plan_id: plan.id,
+            plan_type: tree.plan_type ?? "Plan",
+            source: "lifeplan",
+            title: strat.title,
+            description: strat.description ?? undefined,
+            responsible: strat.person_responsible ?? goal.person_responsible ?? undefined,
+            effective_date: plan.implementation_date ?? plan.created_at,
+            raw: {
+              outcome_statement: outcome.outcome_statement,
+              goal_statement: goal.goal_statement,
+              services_and_expected_outcomes:
+                strat.service_delivery.services_and_expected_outcomes,
+              capture_readings: strat.service_delivery.capture_readings,
+              prompts: strat.service_delivery.prompts,
+              protocol: strat.service_delivery.protocol,
+              funding_stream: strat.service_delivery.funding_stream,
+              schedule: strat.schedule,
+              service_provided_by: strat.service_provided_by,
+            },
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 // All rows for one individual on a date (before shift filtering).
 export function rowsForIndividual(individualId: string, isoDate: string): CareTrackerRow[] {
   const { site } = getIndividualOrgContext(individualId);
-  const services = listCareTrackerServices(individualId).filter((s) => isActiveOn(s, isoDate));
+  const stored = listCareTrackerServices(individualId);
+  const all = stored.length ? stored : derivedServices(individualId);
+  const services = all.filter((s) => isActiveOn(s, isoDate));
   const rows = services.flatMap((s) => rowsForService(s, isoDate, site));
 
   // Apply any documentation charted this session.
