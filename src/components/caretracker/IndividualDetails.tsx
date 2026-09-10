@@ -20,6 +20,8 @@ interface IndividualDetailsProps {
   loading?: boolean;
   selectedShift: string;
   onShiftChange: (shift: string) => void;
+  // Schedule rows built from the individual's implemented plan services.
+  rows?: React.ComponentProps<typeof ServicesTable>["rows"];
 }
 const tabs = [{
   id: "all",
