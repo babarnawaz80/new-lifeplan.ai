@@ -45,6 +45,7 @@ function CareTrackerPage() {
   const [selectedShift, setSelectedShift] = useState("all");
   const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
   const [detailShift, setDetailShift] = useState("all");
+  const [companionOpen, setCompanionOpen] = useState(false);
 
   // Live data: individuals from iCM, schedule rows from the services that
   // implemented LifePlans pushed into CareTracker.
