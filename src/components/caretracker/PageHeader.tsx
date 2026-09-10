@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { ChevronDown, ClipboardCheck } from "lucide-react";
+import { ChevronDown, ClipboardCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,13 +15,15 @@ interface PageHeaderProps {
   onDateChange: (date: string) => void;
   groupByIndividual: boolean;
   onGroupByChange: (value: boolean) => void;
+  onOpenCompanion?: () => void;
 }
 
 export function PageHeader({
   date,
   onDateChange,
   groupByIndividual,
-  onGroupByChange
+  onGroupByChange,
+  onOpenCompanion
 }: PageHeaderProps) {
   const navigate = useNavigate();
   const [serviceNotesOpen, setServiceNotesOpen] = useState(false);
@@ -66,6 +68,17 @@ export function PageHeader({
 
       {/* Right side - Actions */}
       <div className="flex items-center gap-2">
+        {onOpenCompanion && (
+          <Button
+            size="sm"
+            onClick={onOpenCompanion}
+            className="gap-1.5 bg-gradient-to-r from-primary to-violet-600 text-primary-foreground hover:brightness-110"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            AI Companion
+          </Button>
+        )}
+
         <AddServiceDialog />
         
         <DropdownMenu>
