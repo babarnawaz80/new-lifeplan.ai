@@ -1,9 +1,10 @@
 import { ChevronDown, Clock, RotateCcw, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { cn } from "@/lib/utils";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { ProvideServiceDialog } from "./ProvideServiceDialog";
+import { recordDocumentation } from "@/lib/caretracker-feed";
 
 interface ScheduleRow {
   id: string;
@@ -18,6 +19,10 @@ interface ScheduleRow {
   chartedDate?: string;
   serviceDate?: string;
   description?: string;
+  // Present when the row came from an implemented LifePlan strategy.
+  servicesProvided?: string[];
+  prompts?: string[];
+  readings?: Array<{ label: string; units: string }>;
 }
 
 const mockScheduleRows: ScheduleRow[] = [
@@ -358,9 +363,12 @@ function ExpandedRowContent({ row }: { row: ScheduleRow }) {
   );
 }
 
-export function ServicesTable() {
+export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [serviceDialog, setServiceDialog] = useState<{ open: boolean; row?: ScheduleRow }>({ open: false });
+  // Rows come from the individual's implemented plan services; the built-in
+  // sample rows remain as a fallback when nothing has been implemented yet.
+  const dataRows = rows ?? mockScheduleRows;
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows);
@@ -372,7 +380,7 @@ export function ServicesTable() {
     setExpandedRows(newExpanded);
   };
 
-  if (mockScheduleRows.length === 0) {
+  if (dataRows.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
         <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
@@ -407,9 +415,9 @@ export function ServicesTable() {
           </tr>
         </thead>
         <tbody>
-          {mockScheduleRows.map((row) => (
-            <>
-              <tr key={row.id} className="border-b border-border">
+          {dataRows.map((row) => (
+            <Fragment key={row.id}>
+              <tr className="border-b border-border">
                 <td className="py-4 px-6 align-middle">
                   <div>
                     <p className="font-medium text-[13px] text-foreground">{row.title}</p>
@@ -489,7 +497,7 @@ export function ServicesTable() {
                   </td>
                 </tr>
               )}
-            </>
+            </Fragment>
           ))}
         </tbody>
       </table>
@@ -501,6 +509,23 @@ export function ServicesTable() {
         shiftLabel={serviceDialog.row?.shiftName}
         date={serviceDialog.row?.date}
         location={serviceDialog.row?.location}
+        servicesProvided={
+          serviceDialog.row?.servicesProvided?.length
+            ? serviceDialog.row.servicesProvided
+            : undefined
+        }
+        prompts={serviceDialog.row?.prompts}
+        readings={serviceDialog.row?.readings}
+        onSubmit={({ selections, notes }) => {
+          const row = serviceDialog.row;
+          if (!row) return;
+          recordDocumentation(row.id, row.date, {
+            status: selections.length ? "charted" : "not-able",
+            serviceDate: row.date,
+            selections,
+            notes,
+          });
+        }}
       />
     </div>
   );

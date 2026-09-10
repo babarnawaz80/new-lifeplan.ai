@@ -20,6 +20,8 @@ interface IndividualDetailsProps {
   loading?: boolean;
   selectedShift: string;
   onShiftChange: (shift: string) => void;
+  // Schedule rows built from the individual's implemented plan services.
+  rows?: React.ComponentProps<typeof ServicesTable>["rows"];
 }
 const tabs = [{
   id: "all",
@@ -75,7 +77,8 @@ export function IndividualDetails({
   individual,
   loading = false,
   selectedShift,
-  onShiftChange
+  onShiftChange,
+  rows
 }: IndividualDetailsProps) {
   if (loading) {
     return <div className="bg-card rounded-xl border border-border p-6 animate-pulse">
@@ -158,7 +161,7 @@ export function IndividualDetails({
         </div>
 
         {tabs.map(tab => <TabsContent key={tab.id} value={tab.id} className="p-0 m-0">
-            <ServicesTable />
+            <ServicesTable rows={rows} />
           </TabsContent>)}
       </Tabs>
     </div>;

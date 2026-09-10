@@ -16,6 +16,10 @@ interface ProvideServiceDialogProps {
   location?: string;
   address?: string;
   servicesProvided?: string[];
+  // Carried over from the implemented plan's service delivery block.
+  prompts?: string[];
+  readings?: Array<{ label: string; units: string }>;
+  onSubmit?: (result: { selections: string[]; notes: string }) => void;
 }
 
 const defaultServices = [
@@ -40,6 +44,9 @@ export function ProvideServiceDialog({
   location = "Silvercloud1",
   address = "2745 NW Thatcher Road",
   servicesProvided = defaultServices,
+  prompts: _prompts,
+  readings: _readings,
+  onSubmit,
 }: ProvideServiceDialogProps) {
   const now = new Date();
   const currentTime = now.toTimeString().slice(0, 5);
@@ -199,7 +206,16 @@ export function ProvideServiceDialog({
         </div>
 
         <DialogFooter className="border-t border-border pt-4">
-          <Button onClick={() => onOpenChange(false)} className="bg-primary hover:bg-primary/90">
+          <Button
+            onClick={() => {
+              onSubmit?.({
+                selections: Object.keys(checked).filter((k) => checked[k]),
+                notes,
+              });
+              onOpenChange(false);
+            }}
+            className="bg-primary hover:bg-primary/90"
+          >
             Done
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
