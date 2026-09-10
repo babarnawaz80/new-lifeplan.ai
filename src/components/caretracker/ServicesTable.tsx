@@ -362,9 +362,12 @@ function ExpandedRowContent({ row }: { row: ScheduleRow }) {
   );
 }
 
-export function ServicesTable() {
+export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [serviceDialog, setServiceDialog] = useState<{ open: boolean; row?: ScheduleRow }>({ open: false });
+  // Rows come from the individual's implemented plan services; the built-in
+  // sample rows remain as a fallback when nothing has been implemented yet.
+  const dataRows = rows ?? mockScheduleRows;
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows);
