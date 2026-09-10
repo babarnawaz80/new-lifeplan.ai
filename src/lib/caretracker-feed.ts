@@ -15,8 +15,10 @@ import {
   listIndividuals,
   listCareTrackerServices,
   getIndividualOrgContext,
+  listAllPlans,
 } from "@/integrations/icm";
 import type { CareTrackerService } from "@/data/mock";
+import type { IcmPlanTree } from "@/types/icmGoalOutcome";
 
 // ---------------------------------------------------------------------------
 // Types the CareTracker components consume
