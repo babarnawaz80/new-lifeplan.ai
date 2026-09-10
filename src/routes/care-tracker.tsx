@@ -114,6 +114,8 @@ function CareTrackerPage() {
           </div>
         </div>
       </main>
+
+      <CareCompanion date={date} shift={selectedShift as ShiftId} />
     </AppShell>
   );
 }
