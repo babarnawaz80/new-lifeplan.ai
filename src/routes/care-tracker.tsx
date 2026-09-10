@@ -45,6 +45,7 @@ function CareTrackerPage() {
   const [selectedShift, setSelectedShift] = useState("all");
   const [selectedIndividual, setSelectedIndividual] = useState<string | null>(null);
   const [detailShift, setDetailShift] = useState("all");
+  const [companionOpen, setCompanionOpen] = useState(false);
 
   // Live data: individuals from iCM, schedule rows from the services that
   // implemented LifePlans pushed into CareTracker.
@@ -88,6 +89,7 @@ function CareTrackerPage() {
           onDateChange={setDate}
           groupByIndividual={groupByIndividual}
           onGroupByChange={setGroupByIndividual}
+          onOpenCompanion={() => setCompanionOpen(true)}
         />
 
         <FilterBar filters={filters} onFilterChange={handleFilterChange} />
@@ -115,7 +117,12 @@ function CareTrackerPage() {
         </div>
       </main>
 
-      <CareCompanion date={date} shift={selectedShift as ShiftId} />
+      <CareCompanion
+        date={date}
+        shift={selectedShift as ShiftId}
+        open={companionOpen}
+        onClose={() => setCompanionOpen(false)}
+      />
     </AppShell>
   );
 }
