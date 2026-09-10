@@ -44,6 +44,9 @@ export function ProvideServiceDialog({
   location = "Silvercloud1",
   address = "2745 NW Thatcher Road",
   servicesProvided = defaultServices,
+  prompts: _prompts,
+  readings: _readings,
+  onSubmit,
 }: ProvideServiceDialogProps) {
   const now = new Date();
   const currentTime = now.toTimeString().slice(0, 5);
