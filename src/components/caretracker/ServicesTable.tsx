@@ -481,7 +481,11 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
                           Services Provided On <span className="text-green-800 font-medium">{row.serviceDate}</span>
                         </p>
                       </div>
-                      <button className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors">
+                      <button
+                        aria-label="Undo this service"
+                        onClick={() => clearDocumentation(row.id, row.date)}
+                        className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                      >
                         <RotateCcw className="h-4 w-4" />
                       </button>
                     </div>
@@ -498,7 +502,11 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
                           Physically Not Able To On <span className="text-red-800 font-medium">{row.serviceDate}</span>
                         </p>
                       </div>
-                      <button className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                      <button
+                        aria-label="Undo this service"
+                        onClick={() => clearDocumentation(row.id, row.date)}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      >
                         <RotateCcw className="h-4 w-4" />
                       </button>
                     </div>
