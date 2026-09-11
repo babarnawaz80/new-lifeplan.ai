@@ -1,349 +1,122 @@
-// Dashboard — landing page (DEMO MOCK of the iCareManager dashboard).
-// Visual design ported from the IDDBilling.ai dashboard: gradient surface,
-// elevated stat cards, concentric ring charts, 4-column colored quick actions.
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  Users, AlertTriangle, Pill, Sun, ChevronRight, TrendingUp, Shield,
-  ClipboardCheck, Building2, GraduationCap, Calendar, FileText, Car,
-  CalendarCheck, NotepadText, Wrench, Briefcase, Clock, Flame, FileHeart,
-  BarChart3, Brain, Home, Thermometer, UsersRound, UserCheck, FileCheck,
-  ArrowRight, Sparkles, type LucideIcon,
+  AlertTriangle, BarChart3, Briefcase, Building2, CalendarDays, Car, ChevronRight,
+  ClipboardCheck, Clock3, FileCheck2, FileText, Flame, HeartPulse, Home, NotebookPen,
+  Pill, ShieldCheck, Sparkles, Thermometer, TrendingUp, UserRoundCheck, Users,
+  UsersRound, Wrench, type LucideIcon,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Dashboard · iCareManager" },
-      { name: "description", content: "Census, incidents, medication compliance and quick actions for your care organization." },
-      { property: "og:title", content: "Dashboard · iCareManager" },
-      { property: "og:description", content: "Census, incidents, medication compliance and quick actions for your care organization." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: () => ({ meta: [
+    { title: "Dashboard · iCareManager" },
+    { name: "description", content: "Care operations, compliance, and quick actions for iCareManager." },
+    { property: "og:title", content: "Dashboard · iCareManager" },
+    { property: "og:description", content: "Care operations, compliance, and quick actions for iCareManager." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: DashboardPage,
 });
 
-const BLUE = "hsl(217,80%,46%)";
-const ORANGE = "hsl(30,90%,50%)";
-const PURPLE = "hsl(262,47%,55%)";
-const GREEN = "hsl(150,70%,35%)";
-const GREEN_L = "hsl(144,70%,45%)";
-const AMBER = "hsl(40,90%,55%)";
-const RED = "hsl(0,75%,55%)";
-const STEEL = "hsl(205,59%,50%)";
-
-const COLUMN_COLORS = [BLUE, ORANGE, PURPLE, GREEN];
-
-const QUICK_ACTIONS: { label: string; icon: LucideIcon }[] = [
-  { label: "Care Tracker", icon: ClipboardCheck },
-  { label: "Sites & Programs", icon: Building2 },
-  { label: "Training Management", icon: GraduationCap },
-  { label: "Events", icon: Calendar },
-  { label: "LTSS or 837 Billing", icon: FileText },
-  { label: "Fleet Management", icon: Car },
-  { label: "Leads & Outreach", icon: UsersRound },
-  { label: "Staff Scheduler", icon: CalendarCheck },
-  { label: "Note", icon: NotepadText },
-  { label: "Maintenance Request", icon: Wrench },
-  { label: "Employer Lead", icon: Briefcase },
-  { label: "Staff Scheduler", icon: UserCheck },
-  { label: "Attendance", icon: Clock },
-  { label: "Drills", icon: Flame },
-  { label: "Clinical Contact Note", icon: FileHeart },
-  { label: "Events", icon: Calendar },
-  { label: "Ratio Compliance", icon: BarChart3 },
-  { label: "Plan of Correction", icon: FileCheck },
-  { label: "Group Activity Management", icon: UsersRound },
-  { label: "Psych Referral Form", icon: Brain },
-  { label: "Home Inspection", icon: Home },
-  { label: "Water Temperature Reading", icon: Thermometer },
+type Action = { label: string; icon: LucideIcon; action?: "care" | "lifeplan" };
+const ACTION_COLUMNS: Action[][] = [
+  [
+    { label: "Care Tracker", icon: ClipboardCheck, action: "care" },
+    { label: "LTSS Billing View", icon: FileText },
+    { label: "Attendance", icon: Clock3 },
+    { label: "Ratio Compliance", icon: BarChart3 },
+    { label: "Psych Referral Form", icon: HeartPulse },
+    { label: "My Sites", icon: Home },
+  ],
+  [
+    { label: "Fleet Management", icon: Car },
+    { label: "Maintenance Requests", icon: Wrench },
+    { label: "Drills", icon: Flame },
+    { label: "Incident Reporting Center", icon: AlertTriangle },
+    { label: "Plan of Correction (POC)", icon: FileCheck2 },
+    { label: "Home Inspection Form", icon: Home },
+  ],
+  [
+    { label: "Training Management", icon: UserRoundCheck },
+    { label: "Outreach/Referrals", icon: UsersRound },
+    { label: "Employer Leads", icon: Briefcase },
+    { label: "Clinical Contact Note", icon: NotebookPen },
+    { label: "Group Activity Management", icon: Users },
+    { label: "Fleet Management Documents", icon: Car },
+  ],
+  [
+    { label: "Water Temperature Readings", icon: Thermometer },
+    { label: "Events", icon: CalendarDays },
+    { label: "Staffing Log", icon: UsersRound },
+    { label: "Custom Forms", icon: FileText },
+    { label: "QA Meeting", icon: UsersRound },
+    { label: "LifePlan.ai", icon: Sparkles, action: "lifeplan" },
+  ],
 ];
 
-const myWorkData = [
-  { name: "Open", value: 60, color: AMBER },
-  { name: "Past Due", value: 40, color: RED },
-  { name: "In Progress", value: 70, color: STEEL },
-  { name: "Completed", value: 85, color: GREEN_L },
-];
+const ACTION_CLASSES = ["bg-action-blue", "bg-action-orange", "bg-action-purple", "bg-action-green"];
 
-const ispData = [
-  { name: "On Track", value: 80, color: AMBER },
-  { name: "Off Track", value: 50, color: RED },
-  { name: "Out Of Compliance", value: 65, color: STEEL },
-];
-
-function greeting() {
-  const h = new Date().getHours();
-  return h < 12 ? "Good Morning" : h < 17 ? "Good Afternoon" : "Good Evening";
-}
-
-function Donut({ value, size = 76, strokeWidth = 7, color, label }: {
-  value: number; size?: number; strokeWidth?: number; color: string; label: string;
-}) {
-  const r = (size - strokeWidth) / 2;
-  const circ = 2 * Math.PI * r;
+function Gauge({ value, label, tone }: { value: number; label: string; tone: string }) {
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg className="-rotate-90" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(220,20%,93%)" strokeWidth={strokeWidth} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={strokeWidth}
-          strokeDasharray={`${(value / 100) * circ} ${circ}`} strokeLinecap="round" />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-ink">{label}</span>
+    <div className="relative h-16 w-24 overflow-hidden" aria-label={`${label}: ${value}`}>
+      <div className="absolute left-2 top-3 h-20 w-20 rounded-full border-[8px] border-line" />
+      <div className={`absolute left-2 top-3 h-20 w-20 rounded-full border-[8px] border-transparent border-t-current border-r-current ${tone} rotate-[-35deg]`} />
+      <span className="absolute inset-x-0 bottom-0 text-center text-sm font-semibold text-ink">{label}</span>
     </div>
   );
 }
 
-function ConcentricRings({ data, size = 84 }: { data: { name: string; value: number; color: string }[]; size?: number }) {
-  const reversed = [...data].reverse();
-  const maxR = size / 2 - 6;
-  const minR = 14;
-  const step = reversed.length > 1 ? (maxR - minR) / (reversed.length - 1) : 0;
-  return (
-    <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full">
-        {reversed.map((item, i) => {
-          const r = maxR - i * step;
-          const c = 2 * Math.PI * r;
-          const dash = (item.value / 100) * c;
-          return (
-            <g key={i}>
-              <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(220,20%,93%)" strokeWidth={6} />
-              <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={item.color} strokeWidth={6}
-                strokeDasharray={`${dash} ${c - dash}`} strokeDashoffset={c * 0.25} strokeLinecap="round"
-                transform={`rotate(-90 ${size / 2} ${size / 2})`} className="transition-all duration-700" />
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-function StatCard({
-  icon: Icon, tint, label, value, valueTinted, sub, badge, links,
-}: {
-  icon: LucideIcon; tint: string; label: string; value: string; valueTinted?: boolean; sub: string;
-  badge: { text: string; icon?: LucideIcon; positive?: boolean };
-  links: string[];
-}) {
-  return (
-    <div className="cursor-pointer group relative overflow-hidden rounded-2xl bg-card shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-      <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, color-mix(in oklab, ${tint} 6%, transparent), transparent)` }} />
-      <div className="absolute bottom-0 right-0 w-32 h-32 rounded-tl-[80px] transition-colors"
-        style={{ background: `color-mix(in oklab, ${tint} 4%, transparent)` }} />
-      <div className="p-6 relative">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center"
-                style={{ background: `color-mix(in oklab, ${tint} 10%, transparent)` }}>
-                <Icon className="h-5 w-5" style={{ color: tint }} />
-              </div>
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: tint, opacity: 0.75 }}>
-                {label}
-              </span>
-            </div>
-            <p className="text-5xl font-extrabold tracking-tight" style={{ color: valueTinted ? tint : "var(--ink)" }}>{value}</p>
-            <p className="text-sm font-medium text-ink2 mt-1">{sub}</p>
-          </div>
-          <span className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full"
-            style={badge.positive
-              ? { color: GREEN_L, background: `color-mix(in oklab, ${GREEN_L} 10%, transparent)` }
-              : { color: "var(--ink2)", background: "var(--muted)" }}>
-            {badge.icon && <badge.icon className="h-3 w-3" />}
-            {badge.text}
-          </span>
-        </div>
-        <div className="mt-4 pt-3 border-t border-line flex gap-4">
-          {links.map((l) => (
-            <p key={l} className="text-xs text-navy cursor-pointer hover:underline flex items-center gap-1 font-medium">
-              {l} <ChevronRight className="h-3 w-3" />
-            </p>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SummaryCard({ topBar, children }: { topBar: string; children: React.ReactNode }) {
-  return (
-    <div className="group relative overflow-hidden rounded-2xl bg-card shadow-md hover:shadow-lg transition-all duration-200">
-      <div className="absolute top-0 left-0 right-0 h-1" style={{ background: topBar }} />
-      <div className="p-5 relative">{children}</div>
-    </div>
-  );
+function Rings({ compliance = false }: { compliance?: boolean }) {
+  const colors = compliance ? ["border-success", "border-destructive", "border-action-orange"] : ["border-action-blue", "border-action-orange", "border-destructive"];
+  return <div className="relative h-24 w-24 shrink-0">
+    {colors.map((color, index) => <div key={color} className={`absolute rounded-full border-[4px] border-line border-r-current ${color}`} style={{ inset: index * 8, transform: `rotate(${index * 58}deg)` }} />)}
+  </div>;
 }
 
 function DashboardPage() {
   const navigate = useNavigate();
-  const openLifeplan = () => navigate({ to: "/lifeplan" });
-  const openCareTracker = () => navigate({ to: "/care-tracker" });
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   return (
     <AppShell>
-      <div className="relative overflow-hidden min-h-screen">
-        <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, hsl(220 25% 96%) 0%, hsl(225 28% 94%) 100%)" }} />
-
-        <div className="relative w-full px-8 py-6 space-y-6 max-w-[1440px] mx-auto">
-          {/* Greeting */}
-          <div className="flex items-center justify-between rounded-2xl px-7 py-5 border border-line/60 bg-card/80 backdrop-blur-sm shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-2xl flex items-center justify-center shadow-sm border"
-                style={{
-                  background: `linear-gradient(135deg, color-mix(in oklab, ${AMBER} 20%, transparent), color-mix(in oklab, ${AMBER} 5%, transparent))`,
-                  borderColor: `color-mix(in oklab, ${AMBER} 12%, transparent)`,
-                }}>
-                <Sun className="h-6 w-6" style={{ color: AMBER }} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-ink">{greeting()}, John</h1>
-                <p className="text-sm text-ink2 mt-0.5">Here's what's happening today</p>
-              </div>
-            </div>
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-ink">{today}</p>
-              <p className="text-xs text-ink3 mt-0.5">Dashboard Overview</p>
-            </div>
+      <div className="min-h-[calc(100vh-56px)] bg-workspace px-5 py-5 lg:px-6">
+        <section className="flex items-center justify-between rounded-md border border-line bg-card px-5 py-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-md bg-action-orange-soft text-action-orange"><Sparkles className="size-5" /></div>
+            <div><h1 className="text-lg font-bold text-ink">Good afternoon, Babar</h1><p className="text-xs text-ink2">Here's what's happening today</p></div>
           </div>
+          <div className="hidden text-right sm:block"><p className="text-sm font-semibold text-ink">{today}</p><p className="text-xs text-ink2">Dashboard Overview</p></div>
+        </section>
 
-          {/* Hero stat cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <StatCard icon={Users} tint={BLUE} label="Census" value="84" sub="Current Individuals"
-              badge={{ text: "+3", icon: TrendingUp, positive: true }} links={["Census Report"]} />
-            <StatCard icon={AlertTriangle} tint={AMBER} label="Incidents" value="03" sub="Incident Reports"
-              badge={{ text: "Jun–Jul" }} links={["View All"]} />
-            <StatCard icon={Pill} tint={PURPLE} label="Medications" value="eMAR" valueTinted sub="Daily Med Compliance"
-              badge={{ text: "98%", icon: Shield, positive: true }} links={["Details", "Compute"]} />
+        <section className="mt-5 grid gap-4 lg:grid-cols-3">
+          <article className="flex min-h-36 items-center justify-between rounded-md border border-success/35 bg-success-soft p-5 shadow-sm">
+            <div><p className="text-3xl font-bold text-ink">222</p><p className="mt-1 font-semibold text-success">Current Individuals</p><div className="mt-4 flex gap-2"><Button size="sm" variant="success" onClick={() => navigate({ to: "/individuals" })}>Individuals</Button><Button size="sm" variant="outline">Census Report <ChevronRight /></Button></div></div>
+            <div className="flex flex-col items-end gap-2"><div className="flex size-9 items-center justify-center rounded-md bg-success/10 text-success"><Users className="size-5" /></div><Gauge value={72} label="222" tone="text-success" /></div>
+          </article>
+          <article className="flex min-h-36 items-center justify-between rounded-md border border-action-orange/35 bg-action-orange-soft p-5 shadow-sm">
+            <div><p className="text-3xl font-bold text-action-orange">eMAR</p><p className="mt-1 font-semibold text-action-orange">Daily Med Compliance</p><div className="mt-4 flex gap-2"><Button size="sm" className="bg-action-orange text-primary-foreground hover:bg-action-orange/90">Compute</Button><Button size="sm" variant="outline">Details <ChevronRight /></Button></div></div>
+            <div className="flex flex-col items-end gap-2"><div className="flex size-9 items-center justify-center rounded-md bg-action-orange/10 text-action-orange"><Pill className="size-5" /></div><Gauge value={32} label="32%" tone="text-action-orange" /></div>
+          </article>
+          <article className="flex min-h-36 items-center justify-between rounded-md border border-destructive/30 bg-destructive-soft p-5 shadow-sm">
+            <div><p className="text-3xl font-bold text-ink">28</p><p className="mt-1 font-semibold text-destructive">Incident Reporting</p><Button size="sm" variant="outline" className="mt-4">8/11/2026 - 9/11/2026 <ChevronRight /></Button></div>
+            <div className="flex flex-col items-end gap-2"><div className="flex size-9 items-center justify-center rounded-md bg-destructive/10 text-destructive"><AlertTriangle className="size-5" /></div><Gauge value={28} label="28" tone="text-destructive" /></div>
+          </article>
+        </section>
+
+        <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <article className="min-h-40 rounded-md border border-line border-t-4 border-t-action-orange bg-card p-5 shadow-sm"><div className="flex justify-between"><div><p className="text-3xl font-bold text-ink">49</p><p className="mt-1 font-semibold text-action-orange">Non-Verified Orders</p><Button size="sm" className="mt-8 bg-action-orange text-primary-foreground hover:bg-action-orange/90">Verify</Button></div><div className="flex flex-col items-end gap-4"><AlertTriangle className="text-action-orange"/><Gauge value={49} label="49" tone="text-action-orange"/></div></div></article>
+          <article className="min-h-40 rounded-md border border-line border-t-4 border-t-action-blue bg-action-blue-soft p-5 shadow-sm"><div className="flex h-full justify-between"><div><p className="text-3xl font-semibold text-action-blue">Funding Stream</p><p className="mt-1 text-lg text-action-blue">Care Tracker</p><div className="mt-10 flex gap-2"><Button size="sm" className="bg-action-blue text-primary-foreground hover:bg-action-blue/90" onClick={() => navigate({ to: "/care-tracker" })}>Compliance Report</Button><Button size="sm" variant="outline">Calculate</Button></div></div><ClipboardCheck className="text-action-blue" /></div></article>
+          <article className="min-h-40 rounded-md border border-line border-t-4 border-t-action-blue bg-card p-5 shadow-sm"><div className="flex justify-between"><div><h2 className="text-xl font-semibold text-success">My Work</h2><div className="mt-3 space-y-1 text-xs text-ink2"><p>🔵 Open: 175</p><p>🟠 In Progress: 1</p><p>🔴 Past Due: 0</p><p>🟢 Completed: 3</p></div><Button size="sm" variant="outline" className="mt-3">Details <ChevronRight /></Button></div><Rings /></div></article>
+          <article className="min-h-40 rounded-md border border-line border-t-4 border-t-action-blue bg-card p-5 shadow-sm"><div className="flex justify-between"><div><h2 className="text-xl font-semibold text-action-blue">PCP Compliance</h2><div className="mt-3 space-y-1 text-xs text-ink2"><p>🟢 On Track: 69.16%</p><p>🟠 Off Track: 2.8%</p><p>🔴 Out Of Compliance: 28.04%</p></div><Button size="sm" variant="outline" className="mt-3">Details <ChevronRight /></Button></div><Rings compliance /></div></article>
+        </section>
+
+        <section className="mt-5 rounded-md bg-workspace-strong p-3">
+          <div className="mb-3 flex items-center gap-3"><span className="h-1.5 w-9 rounded-full bg-action-blue"/><h2 className="text-xs font-bold uppercase text-ink">Quick Actions</h2><span className="h-px flex-1 bg-line"/></div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {ACTION_COLUMNS.map((column, columnIndex) => <div key={columnIndex} className="space-y-3">{column.map(({ label, icon: Icon, action }) => <Button key={label} onClick={action === "care" ? () => navigate({ to: "/care-tracker" }) : action === "lifeplan" ? () => navigate({ to: "/lifeplan" }) : undefined} className={`h-[58px] w-full justify-start rounded-md px-2.5 text-sm font-semibold shadow-sm hover:brightness-95 ${ACTION_CLASSES[columnIndex]}`}><span className="flex size-10 items-center justify-center rounded-md bg-primary-foreground/10"><Icon className="size-5" /></span><span className="ml-1 truncate">{label}</span></Button>)}</div>)}
           </div>
-
-          {/* Summary cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            <SummaryCard topBar={`linear-gradient(90deg, ${GREEN_L}, color-mix(in oklab, ${GREEN_L} 40%, transparent))`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-ink text-base">Services</p>
-                  <p className="text-sm text-ink2 mt-0.5">Care Tracker</p>
-                  <p onClick={openCareTracker}
-                    className="text-xs text-navy mt-2 cursor-pointer hover:underline flex items-center gap-1 font-medium">
-                    Compliance Report <ChevronRight className="h-3 w-3" />
-                  </p>
-                </div>
-                <Donut value={87} color={GREEN_L} label="87%" />
-              </div>
-            </SummaryCard>
-
-            <SummaryCard topBar={`linear-gradient(90deg, ${RED}, color-mix(in oklab, ${RED} 40%, transparent))`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-ink text-base">Non-Verified Orders</p>
-                  <p className="text-xs text-ink2 mt-0.5 cursor-pointer hover:underline flex items-center gap-1">
-                    View Details <ChevronRight className="h-3 w-3" />
-                  </p>
-                </div>
-                <Donut value={40} color={RED} label="#04" />
-              </div>
-            </SummaryCard>
-
-            <SummaryCard topBar={`linear-gradient(90deg, ${GREEN_L}, color-mix(in oklab, ${BLUE} 40%, transparent))`}>
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-bold text-ink text-base">My Work</p>
-                <p className="text-xs text-navy cursor-pointer hover:underline flex items-center gap-1 font-medium">
-                  Details <ChevronRight className="h-3 w-3" />
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="space-y-1.5 flex-1">
-                  {myWorkData.map((item) => (
-                    <div key={item.name} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-xs text-ink2">{item.name}</span>
-                    </div>
-                  ))}
-                </div>
-                <ConcentricRings data={myWorkData} />
-              </div>
-            </SummaryCard>
-
-            <SummaryCard topBar={`linear-gradient(90deg, ${BLUE}, color-mix(in oklab, ${PURPLE} 40%, transparent))`}>
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-bold text-ink text-base">ISP Compliance</p>
-                <p className="text-xs text-navy cursor-pointer hover:underline flex items-center gap-1 font-medium">
-                  Details <ChevronRight className="h-3 w-3" />
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="space-y-1.5 flex-1">
-                  {ispData.map((item) => (
-                    <div key={item.name} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-xs text-ink2">{item.name}</span>
-                    </div>
-                  ))}
-                </div>
-                <ConcentricRings data={ispData} />
-              </div>
-            </SummaryCard>
-          </div>
-
-          {/* Quick actions */}
-          <div className="relative">
-            <div className="absolute -inset-4 rounded-3xl"
-              style={{ background: `linear-gradient(135deg, color-mix(in oklab, ${BLUE} 3%, transparent), transparent)` }} />
-            <div className="relative">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="h-1.5 w-10 rounded-full" style={{ background: `linear-gradient(90deg, ${BLUE}, ${PURPLE})` }} />
-                <h2 className="text-sm font-bold text-ink uppercase tracking-wider">Quick Actions</h2>
-                <div className="flex-1 h-px bg-line" />
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {QUICK_ACTIONS.map((action, i) => {
-                  const color = COLUMN_COLORS[i % 4];
-                  const Icon = action.icon;
-                  const isCareTracker = action.label === "Care Tracker";
-                  return (
-                    <button
-                      key={`${action.label}-${i}`}
-                      onClick={isCareTracker ? openCareTracker : undefined}
-                      className="group/btn relative cursor-pointer rounded-2xl text-white px-5 py-[18px] flex items-center gap-3.5 transition-all duration-200 overflow-hidden text-left shadow-sm hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 hover:brightness-95"
-                      style={{ background: color }}
-                    >
-                      <div className="absolute inset-0 -translate-x-full group-hover/btn:translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent pointer-events-none transition-transform duration-700" />
-                      <div className="absolute top-0 left-0 right-0 h-px bg-white/15" />
-                      <div className="absolute bottom-0 left-0 right-0 h-px bg-black/10" />
-                      <div className="h-11 w-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 group-hover/btn:scale-105 group-hover/btn:bg-white/20 transition-all duration-200">
-                        <Icon className="h-5 w-5 text-white" />
-                      </div>
-                      <span className="text-[14px] font-semibold leading-tight">{action.label}</span>
-                    </button>
-                  );
-                })}
-
-                {/* LifePlan.ai — branded entry */}
-                <button
-                  onClick={openLifeplan}
-                  title="Open LifePlan.ai"
-                  className="group/btn relative cursor-pointer rounded-2xl text-white px-5 py-[18px] flex items-center justify-between gap-3 transition-all duration-200 overflow-hidden text-left shadow-sm hover:shadow-lg hover:-translate-y-0.5"
-                  style={{ background: "var(--ai-gradient)" }}
-                >
-                  <span className="flex items-center gap-3.5">
-                    <span className="h-11 w-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0 group-hover/btn:scale-105 transition-transform">
-                      <Sparkles className="h-5 w-5 text-white" />
-                    </span>
-                    <span className="text-[14px] font-semibold leading-tight">LifePlan.ai</span>
-                  </span>
-                  <ArrowRight className="h-4 w-4 text-white/90" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        </section>
       </div>
     </AppShell>
   );

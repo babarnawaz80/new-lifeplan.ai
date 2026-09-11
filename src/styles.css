@@ -57,8 +57,18 @@
   --text-page-title--line-height: 2.25rem;
   --text-page-title--font-weight: 600;
 
-  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-  --font-display: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-sans: "Figtree", system-ui, -apple-system, sans-serif;
+  --font-display: "Outfit", system-ui, -apple-system, sans-serif;
+  --color-workspace: var(--workspace);
+  --color-workspace-strong: var(--workspace-strong);
+  --color-action-blue: var(--action-blue);
+  --color-action-blue-soft: var(--action-blue-soft);
+  --color-action-orange: var(--action-orange);
+  --color-action-orange-soft: var(--action-orange-soft);
+  --color-action-purple: var(--action-purple);
+  --color-action-green: var(--action-green);
+  --color-success-soft: var(--success-soft);
+  --color-destructive-soft: var(--destructive-soft);
 }
 
 :root {
@@ -102,6 +112,17 @@
   --indigo: oklch(0.46 0.19 280);                /* #4b46c4 */
   --amber: oklch(0.61 0.12 75);                  /* #b9802a */
   --red: oklch(0.525 0.16 28);                   /* #bb4631 */
+
+  --workspace: oklch(0.974 0.004 255);
+  --workspace-strong: oklch(0.951 0.006 255);
+  --action-blue: oklch(0.55 0.135 243);
+  --action-blue-soft: oklch(0.965 0.018 243);
+  --action-orange: oklch(0.69 0.205 43);
+  --action-orange-soft: oklch(0.975 0.026 80);
+  --action-purple: oklch(0.57 0.145 292);
+  --action-green: oklch(0.64 0.17 145);
+  --success-soft: oklch(0.975 0.025 150);
+  --destructive-soft: oklch(0.975 0.022 20);
 
   --ai-gradient: linear-gradient(118deg, #7C3AED 0%, #A855F7 42%, #E0398B 100%);
   --shadow-soft: 0 14px 40px -28px rgba(26, 35, 64, 0.5);

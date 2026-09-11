@@ -63,11 +63,15 @@ import {
 export const Route = createFileRoute("/individuals/")({
   head: () => ({
     meta: [
-      { title: "Individuals · iCareManager" },
+      { title: "Individuals List · iCareManager" },
       {
         name: "description",
-        content: "Browse and manage individuals enrolled in services.",
+        content: "Manage individuals, services, and care programs in iCareManager.",
       },
+      { property: "og:title", content: "Individuals List · iCareManager" },
+      { property: "og:description", content: "Manage individuals, services, and care programs in iCareManager." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: IndividualsListPage,
@@ -229,17 +233,17 @@ function IndividualsListPage() {
 
   return (
     <AppShell>
-      <main className="p-6">
-        <div className="space-y-6">
+      <main className="min-h-[calc(100vh-100px)] bg-workspace p-5">
+        <div className="space-y-4">
           {/* Header */}
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/10">
-                <Users className="h-7 w-7 text-primary" />
+              <div className="flex items-center justify-center h-12 w-12 rounded-md bg-action-blue/10">
+                <Users className="h-6 w-6 text-action-blue" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground tracking-tight">
-                  Individuals Directory
+                <h1 className="text-2xl font-medium text-foreground">
+                  Individuals List
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   Manage individuals, services, and care programs
@@ -292,8 +296,8 @@ function IndividualsListPage() {
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {/* Summary cards are intentionally hidden in the compact iCM list view. */}
+          <div className="hidden">
             <Card className="bg-gradient-to-br from-primary/5 to-transparent border-primary/10">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -383,7 +387,7 @@ function IndividualsListPage() {
 
           {/* Collapsible Filters */}
           <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-            <Card className="rounded-2xl overflow-hidden">
+            <Card className="rounded-md overflow-hidden shadow-sm">
               <CollapsibleTrigger asChild>
                 <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-2">
@@ -400,6 +404,10 @@ function IndividualsListPage() {
               <CollapsibleContent>
                 <CardContent className="p-4 pt-4 border-t border-border/50">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                    <Select value={locationFilter} onValueChange={setLocationFilter}>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="All Locations" /></SelectTrigger>
+                      <SelectContent><SelectItem value="all">All Locations</SelectItem><SelectItem value="cecil">Cecil Street</SelectItem><SelectItem value="easy">Easy Street</SelectItem><SelectItem value="woodland">Woodland</SelectItem><SelectItem value="spring">Spring Fields</SelectItem></SelectContent>
+                    </Select>
                     <Input
                       placeholder="First Name"
                       value={searchFirstName}
@@ -418,21 +426,6 @@ function IndividualsListPage() {
                       onChange={(e) => setSearchAlsoKnownAs(e.target.value)}
                       className="h-9 text-sm"
                     />
-                    <Select
-                      value={locationFilter}
-                      onValueChange={setLocationFilter}
-                    >
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder="All Locations" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Locations</SelectItem>
-                        <SelectItem value="cecil">Cecil Street</SelectItem>
-                        <SelectItem value="easy">Easy Street</SelectItem>
-                        <SelectItem value="woodland">Woodland</SelectItem>
-                        <SelectItem value="spring">Spring Fields</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="flex flex-wrap items-center gap-6 mb-3 justify-between">
                     <div className="flex flex-wrap items-center gap-6">
@@ -470,7 +463,7 @@ function IndividualsListPage() {
                         onClick={handleClearFilters}
                       >
                         <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                        Reset
+                        Clear
                       </Button>
                     </div>
                   </div>
@@ -481,7 +474,7 @@ function IndividualsListPage() {
 
           {/* Status Tabs & Results Count */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-1 p-1 bg-muted/50 rounded-xl">
+            <div className="flex flex-wrap gap-1 p-1 bg-transparent rounded-md">
               {statusTabs.map((tab) => {
                 const count =
                   statusCounts[tab.key as keyof typeof statusCounts] || 0;
@@ -490,7 +483,7 @@ function IndividualsListPage() {
                   <button
                     key={tab.key}
                     onClick={() => setStatusFilter(tab.key)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                    className={`px-4 py-2 text-xs font-semibold rounded-md transition-all ${
                       active
                         ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
@@ -526,21 +519,21 @@ function IndividualsListPage() {
             {filteredIndividuals.map((individual) => {
               const statusStyle = statusConfig[individual.status];
               return (
-                <Card
+                 <Card
                   key={individual.id}
-                  className="group rounded-2xl hover:shadow-card-hover transition-all duration-200 overflow-hidden"
+                  className="group rounded-md border-line hover:border-action-blue/35 hover:shadow-sm transition-all duration-200 overflow-hidden"
                 >
                   <CardContent className="p-0">
-                    <div className="flex flex-wrap items-center gap-6 p-5">
+                    <div className="flex flex-wrap items-center gap-6 px-4 py-3">
                       {/* Avatar & Info */}
                       <div className="flex items-center gap-4 min-w-[200px]">
                         <div className="relative">
-                          <Avatar className="h-14 w-14 ring-2 ring-background shadow-md">
+                          <Avatar className="h-14 w-14 ring-1 ring-line">
                             <AvatarImage
                               src={individual.avatar}
                               className="object-cover"
                             />
-                            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold">
+                            <AvatarFallback className="bg-muted text-ink3 font-semibold">
                               {getInitials(individual.name)}
                             </AvatarFallback>
                           </Avatar>
@@ -551,7 +544,7 @@ function IndividualsListPage() {
                           />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                           <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-action-blue transition-colors">
                             {individual.name}
                           </h3>
                           <Badge
