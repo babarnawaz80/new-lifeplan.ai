@@ -160,6 +160,7 @@ export function CareCompanion({
               outcomeStatement: b.outcomeStatement,
             })),
             staged: stagedRef.current,
+            activeRowId: focus?.rowId ?? null,
           }),
         });
         if (!res.ok) throw new Error(String(res.status));
@@ -170,15 +171,17 @@ export function CareCompanion({
           actionRowId = action.rowId;
           const item = briefing.find((b) => b.rowId === action.rowId);
           if (item) {
-            setStaged((s) => [
-              ...s.filter((x) => x.rowId !== action.rowId),
+            const nextStaged = [
+              ...stagedRef.current.filter((x) => x.rowId !== action.rowId),
               {
                 rowId: action.rowId,
                 individualName: item.individualName,
                 title: item.title,
                 notes: action.notes,
               },
-            ]);
+            ];
+            stagedRef.current = nextStaged;
+            setStaged(nextStaged);
             setReviewing(false);
             setCommitted(false);
           }
@@ -210,7 +213,7 @@ export function CareCompanion({
         setThinking(false);
       }
     },
-    [briefing, date, say, thinking, turns],
+    [briefing, date, focus?.rowId, say, thinking, turns],
   );
 
   useEffect(() => {
