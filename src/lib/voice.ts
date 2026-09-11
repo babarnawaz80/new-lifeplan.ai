@@ -64,8 +64,55 @@ export function createListener(handlers: {
 }
 
 let currentUtterance: SpeechSynthesisUtterance | null = null;
+let currentAudio: HTMLAudioElement | null = null;
+let speechToken = 0;
 
+// Natural AI voice first (ElevenLabs, server-side); browser voice only if that
+// is unavailable or fails.
 export function speak(text: string, onDone?: () => void): void {
+  if (typeof window === "undefined") {
+    onDone?.();
+    return;
+  }
+  const token = ++speechToken;
+  stopSpeaking();
+
+  void (async () => {
+    try {
+      const res = await fetch("/api/companion-voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (token !== speechToken) return;
+      if (!res.ok || res.status === 204) {
+        speakWithBrowser(text, onDone);
+        return;
+      }
+      const blob = await res.blob();
+      if (token !== speechToken) return;
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudio = audio;
+      const finish = () => {
+        URL.revokeObjectURL(url);
+        if (currentAudio === audio) currentAudio = null;
+        if (token === speechToken) onDone?.();
+      };
+      audio.onended = finish;
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        if (currentAudio === audio) currentAudio = null;
+        if (token === speechToken) speakWithBrowser(text, onDone);
+      };
+      await audio.play();
+    } catch {
+      if (token === speechToken) speakWithBrowser(text, onDone);
+    }
+  })();
+}
+
+function speakWithBrowser(text: string, onDone?: () => void): void {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     onDone?.();
     return;
@@ -86,12 +133,20 @@ export function speak(text: string, onDone?: () => void): void {
 }
 
 export function stopSpeaking(): void {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
+  if (typeof window === "undefined") return;
+  speechToken += 1;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.onended = null;
+    currentAudio.onerror = null;
+    currentAudio = null;
+  }
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   currentUtterance = null;
 }
 
 export function isSpeaking(): boolean {
+  if (currentAudio && !currentAudio.paused) return true;
   return typeof window !== "undefined" && "speechSynthesis" in window
     ? window.speechSynthesis.speaking
     : Boolean(currentUtterance);

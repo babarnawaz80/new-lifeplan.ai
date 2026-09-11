@@ -20,6 +20,7 @@ import { Route as IndividualsIdRouteImport } from './routes/individuals.$id'
 import { Route as GuidelinesNewRouteImport } from './routes/guidelines.new'
 import { Route as GuidelinesIdRouteImport } from './routes/guidelines.$id'
 import { Route as ApiGeneratePlanRouteImport } from './routes/api/generate-plan'
+import { Route as ApiCompanionVoiceRouteImport } from './routes/api/companion-voice'
 import { Route as ApiCareCompanionRouteImport } from './routes/api/care-companion'
 import { Route as AgentsNewRouteImport } from './routes/agents.new'
 import { Route as IndividualsIdIndexRouteImport } from './routes/individuals.$id.index'
@@ -83,6 +84,11 @@ const ApiGeneratePlanRoute = ApiGeneratePlanRouteImport.update({
   path: '/api/generate-plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCompanionVoiceRoute = ApiCompanionVoiceRouteImport.update({
+  id: '/api/companion-voice',
+  path: '/api/companion-voice',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCareCompanionRoute = ApiCareCompanionRouteImport.update({
   id: '/api/care-companion',
   path: '/api/care-companion',
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/service-note-report': typeof ServiceNoteReportRoute
   '/agents/new': typeof AgentsNewRoute
   '/api/care-companion': typeof ApiCareCompanionRoute
+  '/api/companion-voice': typeof ApiCompanionVoiceRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/service-note-report': typeof ServiceNoteReportRoute
   '/agents/new': typeof AgentsNewRoute
   '/api/care-companion': typeof ApiCareCompanionRoute
+  '/api/companion-voice': typeof ApiCompanionVoiceRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
@@ -166,6 +174,7 @@ export interface FileRoutesById {
   '/service-note-report': typeof ServiceNoteReportRoute
   '/agents/new': typeof AgentsNewRoute
   '/api/care-companion': typeof ApiCareCompanionRoute
+  '/api/companion-voice': typeof ApiCompanionVoiceRoute
   '/api/generate-plan': typeof ApiGeneratePlanRoute
   '/guidelines/$id': typeof GuidelinesIdRoute
   '/guidelines/new': typeof GuidelinesNewRoute
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/service-note-report'
     | '/agents/new'
     | '/api/care-companion'
+    | '/api/companion-voice'
     | '/api/generate-plan'
     | '/guidelines/$id'
     | '/guidelines/new'
@@ -208,6 +218,7 @@ export interface FileRouteTypes {
     | '/service-note-report'
     | '/agents/new'
     | '/api/care-companion'
+    | '/api/companion-voice'
     | '/api/generate-plan'
     | '/guidelines/$id'
     | '/guidelines/new'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/service-note-report'
     | '/agents/new'
     | '/api/care-companion'
+    | '/api/companion-voice'
     | '/api/generate-plan'
     | '/guidelines/$id'
     | '/guidelines/new'
@@ -248,6 +260,7 @@ export interface RootRouteChildren {
   ServiceNoteReportRoute: typeof ServiceNoteReportRoute
   AgentsNewRoute: typeof AgentsNewRoute
   ApiCareCompanionRoute: typeof ApiCareCompanionRoute
+  ApiCompanionVoiceRoute: typeof ApiCompanionVoiceRoute
   ApiGeneratePlanRoute: typeof ApiGeneratePlanRoute
   GuidelinesIdRoute: typeof GuidelinesIdRoute
   GuidelinesNewRoute: typeof GuidelinesNewRoute
@@ -337,6 +350,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGeneratePlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/companion-voice': {
+      id: '/api/companion-voice'
+      path: '/api/companion-voice'
+      fullPath: '/api/companion-voice'
+      preLoaderRoute: typeof ApiCompanionVoiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/care-companion': {
       id: '/api/care-companion'
       path: '/api/care-companion'
@@ -414,6 +434,7 @@ const rootRouteChildren: RootRouteChildren = {
   ServiceNoteReportRoute: ServiceNoteReportRoute,
   AgentsNewRoute: AgentsNewRoute,
   ApiCareCompanionRoute: ApiCareCompanionRoute,
+  ApiCompanionVoiceRoute: ApiCompanionVoiceRoute,
   ApiGeneratePlanRoute: ApiGeneratePlanRoute,
   GuidelinesIdRoute: GuidelinesIdRoute,
   GuidelinesNewRoute: GuidelinesNewRoute,
