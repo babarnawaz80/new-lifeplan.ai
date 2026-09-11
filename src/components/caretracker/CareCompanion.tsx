@@ -172,6 +172,13 @@ export function CareCompanion({
     startListening();
   }, [handsFree, startListening]);
 
+  // Hands-free is on every time the companion opens.
+  useEffect(() => {
+    if (!open) return;
+    handsFreeRef.current = true;
+    setHandsFree(true);
+  }, [open]);
+
   // Greet with the shift briefing when the companion opens.
   useEffect(() => {
     if (!open || turns.length) return;
