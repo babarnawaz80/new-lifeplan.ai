@@ -337,18 +337,20 @@ export function CareCompanion({
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           <button
             type="button"
-            aria-label={listening ? "Stop listening" : "Speak to the companion"}
+            aria-label={handsFree ? "Pause the conversation" : "Resume the conversation"}
             onClick={toggleMic}
             disabled={!micSupported}
             className={cn(
               "flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-all",
               listening
                 ? "bg-red-500 text-white shadow-[0_0_0_10px_rgba(239,68,68,0.18)]"
-                : "bg-gradient-to-br from-primary to-violet-600 text-white hover:brightness-110",
+                : handsFree
+                  ? "bg-gradient-to-br from-primary to-violet-600 text-white hover:brightness-110"
+                  : "bg-white/10 text-white/70 hover:bg-white/20",
               !micSupported && "opacity-40",
             )}
           >
-            {micSupported && !listening ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+            {micSupported && handsFree ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
           </button>
           <textarea
             value={input}
