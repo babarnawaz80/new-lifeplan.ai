@@ -344,6 +344,51 @@ export function CareCompanion({
           <p className="text-xs text-white/50">{statusLine}</p>
         )}
 
+        {staged.length > 0 && (
+          <div
+            className={cn(
+              "w-full max-w-2xl rounded-2xl border px-5 py-4 text-left backdrop-blur",
+              reviewing ? "border-amber-400/40 bg-amber-400/10" : "border-white/15 bg-white/5",
+            )}
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/60">
+              {reviewing ? "End-of-shift snapshot — not committed yet" : "Held for your review"}
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {staged.map((s) => (
+                <li key={s.rowId} className="text-sm text-white/90">
+                  <span className="font-semibold">{s.individualName}</span> · {s.title}
+                  {s.notes ? <span className="text-white/60"> — {s.notes}</span> : null}
+                </li>
+              ))}
+            </ul>
+            {reviewing && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void send("Yes, go ahead and commit it.")}
+                  className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white hover:brightness-110"
+                >
+                  Yes, commit to Care Tracker
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void send("Not yet, I want to change something.")}
+                  className="rounded-full border border-white/20 px-4 py-2 text-xs text-white/80 hover:bg-white/10"
+                >
+                  Not yet
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {committed && staged.length === 0 && (
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-300">
+            Committed to Care Tracker
+          </p>
+        )}
+
         {charted.length > 0 && (
           <div className="flex flex-wrap justify-center gap-2">
             {charted.map((c) => (
