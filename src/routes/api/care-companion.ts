@@ -79,12 +79,13 @@ export const Route = createFileRoute("/api/care-companion")({
         const body = (await request.json()) as Body;
         const briefing = body.briefing ?? [];
         const messages = body.messages ?? [];
+        const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
         const caregiver = body.caregiver ?? "there";
         const greeting = body.greeting ?? "Hello";
         const key = process.env["LOVABLE_API_KEY"];
 
         if (!key) {
-          return Response.json(fallback(briefing, body.caregiver, body.staged ?? []));
+          return Response.json(fallback(briefing, body.caregiver, body.staged ?? [], lastUserMessage));
         }
 
         const pending = briefing.filter((b) => b.status === "pending");
