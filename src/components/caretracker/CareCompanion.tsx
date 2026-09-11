@@ -152,27 +152,25 @@ export function CareCompanion({
     [briefing, date, say, thinking, turns],
   );
 
+  useEffect(() => {
+    sendRef.current = (t: string) => void send(t);
+  }, [send]);
+
+  // Mic button pauses / resumes the hands-free conversation.
   const toggleMic = useCallback(() => {
-    if (listening) {
-      listenerRef.current?.stop();
+    if (handsFree) {
+      setHandsFree(false);
+      handsFreeRef.current = false;
+      listenerRef.current?.abort();
+      setListening(false);
       return;
     }
+    setHandsFree(true);
+    handsFreeRef.current = true;
     stopSpeaking();
     setSpeaking(false);
-    const listener = createListener({
-      onTranscript: (t) => setInput(t),
-      onEnd: () => {
-        setListening(false);
-        const spoken = listenerRef.current?.text ?? "";
-        if (spoken.trim()) void send(spoken);
-      },
-      onError: () => setListening(false),
-    });
-    if (!listener) return;
-    listenerRef.current = listener;
-    setListening(true);
-    listener.start();
-  }, [listening, send]);
+    startListening();
+  }, [handsFree, startListening]);
 
   // Greet with the shift briefing when the companion opens.
   useEffect(() => {
