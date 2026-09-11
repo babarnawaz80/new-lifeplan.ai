@@ -105,6 +105,8 @@ export function CareCompanion({
     async (text: string) => {
       const clean = text.trim();
       if (!clean || thinking) return;
+      listenerRef.current?.abort();
+      setListening(false);
       setInput("");
       const next: Turn[] = [...turns, { role: "user", content: clean }];
       setTurns(next);
