@@ -57,13 +57,48 @@ export function CareCompanion({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [turns, thinking]);
 
+  const sendRef = useRef<(text: string) => void>(() => {});
+  const handsFreeRef = useRef(true);
+  const [handsFree, setHandsFree] = useState(true);
+  handsFreeRef.current = handsFree;
+
+  // Open the mic and keep it open until the caregiver stops talking.
+  const startListening = useCallback(() => {
+    if (!voiceInputSupported()) return;
+    listenerRef.current?.abort();
+    const listener = createListener({
+      onTranscript: (t) => setInput(t),
+      onEnd: () => {
+        setListening(false);
+        const spoken = listenerRef.current?.text ?? "";
+        if (spoken.trim()) sendRef.current(spoken);
+        else if (handsFreeRef.current) setTimeout(() => startListening(), 400);
+      },
+      onError: () => setListening(false),
+    });
+    if (!listener) return;
+    listenerRef.current = listener;
+    setListening(true);
+    try {
+      listener.start();
+    } catch {
+      setListening(false);
+    }
+  }, []);
+
   const say = useCallback(
     (text: string) => {
-      if (muted) return;
+      if (muted) {
+        if (handsFreeRef.current) startListening();
+        return;
+      }
       setSpeaking(true);
-      speak(text, () => setSpeaking(false));
+      speak(text, () => {
+        setSpeaking(false);
+        if (handsFreeRef.current) setTimeout(() => startListening(), 250);
+      });
     },
-    [muted],
+    [muted, startListening],
   );
 
   const send = useCallback(
