@@ -133,12 +133,20 @@ function speakWithBrowser(text: string, onDone?: () => void): void {
 }
 
 export function stopSpeaking(): void {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
+  if (typeof window === "undefined") return;
+  speechToken += 1;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.onended = null;
+    currentAudio.onerror = null;
+    currentAudio = null;
+  }
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   currentUtterance = null;
 }
 
 export function isSpeaking(): boolean {
+  if (currentAudio && !currentAudio.paused) return true;
   return typeof window !== "undefined" && "speechSynthesis" in window
     ? window.speechSynthesis.speaking
     : Boolean(currentUtterance);
