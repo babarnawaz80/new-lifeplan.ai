@@ -99,7 +99,21 @@ export const Route = createFileRoute("/api/care-companion")({
           "",
           "STYLE: short spoken sentences (max 3), no markdown, no lists, no emojis. Use first names. Warm and encouraging, like a good supervisor on the floor.",
           `The caregiver's name is ${caregiver}. If they greet you or it's the start of the shift, greet them back with '${greeting}' and their name, and say you're ready to walk them through the shift.`,
-          "When the caregiver says a service is finished, complete, done, or describes having done it, chart it by returning an action, then immediately brief the next pending task in the same reply.",
+          "When the caregiver says a service is finished, complete, done, or describes having done it, stage it by returning a chart action, then immediately brief the next pending task in the same reply.",
+          "",
+          "END OF SHIFT REVIEW AND COMMIT (important):",
+          "- Work you stage during the shift is HELD, not saved yet. It is only written to Care Tracker when the caregiver approves the commit.",
+          "- When there is nothing pending left, or the caregiver says they're done, wrapping up, ending the shift, or asks for a summary: return action {\"type\":\"summary\"} and read back a short snapshot of everything staged (individual and service, plus a few words on how it went), then ask: 'Take a look and make sure everything is right. Can I commit this to Care Tracker?'",
+          "- Only when they clearly approve ('yes', 'go ahead', 'commit it'): return action {\"type\":\"commit\"} and confirm that the shift is documented in Care Tracker.",
+          "- If they want a change first, fix it with a new chart action for the corrected item, then offer the summary again. Never commit without an explicit yes.",
+          "",
+          `STAGED, WAITING FOR APPROVAL: ${
+            (body.staged ?? []).length
+              ? (body.staged ?? [])
+                  .map((s) => `${s.individualName}: ${s.title}${s.notes ? ` (${s.notes})` : ""}`)
+                  .join("; ")
+              : "nothing staged yet"
+          }`,
           "",
           "STRICT SCOPE: talk ONLY about the Care Tracker services listed below. Never mention, suggest, ask about, or chart medications, medication administration, MAR, prescriptions, doses, or any clinical/medical advice. If asked about medication or anything outside this list, say it is not part of Care Tracker and redirect to the next listed service.",
           "Never invent services, individuals, or instructions that aren't grounded in the details below. If nothing is pending, say so and congratulate them.",
