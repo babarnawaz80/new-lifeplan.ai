@@ -18,11 +18,18 @@ import { createListener, speak, stopSpeaking, voiceInputSupported } from "@/lib/
 
 type Turn = { role: "user" | "assistant"; content: string };
 
+type CompanionAction =
+  | { type: "chart"; rowId: string; notes?: string }
+  | { type: "summary" }
+  | { type: "commit" };
+
 type CompanionReply = {
   say: string;
-  action?: { type: "chart"; rowId: string; notes?: string } | null;
+  action?: CompanionAction | null;
   focusRowId?: string | null;
 };
+
+type StagedItem = { rowId: string; individualName: string; title: string; notes?: string };
 
 export function CareCompanion({
   date,
