@@ -109,11 +109,6 @@ export const Route = createFileRoute("/api/care-companion")({
         const caregiver = body.caregiver ?? "there";
         const greeting = body.greeting ?? "Hello";
         const key = process.env["LOVABLE_API_KEY"];
-
-        if (!key) {
-          return Response.json(fallback(briefing, body.caregiver, body.staged ?? [], lastUserMessage));
-        }
-
         const stagedIds = new Set((body.staged ?? []).map((item) => item.rowId));
         const pending = briefing.filter((b) => b.status === "pending" && !stagedIds.has(b.rowId));
         const done = briefing.filter((b) => b.status !== "pending" || stagedIds.has(b.rowId));
@@ -123,6 +118,28 @@ export const Route = createFileRoute("/api/care-companion")({
         const activeItem = body.activeRowId
           ? pending.find((item) => item.rowId === body.activeRowId)
           : undefined;
+
+        if (reportsCurrentDone && activeItem) {
+          const nextForPerson = pending.find(
+            (item) => item.rowId !== activeItem.rowId && item.individualName === activeItem.individualName,
+          );
+          const nextDifferent = nextForPerson ?? pending.find((item) => item.rowId !== activeItem.rowId);
+          return Response.json({
+            say: nextDifferent
+              ? `Done — I’ve held ${activeItem.title} for your review. Next, work with ${nextDifferent.individualName} on ${nextDifferent.title}. Come back and report to me when it’s done.`
+              : `Done — I’ve held ${activeItem.title} for your review. That completes the scheduled work. Would you like me to summarize it before I document it?`,
+            action: {
+              type: "chart",
+              rowId: activeItem.rowId,
+              notes: "Caregiver reported the service completed.",
+            },
+            focusRowId: nextDifferent?.rowId ?? null,
+          } satisfies CompanionReply);
+        }
+
+        if (!key) {
+          return Response.json(fallback(briefing, body.caregiver, body.staged ?? [], lastUserMessage));
+        }
 
         const describe = (b: BriefItem) =>
           [
