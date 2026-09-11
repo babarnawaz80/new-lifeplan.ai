@@ -43,14 +43,17 @@ export type CompanionReply = {
 };
 
 function fallback(briefing: BriefItem[], caregiver?: string, staged: StagedItem[] = [], lastMessage = ""): CompanionReply {
-  const next = briefing.find((b) => b.status === "pending");
+  const stagedIds = new Set(staged.map((item) => item.rowId));
+  const next = briefing.find((b) => b.status === "pending" && !stagedIds.has(b.rowId));
   const wantsCommit = /\b(commit|document|wrap up|wrap-up|done for now|finish up)\b/i.test(lastMessage);
 
   // "Who should I work with next?" — finish the current person first.
   const asksNextPerson = /\b(who('s| is)? next|next person|who should i (do|work|go|start)|done with)\b/i.test(lastMessage);
   const currentPerson = staged.length ? staged[staged.length - 1]!.individualName : null;
   if (asksNextPerson && currentPerson) {
-    const leftover = briefing.filter((b) => b.status === "pending" && b.individualName === currentPerson);
+    const leftover = briefing.filter(
+      (b) => b.status === "pending" && !stagedIds.has(b.rowId) && b.individualName === currentPerson,
+    );
     if (leftover.length) {
       return {
         say: `Before we move on, ${currentPerson} still has ${leftover.length === 1 ? "one thing" : `${leftover.length} things`} left: ${leftover
@@ -110,8 +113,9 @@ export const Route = createFileRoute("/api/care-companion")({
           return Response.json(fallback(briefing, body.caregiver, body.staged ?? [], lastUserMessage));
         }
 
-        const pending = briefing.filter((b) => b.status === "pending");
-        const done = briefing.filter((b) => b.status !== "pending");
+        const stagedIds = new Set((body.staged ?? []).map((item) => item.rowId));
+        const pending = briefing.filter((b) => b.status === "pending" && !stagedIds.has(b.rowId));
+        const done = briefing.filter((b) => b.status !== "pending" || stagedIds.has(b.rowId));
 
         const describe = (b: BriefItem) =>
           [
@@ -139,14 +143,15 @@ export const Route = createFileRoute("/api/care-companion")({
           "",
           "STYLE: short spoken sentences (max 3), no markdown, no lists, no emojis. Use first names. Warm and encouraging, like a good supervisor on the floor.",
           `The caregiver's name is ${caregiver}. If they greet you or it's the start of the shift, greet them back with '${greeting}' and their name, and say you're ready to walk them through the shift.`,
-          "When the caregiver says a service is finished, complete, done, or describes having done it, stage it by returning a chart action, then immediately brief the next pending task in the same reply.",
+           "When the caregiver says a service is finished, complete, done, or describes having done it, stage it by returning a chart action, then immediately brief a DIFFERENT pending task in the same reply. Never repeat or reassign the rowId you just charted.",
           "",
           "ONE PERSON AT A TIME (hard rule):",
           "- Stay with the current individual until every pending service for that individual is reported done or the caregiver explicitly defers it.",
           "- When the caregiver says 'I'm done with X, who's next?': check X's pending services. If any remain, say what's still left for X and ask if they want to knock them out first. Do NOT name another individual yet.",
           "- Once X has nothing pending, you MUST run the summary and commit step for the work staged so far BEFORE naming the next individual: return {\"type\":\"summary\"}, read it back, ask for approval, then on approval return {\"type\":\"commit\"} and only THEN brief the first task for the next individual.",
           "- Never move the caregiver to a new individual while there is staged, uncommitted work. Documentation happens first, every time.",
-          "- Remember everything reported earlier in this conversation; never ask them to repeat work they already reported.",
+           "- Anything under STAGED or ALREADY DOCUMENTED is complete for navigation purposes. Never brief it again or ask the caregiver to repeat it.",
+           "- Remember everything reported earlier in this conversation; never ask them to repeat work they already reported.",
           "",
           "END OF SHIFT REVIEW AND COMMIT (important):",
           "- Work you stage during the shift is HELD, not saved yet. It is only written to Care Tracker when the caregiver approves the commit.",
@@ -188,6 +193,23 @@ export const Route = createFileRoute("/api/care-companion")({
           const raw = result.text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "");
           const parsed = JSON.parse(raw) as CompanionReply;
           if (!parsed.say) throw new Error("empty");
+
+          // A charted row remains technically pending until final approval. Guard
+          // against the model selecting that same row again in its spoken follow-up.
+          if (parsed.action?.type === "chart") {
+            const completed = briefing.find((item) => item.rowId === parsed.action?.type === "chart" ? parsed.action.rowId : "");
+            const nextForPerson = pending.find(
+              (item) => item.rowId !== parsed.action?.rowId && item.individualName === completed?.individualName,
+            );
+            const nextDifferent = nextForPerson ?? pending.find((item) => item.rowId !== parsed.action?.rowId);
+            if (parsed.focusRowId === parsed.action.rowId || parsed.say.includes(completed?.title ?? "__never__")) {
+              parsed.focusRowId = nextDifferent?.rowId ?? null;
+              parsed.say = nextDifferent
+                ? `Got it. I’ve held ${completed?.title ?? "that service"} for your review. Next, work with ${nextDifferent.individualName} on ${nextDifferent.title}. Come back and report to me when it’s done.`
+                : `Got it. I’ve held ${completed?.title ?? "that service"} for your review. That completes the scheduled work. Would you like me to summarize it before I document it?`;
+              if (!nextDifferent) parsed.action = { type: "summary" };
+            }
+          }
           return Response.json(parsed);
         } catch {
           return Response.json(fallback(briefing, body.caregiver, body.staged ?? [], lastUserMessage));
