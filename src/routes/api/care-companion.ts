@@ -29,6 +29,7 @@ type Body = {
   caregiver?: string;
   greeting?: string; // "Good morning" | "Good afternoon" | "Good evening"
   staged?: StagedItem[];
+  activeRowId?: string | null;
 };
 
 export type CompanionAction =
@@ -116,6 +117,12 @@ export const Route = createFileRoute("/api/care-companion")({
         const stagedIds = new Set((body.staged ?? []).map((item) => item.rowId));
         const pending = briefing.filter((b) => b.status === "pending" && !stagedIds.has(b.rowId));
         const done = briefing.filter((b) => b.status !== "pending" || stagedIds.has(b.rowId));
+        const reportsCurrentDone = /\b(i(?:'m| am)? done|it(?:'s| is) done|finished|completed|all done|we(?:'re| are) done)\b/i.test(
+          lastUserMessage,
+        );
+        const activeItem = body.activeRowId
+          ? pending.find((item) => item.rowId === body.activeRowId)
+          : undefined;
 
         const describe = (b: BriefItem) =>
           [
@@ -194,6 +201,24 @@ export const Route = createFileRoute("/api/care-companion")({
           const parsed = JSON.parse(raw) as CompanionReply;
           if (!parsed.say) throw new Error("empty");
 
+          // A plain “I'm done” always completes the service currently shown in
+          // the companion. Never leave this reference for the model to guess.
+          if (reportsCurrentDone && activeItem) {
+            const nextForPerson = pending.find(
+              (item) => item.rowId !== activeItem.rowId && item.individualName === activeItem.individualName,
+            );
+            const nextDifferent = nextForPerson ?? pending.find((item) => item.rowId !== activeItem.rowId);
+            parsed.action = {
+              type: "chart",
+              rowId: activeItem.rowId,
+              notes: parsed.action?.type === "chart" ? parsed.action.notes : "Caregiver reported the service completed.",
+            };
+            parsed.focusRowId = nextDifferent?.rowId ?? null;
+            parsed.say = nextDifferent
+              ? `Done — I’ve held ${activeItem.title} for your review. Next, work with ${nextDifferent.individualName} on ${nextDifferent.title}. Come back and report to me when it’s done.`
+              : `Done — I’ve held ${activeItem.title} for your review. That completes the scheduled work. Would you like me to summarize it before I document it?`;
+          }
+
           // A charted row remains technically pending until final approval. Guard
           // against the model selecting that same row again in its spoken follow-up.
           if (parsed.action?.type === "chart") {
@@ -203,7 +228,7 @@ export const Route = createFileRoute("/api/care-companion")({
               (item) => item.rowId !== chartAction.rowId && item.individualName === completed?.individualName,
             );
             const nextDifferent = nextForPerson ?? pending.find((item) => item.rowId !== chartAction.rowId);
-            if (parsed.focusRowId === chartAction.rowId || parsed.say.includes(completed?.title ?? "__never__")) {
+            if (!reportsCurrentDone && (parsed.focusRowId === chartAction.rowId || parsed.say.includes(completed?.title ?? "__never__"))) {
               parsed.focusRowId = nextDifferent?.rowId ?? null;
               parsed.say = nextDifferent
                 ? `Got it. I’ve held ${completed?.title ?? "that service"} for your review. Next, work with ${nextDifferent.individualName} on ${nextDifferent.title}. Come back and report to me when it’s done.`
