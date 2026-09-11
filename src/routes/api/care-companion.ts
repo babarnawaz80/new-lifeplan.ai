@@ -157,7 +157,7 @@ export const Route = createFileRoute("/api/care-companion")({
           if (!parsed.say) throw new Error("empty");
           return Response.json(parsed);
         } catch {
-          return Response.json(fallback(briefing, body.caregiver, body.staged ?? []));
+          return Response.json(fallback(briefing, body.caregiver, body.staged ?? [], lastUserMessage));
         }
       },
     },
