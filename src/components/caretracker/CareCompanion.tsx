@@ -148,18 +148,45 @@ export function CareCompanion({
               goalStatement: b.goalStatement,
               outcomeStatement: b.outcomeStatement,
             })),
+            staged: stagedRef.current,
           }),
         });
         if (!res.ok) throw new Error(String(res.status));
         const reply = (await res.json()) as CompanionReply;
-        if (reply.action?.type === "chart") {
-          const ok = chartFromCompanion(reply.action.rowId, date, { notes: reply.action.notes });
-          if (ok) {
-            const item = briefing.find((b) => b.rowId === reply.action?.rowId);
-            if (item) setCharted((c) => [`${item.individualName} — ${item.title}`, ...c].slice(0, 6));
+        const action = reply.action ?? null;
+        let actionRowId: string | null = null;
+        if (action?.type === "chart") {
+          actionRowId = action.rowId;
+          const item = briefing.find((b) => b.rowId === action.rowId);
+          if (item) {
+            setStaged((s) => [
+              ...s.filter((x) => x.rowId !== action.rowId),
+              {
+                rowId: action.rowId,
+                individualName: item.individualName,
+                title: item.title,
+                notes: action.notes,
+              },
+            ]);
+            setReviewing(false);
           }
+        } else if (action?.type === "summary") {
+          setReviewing(true);
+        } else if (action?.type === "commit") {
+          const items = stagedRef.current;
+          const done: string[] = [];
+          for (const s of items) {
+            if (chartFromCompanion(s.rowId, date, { notes: s.notes })) {
+              done.push(`${s.individualName} — ${s.title}`);
+            }
+          }
+          setCharted((c) => [...done.reverse(), ...c].slice(0, 12));
+          setStaged([]);
+          stagedRef.current = [];
+          setReviewing(false);
+          setCommitted(true);
         }
-        setFocusRowId(reply.focusRowId ?? reply.action?.rowId ?? null);
+        setFocusRowId(reply.focusRowId ?? actionRowId ?? null);
         setTurns((t) => [...t, { role: "assistant", content: reply.say }]);
         say(reply.say);
       } catch {
