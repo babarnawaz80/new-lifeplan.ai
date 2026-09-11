@@ -2230,4 +2230,165 @@ export const accentColor: Record<Agent["accent"], string> = {
       });
     }
   })();
+
+  // ── Esha's Behavior Support Plan — implemented, Care Tracker ready ───────
+  (() => {
+    const bspAgent = agents.find((a) => a.id === "bsp");
+    if (!bspAgent) return;
+    type Tree = import("@/types/icmGoalOutcome").IcmPlanTree;
+    type Strat = import("@/types/icmGoalOutcome").IcmStrategy;
+    const mkStrat = (
+      id: string,
+      title: string,
+      description: string,
+      options: string[],
+      prompts: string[],
+      protocol: string,
+      days: string,
+      shift: string,
+    ): Strat => ({
+      id,
+      title,
+      target_date: iso(345).slice(0, 10),
+      person_responsible: "DSP",
+      description,
+      progress: null,
+      service_delivery: {
+        services_and_expected_outcomes: options,
+        capture_readings: [{ label: "Times used", units: "Simple Count" }],
+        prompts,
+        protocol,
+        show_on_care_tracker: true,
+        funding_stream: null,
+        notify_when_documented: false,
+        status: "Active",
+      },
+      schedule: [{ schedule_date: null, shift_time: shift, days }],
+      service_provided_by: ["DSP"],
+      comments: null,
+    });
+    const bspTree: Tree = {
+      plan_type: bspAgent.plan_type,
+      outcomes: [
+        {
+          id: "o_esha_bsp_1",
+          outcome_statement: "Esha moves through her day calmly and uses her own coping skills when things get hard.",
+          sort_order: 0,
+          goals: [
+            {
+              id: "g_esha_bsp_1",
+              goal_statement:
+                "Esha will use a coping strategy of her choice — coping cards, headphones, or a quiet space — during difficult moments, with no more than one prompt.",
+              target_implementation_date: iso(-20).slice(0, 10),
+              target_completion_date: iso(345).slice(0, 10),
+              who_will_help: "Direct Support Professionals and the behavior specialist",
+              frequency_worked_on: "Daily",
+              who_reviews_progress: "Behavior Specialist",
+              review_frequency: "Monthly",
+              family_or_responsible_person: null,
+              person_responsible: "Behavior Specialist",
+              description:
+                "Teaching and rehearsing coping skills when Esha is calm makes them available to her when she is upset.",
+              progress: null,
+              status: "Active",
+              strategies: [
+                mkStrat(
+                  "s_esha_bsp_1",
+                  "Practice de-escalation with coping cards",
+                  "Rehearse Esha's coping cards with her while she is calm: name the feeling, pick the card, practice the step together.",
+                  ["Practiced independently", "Practiced with prompting", "Observed only", "Declined"],
+                  ["Start when she is calm, never mid-escalation", "Let her choose the card", "Practice the step together", "Praise every attempt"],
+                  "Never practice during an escalation. If Esha becomes upset, stop, give space, and use the calming steps in her plan.",
+                  "Every Day",
+                  "10:00 AM - 10:30 AM",
+                ),
+                mkStrat(
+                  "s_esha_bsp_2",
+                  "Transition warning and choice board",
+                  "Give Esha a five-minute warning before every transition and offer a choice about how the next activity starts.",
+                  ["Transitioned smoothly", "Needed extra time", "Needed the coping plan", "Refused the transition"],
+                  ["Give the five-minute warning", "Show the choice board", "Offer two ways to start", "Allow extra time"],
+                  "Transitions are Esha's hardest moments. Never surprise her with a change; document what helped.",
+                  "Every Day",
+                  "Afternoon",
+                ),
+              ],
+            },
+            {
+              id: "g_esha_bsp_2",
+              goal_statement:
+                "Esha will end each shift having had at least one positive one-to-one check-in with staff.",
+              target_implementation_date: iso(-20).slice(0, 10),
+              target_completion_date: iso(345).slice(0, 10),
+              who_will_help: "Direct Support Professionals",
+              frequency_worked_on: "Each shift",
+              who_reviews_progress: "Behavior Specialist",
+              review_frequency: "Monthly",
+              family_or_responsible_person: null,
+              person_responsible: "Program Coordinator",
+              description: "Positive attention given freely reduces the need to seek attention in harder ways.",
+              progress: null,
+              status: "Active",
+              strategies: [
+                mkStrat(
+                  "s_esha_bsp_3",
+                  "Positive one-to-one check-in",
+                  "Spend five unhurried minutes with Esha doing something she enjoys — no demands, no tasks, just connection.",
+                  ["Engaged and enjoyed it", "Brief engagement", "Preferred to be alone", "Not offered this shift"],
+                  ["Let her pick the activity", "Make no requests during the five minutes", "Comment on what she is doing"],
+                  "This time is unconditional. It is never removed as a consequence.",
+                  "Every Day",
+                  "Evening",
+                ),
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const bspMarkdown = [
+      "# Behavior Support Plan",
+      "",
+      "**Individual:** Esha  ",
+      "**Status:** Implemented",
+      "",
+      "Esha's plan focuses on teaching coping skills, predictable transitions, and unconditional positive attention.",
+    ].join("\n");
+
+    const existing = plans.find((p) => p.individual_id === "esha" && p.agent_id === "bsp");
+    const content = {
+      markdown: bspMarkdown,
+      structured_tree: bspTree,
+      implementation_date: iso(-20),
+      implemented_by: "Babar Nawaz",
+    };
+    if (existing) {
+      existing.status = "implemented";
+      existing.structured_tree = bspTree;
+      existing.plan_content = content;
+      existing.implementation_date = iso(-20);
+      existing.awaiting_source_document = false;
+      existing.updated_at = iso(-3);
+    } else {
+      plans.push({
+        id: "seed_plan_esha_bsp",
+        agent_id: "bsp",
+        individual_id: "esha",
+        individual_name: "Esha",
+        creation_mode: "ai",
+        plan_type_label: "Annual",
+        plan_mode: "annual",
+        status: "implemented",
+        plan_content: content,
+        field_values: {},
+        structured_tree: bspTree,
+        auto_renew: false,
+        annual_plan_date: iso(280),
+        implementation_date: iso(-20),
+        created_at: iso(-40),
+        updated_at: iso(-3),
+      });
+    }
+  })();
 })();
