@@ -278,7 +278,7 @@ export function CareCompanion({
       <div className="relative flex flex-1 flex-col items-center justify-center gap-6 overflow-hidden px-6">
         <div className="h-[min(46vh,380px)] w-[min(46vh,380px)]">
           <VoicePoweredOrb
-            hue={280}
+            hue={listening ? 160 : 280}
             enableVoiceControl={listening}
             activity={speaking ? 0.55 : thinking ? 0.3 : 0}
           />

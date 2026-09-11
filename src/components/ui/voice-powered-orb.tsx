@@ -187,10 +187,12 @@ export const VoicePoweredOrb: FC<VoicePoweredOrbProps> = ({
   const activityRef = useRef(activity);
   const voiceRef = useRef(enableVoiceControl);
   const detectedCb = useRef(onVoiceDetected);
+  const hueRef = useRef(hue);
 
   activityRef.current = activity;
   voiceRef.current = enableVoiceControl;
   detectedCb.current = onVoiceDetected;
+  hueRef.current = hue;
 
   useEffect(() => {
     const container = ctnDom.current;
@@ -310,7 +312,7 @@ export const VoicePoweredOrb: FC<VoicePoweredOrbProps> = ({
         const dt = (t - last) * 0.001;
         last = t;
         program.uniforms.iTime.value = t * 0.001;
-        program.uniforms.hue.value = hue;
+        program.uniforms.hue.value = hueRef.current;
 
         const mic = voiceRef.current && micReady ? level() : 0;
         const energy = Math.max(mic, activityRef.current);
@@ -345,7 +347,9 @@ export const VoicePoweredOrb: FC<VoicePoweredOrbProps> = ({
       disposed = true;
       cleanup?.();
     };
-  }, [hue, enableVoiceControl, voiceSensitivity, maxRotationSpeed, maxHoverIntensity]);
+    // hue is read via hueRef so color changes don't tear down the renderer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enableVoiceControl, voiceSensitivity, maxRotationSpeed, maxHoverIntensity]);
 
   return <div ref={ctnDom} className={cn("h-full w-full", className)} />;
 };
