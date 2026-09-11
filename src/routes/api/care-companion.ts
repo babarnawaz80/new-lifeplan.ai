@@ -42,8 +42,17 @@ export type CompanionReply = {
   focusRowId?: string | null;
 };
 
-function fallback(briefing: BriefItem[], caregiver?: string, staged: StagedItem[] = []): CompanionReply {
+function fallback(briefing: BriefItem[], caregiver?: string, staged: StagedItem[] = [], lastMessage = ""): CompanionReply {
   const next = briefing.find((b) => b.status === "pending");
+  const wantsCommit = /\b(commit|document|wrap up|wrap-up|done for now|finish up)\b/i.test(lastMessage);
+  if (wantsCommit && staged.length) {
+    return {
+      say: `Okay${caregiver ? `, ${caregiver}` : ""}, here's what you've done so far: ${staged
+        .map((s) => `${s.individualName} — ${s.title}`)
+        .join(", ")}. Does everything look good? Should I go ahead and document it?`,
+      action: { type: "summary" },
+    };
+  }
   if (!next) {
     if (staged.length) {
       return {
@@ -70,12 +79,13 @@ export const Route = createFileRoute("/api/care-companion")({
         const body = (await request.json()) as Body;
         const briefing = body.briefing ?? [];
         const messages = body.messages ?? [];
+        const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
         const caregiver = body.caregiver ?? "there";
         const greeting = body.greeting ?? "Hello";
         const key = process.env["LOVABLE_API_KEY"];
 
         if (!key) {
-          return Response.json(fallback(briefing, body.caregiver, body.staged ?? []));
+          return Response.json(fallback(briefing, body.caregiver, body.staged ?? [], lastUserMessage));
         }
 
         const pending = briefing.filter((b) => b.status === "pending");
@@ -111,7 +121,8 @@ export const Route = createFileRoute("/api/care-companion")({
           "",
           "END OF SHIFT REVIEW AND COMMIT (important):",
           "- Work you stage during the shift is HELD, not saved yet. It is only written to Care Tracker when the caregiver approves the commit.",
-          "- When there is nothing pending left, or the caregiver says they're done, wrapping up, ending the shift, or asks for a summary: return action {\"type\":\"summary\"} and read back a short snapshot of everything staged (individual and service, plus a few words on how it went), then ask: 'Take a look and make sure everything is right. Can I commit this to Care Tracker?'",
+          "- The caregiver NEVER uses the Care Tracker screen itself — everything happens in this conversation. At ANY point they can say 'commit what I've done so far', 'document it', 'go ahead and commit', or similar, even mid-shift with work still pending.",
+          "- When there is nothing pending left, or the caregiver says they're done, wrapping up, ending the shift, asks to commit or document what they've done, or asks for a summary: return action {\"type\":\"summary\"} and read back a short snapshot of everything staged (individual and service, plus a few words on how it went), then ask: 'Take a look and make sure everything is right. Should I go ahead and document it?'",
           "- Only when they clearly approve ('yes', 'go ahead', 'commit it'): return action {\"type\":\"commit\"} and confirm that the shift is documented in Care Tracker.",
           "- If they want a change first, fix it with a new chart action for the corrected item, then offer the summary again. Never commit without an explicit yes.",
           "",
@@ -147,7 +158,7 @@ export const Route = createFileRoute("/api/care-companion")({
           if (!parsed.say) throw new Error("empty");
           return Response.json(parsed);
         } catch {
-          return Response.json(fallback(briefing, body.caregiver, body.staged ?? []));
+          return Response.json(fallback(briefing, body.caregiver, body.staged ?? [], lastUserMessage));
         }
       },
     },
