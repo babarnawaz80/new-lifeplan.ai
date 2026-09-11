@@ -45,6 +45,28 @@ export type CompanionReply = {
 function fallback(briefing: BriefItem[], caregiver?: string, staged: StagedItem[] = [], lastMessage = ""): CompanionReply {
   const next = briefing.find((b) => b.status === "pending");
   const wantsCommit = /\b(commit|document|wrap up|wrap-up|done for now|finish up)\b/i.test(lastMessage);
+
+  // "Who should I work with next?" — finish the current person first.
+  const asksNextPerson = /\b(who('s| is)? next|next person|who should i (do|work|go|start)|done with)\b/i.test(lastMessage);
+  const currentPerson = staged.length ? staged[staged.length - 1]!.individualName : null;
+  if (asksNextPerson && currentPerson) {
+    const leftover = briefing.filter((b) => b.status === "pending" && b.individualName === currentPerson);
+    if (leftover.length) {
+      return {
+        say: `Before we move on, ${currentPerson} still has ${leftover.length === 1 ? "one thing" : `${leftover.length} things`} left: ${leftover
+          .map((l) => l.title)
+          .join(", ")}. Want to knock ${leftover.length === 1 ? "it" : "them"} out first?`,
+        focusRowId: leftover[0]!.rowId,
+      };
+    }
+    return {
+      say: `${currentPerson} is all set. Before we move to anyone else, let me read back what I have: ${staged
+        .map((s) => `${s.individualName} — ${s.title}`)
+        .join(", ")}. Should I go ahead and document it?`,
+      action: { type: "summary" },
+    };
+  }
+
   if (wantsCommit && staged.length) {
     return {
       say: `Okay${caregiver ? `, ${caregiver}` : ""}, here's what you've done so far: ${staged
