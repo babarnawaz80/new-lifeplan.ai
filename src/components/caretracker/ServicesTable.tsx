@@ -1,10 +1,11 @@
-import { ChevronDown, Clock, RotateCcw, ExternalLink } from "lucide-react";
+import { ChevronDown, Clock, RotateCcw, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Fragment, useState } from "react";
 import { cn } from "@/lib/utils";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { ProvideServiceDialog } from "./ProvideServiceDialog";
-import { recordDocumentation } from "@/lib/caretracker-feed";
+import { recordDocumentation, clearDocumentation } from "@/lib/caretracker-feed";
+
 
 interface ScheduleRow {
   id: string;
@@ -430,15 +431,42 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
                   <p className="text-[13px] text-muted-foreground">{row.location}</p>
                 </td>
                 <td className="py-4 px-6 align-middle">
-                  <button
-                    onClick={() => setServiceDialog({ open: true, row })}
-                    className="flex items-center gap-2 px-3.5 py-2 bg-muted hover:bg-primary/5 hover:border-primary/40 border border-border rounded-lg text-[13px] transition-colors group min-w-[200px]"
-                  >
-                    <span className="font-medium text-foreground">{row.shiftName}</span>
-                    <span className="text-muted-foreground">({row.date})</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-auto group-hover:text-foreground" />
-                  </button>
+                  {row.status === "charted" || row.status === "not-able" ? (
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={cn(
+                          "flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] border min-w-[200px]",
+                          row.status === "charted"
+                            ? "bg-green-600 border-green-600 text-white"
+                            : "bg-red-600 border-red-600 text-white",
+                        )}
+                      >
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <span className="font-semibold">
+                          {row.status === "charted" ? "Completed" : "Not able"}
+                        </span>
+                        <span className="opacity-80">({row.date})</span>
+                      </div>
+                      <button
+                        onClick={() => clearDocumentation(row.id, row.date)}
+                        className="flex items-center gap-1 px-2.5 py-2 rounded-lg border border-border text-[12px] text-muted-foreground hover:bg-muted transition-colors"
+                        aria-label="Undo this service"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" /> Undo
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setServiceDialog({ open: true, row })}
+                      className="flex items-center gap-2 px-3.5 py-2 bg-muted hover:bg-primary/5 hover:border-primary/40 border border-border rounded-lg text-[13px] transition-colors group min-w-[200px]"
+                    >
+                      <span className="font-medium text-foreground">{row.shiftName}</span>
+                      <span className="text-muted-foreground">({row.date})</span>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-auto group-hover:text-foreground" />
+                    </button>
+                  )}
                 </td>
+
                 <td className="py-4 px-6 align-middle">
                   {row.status === "charted" ? (
                     <div className="flex items-center gap-3">
@@ -453,7 +481,11 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
                           Services Provided On <span className="text-green-800 font-medium">{row.serviceDate}</span>
                         </p>
                       </div>
-                      <button className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors">
+                      <button
+                        aria-label="Undo this service"
+                        onClick={() => clearDocumentation(row.id, row.date)}
+                        className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                      >
                         <RotateCcw className="h-4 w-4" />
                       </button>
                     </div>
@@ -470,7 +502,11 @@ export function ServicesTable({ rows }: { rows?: ScheduleRow[] }) {
                           Physically Not Able To On <span className="text-red-800 font-medium">{row.serviceDate}</span>
                         </p>
                       </div>
-                      <button className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                      <button
+                        aria-label="Undo this service"
+                        onClick={() => clearDocumentation(row.id, row.date)}
+                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      >
                         <RotateCcw className="h-4 w-4" />
                       </button>
                     </div>

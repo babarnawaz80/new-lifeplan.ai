@@ -77,40 +77,36 @@ export function speak(text: string, onDone?: () => void): void {
   stopSpeaking();
   const token = ++speechToken;
 
-  void (async () => {
-    try {
-      const res = await fetch("/api/companion-voice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+  // Stream the AI voice straight into an <audio> element: playback starts as
+  // soon as the first bytes arrive instead of waiting for the whole clip.
+  try {
+    const audio = new Audio(`/api/companion-voice?text=${encodeURIComponent(text.slice(0, 2000))}`);
+    audio.preload = "auto";
+    currentAudio = audio;
+    let started = false;
+    const finish = () => {
+      if (currentAudio === audio) currentAudio = null;
+      if (token === speechToken) onDone?.();
+    };
+    audio.onplaying = () => {
+      started = true;
+    };
+    audio.onended = finish;
+    audio.onerror = () => {
+      if (currentAudio === audio) currentAudio = null;
       if (token !== speechToken) return;
-      if (!res.ok || res.status === 204) {
-        speakWithBrowser(text, onDone);
-        return;
-      }
-      const blob = await res.blob();
-      if (token !== speechToken) return;
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      currentAudio = audio;
-      const finish = () => {
-        URL.revokeObjectURL(url);
-        if (currentAudio === audio) currentAudio = null;
-        if (token === speechToken) onDone?.();
-      };
-      audio.onended = finish;
-      audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        if (currentAudio === audio) currentAudio = null;
-        if (token === speechToken) speakWithBrowser(text, onDone);
-      };
-      await audio.play();
-    } catch {
-      if (token === speechToken) speakWithBrowser(text, onDone);
-    }
-  })();
+      // No AI voice available (or it failed before any audio) — use the browser.
+      if (!started) speakWithBrowser(text, onDone);
+      else onDone?.();
+    };
+    void audio.play().catch(() => {
+      if (token === speechToken && !started) speakWithBrowser(text, onDone);
+    });
+  } catch {
+    if (token === speechToken) speakWithBrowser(text, onDone);
+  }
 }
+
 
 function speakWithBrowser(text: string, onDone?: () => void): void {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {

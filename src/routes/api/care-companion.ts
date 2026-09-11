@@ -180,8 +180,11 @@ export const Route = createFileRoute("/api/care-companion")({
           const result = await generateText({
             model: gateway("google/gemini-3.8-flash"),
             system,
-            messages: messages.slice(-14),
+            messages: messages.slice(-8),
+            maxOutputTokens: 220,
+            temperature: 0.5,
           });
+
           const raw = result.text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "");
           const parsed = JSON.parse(raw) as CompanionReply;
           if (!parsed.say) throw new Error("empty");
