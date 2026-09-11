@@ -41,6 +41,7 @@ export type CompanionReply = {
   say: string;
   action?: CompanionAction | null;
   focusRowId?: string | null;
+  reviewRequired?: boolean;
 };
 
 function fallback(briefing: BriefItem[], caregiver?: string, staged: StagedItem[] = [], lastMessage = ""): CompanionReply {
