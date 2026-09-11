@@ -1617,8 +1617,8 @@ export const accentColor: Record<Agent["accent"], string> = {
   const STRAT_TEXT: Record<string, string> = {
     person_centered: "Weekly community outing with graduated prompting",
     behavior_support: "Practice de-escalation steps with staff support",
-    nursing_care: "Daily vitals check and medication administration",
-    medication: "Medication administration with side-effect tracking",
+    nursing_care: "Daily wellness and comfort round",
+    medication: "Medication review (nurse only — not a Care Tracker service)",
     high_risk: "Scheduled safety checks and environmental review",
   };
 
@@ -1658,7 +1658,8 @@ export const accentColor: Record<Agent["accent"], string> = {
                     capture_readings: [{ label: "Minutes", units: "Simple Count" }],
                     prompts: ["Offer a choice", "Encourage and reinforce"],
                     protocol: "Follow the individual's support plan.",
-                    show_on_care_tracker: true,
+                    // Medication work lives in eMAR, never on the Care Tracker.
+                    show_on_care_tracker: planType !== "medication",
                     funding_stream: null,
                     notify_when_documented: false,
                     status: "Active",
