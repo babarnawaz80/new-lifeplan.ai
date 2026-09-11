@@ -177,8 +177,8 @@ export function CareCompanion({
     if (!open || turns.length) return;
     const first = pending[0];
     const greeting = first
-      ? `Hi — you have ${pending.length} service${pending.length === 1 ? "" : "s"} due. Start with ${first.title} for ${first.individualName} at ${first.time}. Tap the mic and tell me when it's done.`
-      : "Everything scheduled right now is documented. Tap the mic if anything comes up.";
+      ? `Hi — you have ${pending.length} service${pending.length === 1 ? "" : "s"} due. Start with ${first.title} for ${first.individualName} at ${first.time}. I'm listening — just tell me when it's done.`
+      : "Everything scheduled right now is documented. I'm listening if anything comes up.";
     setTurns([{ role: "assistant", content: greeting }]);
     setFocusRowId(first?.rowId ?? null);
     say(greeting);
