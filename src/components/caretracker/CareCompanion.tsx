@@ -197,18 +197,22 @@ export function CareCompanion({
         } else if (action?.type === "summary") {
           setReviewing(true);
         } else if (action?.type === "commit") {
-          const items = stagedRef.current;
+          const items = [...stagedRef.current];
           const done: string[] = [];
           for (const s of items) {
             if (chartFromCompanion(s.rowId, date, { notes: s.notes })) {
               done.push(`${s.individualName} — ${s.title}`);
             }
           }
-          setCharted((c) => [...done.reverse(), ...c].slice(0, 12));
-          setStaged([]);
-          stagedRef.current = [];
-          setReviewing(false);
-          setCommitted(true);
+          if (done.length === items.length) {
+            setCharted((c) => [...done.reverse(), ...c].slice(0, 12));
+            setStaged([]);
+            stagedRef.current = [];
+            setReviewing(false);
+            setCommitted(true);
+          } else {
+            throw new Error("Unable to document every staged service");
+          }
         }
         const nextFocusRowId = reply.focusRowId ?? (action?.type === "chart" ? null : actionRowId);
         focusRowIdRef.current = nextFocusRowId;
