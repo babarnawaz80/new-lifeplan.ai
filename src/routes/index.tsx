@@ -20,7 +20,7 @@ export const Route = createFileRoute("/")({
   component: DashboardPage,
 });
 
-type Action = { label: string; icon: LucideIcon; action?: "care" | "lifeplan" };
+type Action = { label: string; icon: LucideIcon; action?: "care" };
 const ACTION_COLUMNS: Action[][] = [
   [
     { label: "Care Tracker", icon: ClipboardCheck, action: "care" },
@@ -52,7 +52,6 @@ const ACTION_COLUMNS: Action[][] = [
     { label: "Staffing Log", icon: UsersRound },
     { label: "Custom Forms", icon: FileText },
     { label: "QA Meeting", icon: UsersRound },
-    { label: "LifePlan.ai", icon: Sparkles, action: "lifeplan" },
   ],
 ];
 
@@ -111,10 +110,10 @@ function DashboardPage() {
           <article className="min-h-40 rounded-md border border-line border-t-4 border-t-action-blue bg-card p-5 shadow-sm"><div className="flex justify-between"><div><h2 className="text-xl font-semibold text-action-blue">PCP Compliance</h2><div className="mt-3 space-y-1 text-xs text-ink2"><p>🟢 On Track: 69.16%</p><p>🟠 Off Track: 2.8%</p><p>🔴 Out Of Compliance: 28.04%</p></div><Button size="sm" variant="outline" className="mt-3">Details <ChevronRight /></Button></div><Rings compliance /></div></article>
         </section>
 
-        <section className="mt-5 rounded-md bg-workspace-strong p-3">
-          <div className="mb-3 flex items-center gap-3"><span className="h-1.5 w-9 rounded-full bg-action-blue"/><h2 className="text-xs font-bold uppercase text-ink">Quick Actions</h2><span className="h-px flex-1 bg-line"/></div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {ACTION_COLUMNS.map((column, columnIndex) => <div key={columnIndex} className="space-y-3">{column.map(({ label, icon: Icon, action }) => <Button key={label} onClick={action === "care" ? () => navigate({ to: "/care-tracker" }) : action === "lifeplan" ? () => navigate({ to: "/lifeplan" }) : undefined} className={`h-[58px] w-full justify-start rounded-md px-2.5 text-sm font-semibold shadow-sm hover:brightness-95 ${ACTION_CLASSES[columnIndex]}`}><span className="flex size-10 items-center justify-center rounded-md bg-primary-foreground/10"><Icon className="size-5" /></span><span className="ml-1 truncate">{label}</span></Button>)}</div>)}
+        <section className="mt-5 rounded-xl bg-workspace-strong px-3 py-3.5">
+          <div className="mb-4 flex items-center gap-3"><span className="h-1.5 w-10 rounded-full bg-gradient-to-r from-navy to-teal"/><h2 className="text-xs font-bold uppercase text-ink">Quick Actions</h2><span className="h-px flex-1 bg-line"/></div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {ACTION_COLUMNS.map((column, columnIndex) => <div key={columnIndex} className="space-y-4">{column.map(({ label, icon: Icon, action }) => <Button key={label} onClick={action === "care" ? () => navigate({ to: "/care-tracker" }) : undefined} className={`h-[60px] w-full justify-start rounded-md px-2.5 text-base font-semibold shadow-sm hover:brightness-95 ${ACTION_CLASSES[columnIndex]}`}><span className="flex size-11 items-center justify-center rounded-md bg-primary-foreground/10"><Icon className="size-5" /></span><span className="ml-1 truncate">{label}</span></Button>)}</div>)}
           </div>
         </section>
       </div>
