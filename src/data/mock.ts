@@ -1658,8 +1658,12 @@ export const accentColor: Record<Agent["accent"], string> = {
                     capture_readings: [{ label: "Minutes", units: "Simple Count" }],
                     prompts: ["Offer a choice", "Encourage and reinforce"],
                     protocol: "Follow the individual's support plan.",
-                    // Medication work lives in eMAR, never on the Care Tracker.
-                    show_on_care_tracker: planType !== "medication",
+                    // Only the three real demo individuals push services to the
+                    // Care Tracker; the filler roster stays off it. Medication
+                    // work lives in eMAR and never appears here.
+                    show_on_care_tracker:
+                      planType !== "medication" &&
+                      /^(esha|marcus|lena)_/.test(key),
                     funding_stream: null,
                     notify_when_documented: false,
                     status: "Active",

@@ -413,8 +413,11 @@ export function buildShiftBriefing(isoDate: string, shift: ShiftId = "all"): Bri
       });
     }
   }
+  // Esha leads the shift — her plan is the fully built-out one.
+  const lead = (i: BriefingItem) => (i.individualId === "esha" ? 0 : 1);
   return items.sort(
     (a, b) =>
+      lead(a) - lead(b) ||
       SHIFT_ORDER[a.shiftId] - SHIFT_ORDER[b.shiftId] ||
       a.individualName.localeCompare(b.individualName) ||
       a.title.localeCompare(b.title),
