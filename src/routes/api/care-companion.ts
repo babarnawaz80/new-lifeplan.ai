@@ -197,17 +197,17 @@ export const Route = createFileRoute("/api/care-companion")({
           // A charted row remains technically pending until final approval. Guard
           // against the model selecting that same row again in its spoken follow-up.
           if (parsed.action?.type === "chart") {
-            const completed = briefing.find((item) => item.rowId === parsed.action?.type === "chart" ? parsed.action.rowId : "");
+            const chartAction = parsed.action;
+            const completed = briefing.find((item) => item.rowId === chartAction.rowId);
             const nextForPerson = pending.find(
-              (item) => item.rowId !== parsed.action?.rowId && item.individualName === completed?.individualName,
+              (item) => item.rowId !== chartAction.rowId && item.individualName === completed?.individualName,
             );
-            const nextDifferent = nextForPerson ?? pending.find((item) => item.rowId !== parsed.action?.rowId);
-            if (parsed.focusRowId === parsed.action.rowId || parsed.say.includes(completed?.title ?? "__never__")) {
+            const nextDifferent = nextForPerson ?? pending.find((item) => item.rowId !== chartAction.rowId);
+            if (parsed.focusRowId === chartAction.rowId || parsed.say.includes(completed?.title ?? "__never__")) {
               parsed.focusRowId = nextDifferent?.rowId ?? null;
               parsed.say = nextDifferent
                 ? `Got it. I’ve held ${completed?.title ?? "that service"} for your review. Next, work with ${nextDifferent.individualName} on ${nextDifferent.title}. Come back and report to me when it’s done.`
                 : `Got it. I’ve held ${completed?.title ?? "that service"} for your review. That completes the scheduled work. Would you like me to summarize it before I document it?`;
-              if (!nextDifferent) parsed.action = { type: "summary" };
             }
           }
           return Response.json(parsed);
