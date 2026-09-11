@@ -50,6 +50,11 @@ export function CareCompanion({
   const [muted, setMuted] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
   const [charted, setCharted] = useState<string[]>([]);
+  const [staged, setStaged] = useState<StagedItem[]>([]);
+  const [reviewing, setReviewing] = useState(false);
+  const [committed, setCommitted] = useState(false);
+  const stagedRef = useRef<StagedItem[]>([]);
+  stagedRef.current = staged;
   const listenerRef = useRef<ReturnType<typeof createListener>>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const version = useCareTrackerVersion();
