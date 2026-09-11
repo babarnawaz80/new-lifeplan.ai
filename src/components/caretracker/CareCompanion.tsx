@@ -188,6 +188,8 @@ export function CareCompanion({
   useEffect(() => () => stopSpeaking(), []);
 
   const close = useCallback(() => {
+    handsFreeRef.current = false;
+    setHandsFree(false);
     stopSpeaking();
     listenerRef.current?.abort();
     setListening(false);
