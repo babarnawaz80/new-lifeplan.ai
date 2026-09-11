@@ -346,6 +346,19 @@ export function listCareTrackerIndividuals(isoDate: string): CareTrackerIndividu
 // ---------------------------------------------------------------------------
 // Shift briefing — everything due across the whole house, for the AI companion
 // ---------------------------------------------------------------------------
+
+// The demo caregiver using this device. When real auth arrives, replace with
+// the signed-in staff member's name.
+export const CURRENT_CAREGIVER = "Babar";
+
+// Time-of-day salutation for the companion's opening greeting.
+export function shiftGreeting(now: Date = new Date()): string {
+  const h = now.getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export type BriefingItem = {
   rowId: string;
   individualId: string;
@@ -359,7 +372,10 @@ export type BriefingItem = {
   status: "charted" | "not-able" | "pending";
   servicesProvided: string[];
   prompts: string[];
+  description?: string;
+  protocol?: string | null;
   goalStatement?: string;
+  outcomeStatement?: string;
   planTypeLabel?: string;
 };
 
@@ -389,7 +405,10 @@ export function buildShiftBriefing(isoDate: string, shift: ShiftId = "all"): Bri
         status: r.status ?? "pending",
         servicesProvided: r.servicesProvided,
         prompts: r.prompts,
+        description: r.description,
+        protocol: r.protocol,
         goalStatement: r.goalStatement,
+        outcomeStatement: r.outcomeStatement,
         planTypeLabel: r.planTypeLabel,
       });
     }
