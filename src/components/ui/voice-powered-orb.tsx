@@ -187,10 +187,12 @@ export const VoicePoweredOrb: FC<VoicePoweredOrbProps> = ({
   const activityRef = useRef(activity);
   const voiceRef = useRef(enableVoiceControl);
   const detectedCb = useRef(onVoiceDetected);
+  const hueRef = useRef(hue);
 
   activityRef.current = activity;
   voiceRef.current = enableVoiceControl;
   detectedCb.current = onVoiceDetected;
+  hueRef.current = hue;
 
   useEffect(() => {
     const container = ctnDom.current;
