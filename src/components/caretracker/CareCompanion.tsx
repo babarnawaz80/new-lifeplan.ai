@@ -9,6 +9,8 @@ import {
   buildShiftBriefing,
   chartFromCompanion,
   useCareTrackerVersion,
+  CURRENT_CAREGIVER,
+  shiftGreeting,
   type BriefingItem,
   type ShiftId,
 } from "@/lib/caretracker-feed";
@@ -117,6 +119,8 @@ export function CareCompanion({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: next,
+            caregiver: CURRENT_CAREGIVER,
+            greeting: shiftGreeting(),
             briefing: briefing.map((b) => ({
               rowId: b.rowId,
               individualName: b.individualName,
@@ -125,7 +129,12 @@ export function CareCompanion({
               shiftName: b.shiftName,
               location: b.location,
               status: b.status,
+              servicesProvided: b.servicesProvided,
+              prompts: b.prompts,
+              description: b.description,
+              protocol: b.protocol,
               goalStatement: b.goalStatement,
+              outcomeStatement: b.outcomeStatement,
             })),
           }),
         });
@@ -179,13 +188,14 @@ export function CareCompanion({
     setHandsFree(true);
   }, [open]);
 
-  // Greet with the shift briefing when the companion opens.
+  // Greet by time of day and caregiver name when the companion opens.
   useEffect(() => {
     if (!open || turns.length) return;
     const first = pending[0];
+    const salutation = `${shiftGreeting()}, ${CURRENT_CAREGIVER}. I'm ready to assist you.`;
     const greeting = first
-      ? `Hi — you have ${pending.length} service${pending.length === 1 ? "" : "s"} due. Start with ${first.title} for ${first.individualName} at ${first.time}. I'm listening — just tell me when it's done.`
-      : "Everything scheduled right now is documented. I'm listening if anything comes up.";
+      ? `${salutation} You have ${pending.length} service${pending.length === 1 ? "" : "s"} on the board this shift. Just say the word — ask me who to start with, and I'll walk you through it.`
+      : `${salutation} Everything scheduled right now is documented. I'm here if anything comes up.`;
     setTurns([{ role: "assistant", content: greeting }]);
     setFocusRowId(first?.rowId ?? null);
     say(greeting);
