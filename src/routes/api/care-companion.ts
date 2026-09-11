@@ -123,17 +123,27 @@ export const Route = createFileRoute("/api/care-companion")({
           const nextForPerson = pending.find(
             (item) => item.rowId !== activeItem.rowId && item.individualName === activeItem.individualName,
           );
-          const nextDifferent = nextForPerson ?? pending.find((item) => item.rowId !== activeItem.rowId);
+          const stagedAfterThis = [
+            ...(body.staged ?? []).filter((item) => item.rowId !== activeItem.rowId),
+            {
+              rowId: activeItem.rowId,
+              individualName: activeItem.individualName,
+              title: activeItem.title,
+            },
+          ];
           return Response.json({
-            say: nextDifferent
-              ? `Done — I’ve held ${activeItem.title} for your review. Next, work with ${nextDifferent.individualName} on ${nextDifferent.title}. Come back and report to me when it’s done.`
-              : `Done — I’ve held ${activeItem.title} for your review. That completes the scheduled work. Would you like me to summarize it before I document it?`,
+            say: nextForPerson
+              ? `Done — I’ve staged ${activeItem.title}. Next for ${activeItem.individualName} is ${nextForPerson.title}. Come back and report to me when it’s done.`
+              : `${activeItem.individualName} is complete. So far I have staged: ${stagedAfterThis
+                  .map((item) => item.title)
+                  .join(", ")}. Would you like me to commit and document these before we move to the next person?`,
             action: {
               type: "chart",
               rowId: activeItem.rowId,
               notes: "Caregiver reported the service completed.",
             },
-            focusRowId: nextDifferent?.rowId ?? null,
+            focusRowId: nextForPerson?.rowId ?? null,
+            reviewRequired: !nextForPerson,
           } satisfies CompanionReply);
         }
 
@@ -244,12 +254,12 @@ export const Route = createFileRoute("/api/care-companion")({
             const nextForPerson = pending.find(
               (item) => item.rowId !== chartAction.rowId && item.individualName === completed?.individualName,
             );
-            const nextDifferent = nextForPerson ?? pending.find((item) => item.rowId !== chartAction.rowId);
             if (!reportsCurrentDone && (parsed.focusRowId === chartAction.rowId || parsed.say.includes(completed?.title ?? "__never__"))) {
-              parsed.focusRowId = nextDifferent?.rowId ?? null;
-              parsed.say = nextDifferent
-                ? `Got it. I’ve held ${completed?.title ?? "that service"} for your review. Next, work with ${nextDifferent.individualName} on ${nextDifferent.title}. Come back and report to me when it’s done.`
-                : `Got it. I’ve held ${completed?.title ?? "that service"} for your review. That completes the scheduled work. Would you like me to summarize it before I document it?`;
+              parsed.focusRowId = nextForPerson?.rowId ?? null;
+              parsed.say = nextForPerson
+                ? `Got it. I’ve staged ${completed?.title ?? "that service"}. Next for ${nextForPerson.individualName} is ${nextForPerson.title}. Come back and report to me when it’s done.`
+                : `Got it. I’ve staged ${completed?.title ?? "that service"}. ${completed?.individualName ?? "This person"} is complete. Would you like me to review and document their staged services before we move on?`;
+              parsed.reviewRequired = !nextForPerson;
             }
           }
           return Response.json(parsed);

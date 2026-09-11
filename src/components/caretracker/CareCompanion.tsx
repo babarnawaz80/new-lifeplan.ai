@@ -27,6 +27,7 @@ type CompanionReply = {
   say: string;
   action?: CompanionAction | null;
   focusRowId?: string | null;
+  reviewRequired?: boolean;
 };
 
 type StagedItem = { rowId: string; individualName: string; title: string; notes?: string };
@@ -55,6 +56,7 @@ export function CareCompanion({
   const [committed, setCommitted] = useState(false);
   const stagedRef = useRef<StagedItem[]>([]);
   stagedRef.current = staged;
+  const focusRowIdRef = useRef<string | null>(null);
   const listenerRef = useRef<ReturnType<typeof createListener>>(null);
   const sendingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -66,7 +68,14 @@ export function CareCompanion({
     [date, shift, version],
   );
   const pending = briefing.filter((b) => b.status === "pending");
-  const focus = briefing.find((b) => b.rowId === focusRowId) ?? pending[0] ?? null;
+  const stagedIds = new Set(staged.map((item) => item.rowId));
+  const available = pending.filter((item) => !stagedIds.has(item.rowId));
+  const stagedPerson = staged.at(-1)?.individualName;
+  const focus =
+    available.find((b) => b.rowId === focusRowId) ??
+    (stagedPerson ? available.find((b) => b.individualName === stagedPerson) : available[0]) ??
+    null;
+  focusRowIdRef.current = focus?.rowId ?? null;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -160,7 +169,7 @@ export function CareCompanion({
               outcomeStatement: b.outcomeStatement,
             })),
             staged: stagedRef.current,
-            activeRowId: focus?.rowId ?? null,
+            activeRowId: focusRowIdRef.current,
           }),
         });
         if (!res.ok) throw new Error(String(res.status));
@@ -182,7 +191,7 @@ export function CareCompanion({
             ];
             stagedRef.current = nextStaged;
             setStaged(nextStaged);
-            setReviewing(false);
+            setReviewing(Boolean(reply.reviewRequired));
             setCommitted(false);
           }
         } else if (action?.type === "summary") {
@@ -201,7 +210,9 @@ export function CareCompanion({
           setReviewing(false);
           setCommitted(true);
         }
-        setFocusRowId(reply.focusRowId ?? actionRowId ?? null);
+        const nextFocusRowId = reply.focusRowId ?? (action?.type === "chart" ? null : actionRowId);
+        focusRowIdRef.current = nextFocusRowId;
+        setFocusRowId(nextFocusRowId);
         setTurns((t) => [...t, { role: "assistant", content: reply.say }]);
         say(reply.say);
       } catch {
@@ -213,7 +224,7 @@ export function CareCompanion({
         setThinking(false);
       }
     },
-    [briefing, date, focus?.rowId, say, thinking, turns],
+    [briefing, date, say, thinking, turns],
   );
 
   useEffect(() => {
