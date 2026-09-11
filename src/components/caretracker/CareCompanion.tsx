@@ -56,6 +56,7 @@ export function CareCompanion({
   const stagedRef = useRef<StagedItem[]>([]);
   stagedRef.current = staged;
   const listenerRef = useRef<ReturnType<typeof createListener>>(null);
+  const sendingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const version = useCareTrackerVersion();
 
@@ -80,15 +81,23 @@ export function CareCompanion({
   const startListening = useCallback(() => {
     if (!voiceInputSupported()) return;
     listenerRef.current?.abort();
+    let settled = false;
     const listener = createListener({
       onTranscript: (t) => setInput(t),
       onEnd: () => {
+        if (settled) return;
+        settled = true;
+        if (listenerRef.current === listener) listenerRef.current = null;
         setListening(false);
-        const spoken = listenerRef.current?.text ?? "";
+        const spoken = listener?.text ?? "";
         if (spoken.trim()) sendRef.current(spoken);
         else if (handsFreeRef.current) setTimeout(() => startListening(), 120);
       },
-      onError: () => setListening(false),
+      onError: () => {
+        settled = true;
+        if (listenerRef.current === listener) listenerRef.current = null;
+        setListening(false);
+      },
     });
     if (!listener) return;
     listenerRef.current = listener;
@@ -118,8 +127,10 @@ export function CareCompanion({
   const send = useCallback(
     async (text: string) => {
       const clean = text.trim();
-      if (!clean || thinking) return;
+      if (!clean || thinking || sendingRef.current) return;
+      sendingRef.current = true;
       listenerRef.current?.abort();
+      listenerRef.current = null;
       setListening(false);
       setInput("");
       const next: Turn[] = [...turns, { role: "user", content: clean }];
@@ -195,6 +206,7 @@ export function CareCompanion({
         setTurns((t) => [...t, { role: "assistant", content: msg }]);
         say(msg);
       } finally {
+        sendingRef.current = false;
         setThinking(false);
       }
     },
