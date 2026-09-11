@@ -21,16 +21,24 @@ type BriefItem = {
   outcomeStatement?: string;
 };
 
+type StagedItem = { rowId: string; individualName: string; title: string; notes?: string };
+
 type Body = {
   messages?: Array<{ role: "user" | "assistant"; content: string }>;
   briefing?: BriefItem[];
   caregiver?: string;
   greeting?: string; // "Good morning" | "Good afternoon" | "Good evening"
+  staged?: StagedItem[];
 };
+
+export type CompanionAction =
+  | { type: "chart"; rowId: string; notes?: string }
+  | { type: "summary" }
+  | { type: "commit" };
 
 export type CompanionReply = {
   say: string;
-  action?: { type: "chart"; rowId: string; notes?: string } | null;
+  action?: CompanionAction | null;
   focusRowId?: string | null;
 };
 
