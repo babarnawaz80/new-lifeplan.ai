@@ -207,6 +207,15 @@ export function CareCompanion({
   }, [open, close]);
 
   const micSupported = voiceInputSupported();
+  const statusLine = thinking
+    ? "Thinking…"
+    : listening
+      ? input || "Listening…"
+      : handsFree
+        ? speaking
+          ? ""
+          : "One moment…"
+        : "Paused — tap the mic to talk again";
   const lastAssistant = [...turns].reverse().find((t) => t.role === "assistant")?.content ?? "";
 
   if (!open) return null;
