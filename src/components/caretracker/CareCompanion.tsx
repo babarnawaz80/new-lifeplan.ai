@@ -282,8 +282,11 @@ export function CareCompanion({
         )}
 
         <p className="max-w-2xl text-center text-lg leading-relaxed text-white/90">
-          {thinking ? "Thinking…" : listening ? input || "Listening…" : lastAssistant}
+          {thinking || listening ? statusLine : lastAssistant}
         </p>
+        {!thinking && !listening && !handsFree && (
+          <p className="text-xs text-white/50">{statusLine}</p>
+        )}
 
         {charted.length > 0 && (
           <div className="flex flex-wrap justify-center gap-2">
