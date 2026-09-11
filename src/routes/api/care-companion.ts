@@ -42,9 +42,17 @@ export type CompanionReply = {
   focusRowId?: string | null;
 };
 
-function fallback(briefing: BriefItem[], caregiver?: string): CompanionReply {
+function fallback(briefing: BriefItem[], caregiver?: string, staged: StagedItem[] = []): CompanionReply {
   const next = briefing.find((b) => b.status === "pending");
   if (!next) {
+    if (staged.length) {
+      return {
+        say: `That's the whole shift${caregiver ? `, ${caregiver}` : ""}. Here's what I have: ${staged
+          .map((s) => `${s.individualName} — ${s.title}`)
+          .join(", ")}. Take a look and make sure everything is right. Can I commit this to Care Tracker?`,
+        action: { type: "summary" },
+      };
+    }
     return { say: `Everything scheduled for this shift is documented${caregiver ? `, ${caregiver}` : ""}. Nice work.` };
   }
   const extras = next.servicesProvided?.slice(1, 3) ?? [];
