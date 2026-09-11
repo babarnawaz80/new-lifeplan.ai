@@ -45,6 +45,28 @@ export type CompanionReply = {
 function fallback(briefing: BriefItem[], caregiver?: string, staged: StagedItem[] = [], lastMessage = ""): CompanionReply {
   const next = briefing.find((b) => b.status === "pending");
   const wantsCommit = /\b(commit|document|wrap up|wrap-up|done for now|finish up)\b/i.test(lastMessage);
+
+  // "Who should I work with next?" — finish the current person first.
+  const asksNextPerson = /\b(who('s| is)? next|next person|who should i (do|work|go|start)|done with)\b/i.test(lastMessage);
+  const currentPerson = staged.length ? staged[staged.length - 1]!.individualName : null;
+  if (asksNextPerson && currentPerson) {
+    const leftover = briefing.filter((b) => b.status === "pending" && b.individualName === currentPerson);
+    if (leftover.length) {
+      return {
+        say: `Before we move on, ${currentPerson} still has ${leftover.length === 1 ? "one thing" : `${leftover.length} things`} left: ${leftover
+          .map((l) => l.title)
+          .join(", ")}. Want to knock ${leftover.length === 1 ? "it" : "them"} out first?`,
+        focusRowId: leftover[0]!.rowId,
+      };
+    }
+    return {
+      say: `${currentPerson} is all set. Before we move to anyone else, let me read back what I have: ${staged
+        .map((s) => `${s.individualName} — ${s.title}`)
+        .join(", ")}. Should I go ahead and document it?`,
+      action: { type: "summary" },
+    };
+  }
+
   if (wantsCommit && staged.length) {
     return {
       say: `Okay${caregiver ? `, ${caregiver}` : ""}, here's what you've done so far: ${staged
@@ -118,6 +140,13 @@ export const Route = createFileRoute("/api/care-companion")({
           "STYLE: short spoken sentences (max 3), no markdown, no lists, no emojis. Use first names. Warm and encouraging, like a good supervisor on the floor.",
           `The caregiver's name is ${caregiver}. If they greet you or it's the start of the shift, greet them back with '${greeting}' and their name, and say you're ready to walk them through the shift.`,
           "When the caregiver says a service is finished, complete, done, or describes having done it, stage it by returning a chart action, then immediately brief the next pending task in the same reply.",
+          "",
+          "ONE PERSON AT A TIME (hard rule):",
+          "- Stay with the current individual until every pending service for that individual is reported done or the caregiver explicitly defers it.",
+          "- When the caregiver says 'I'm done with X, who's next?': check X's pending services. If any remain, say what's still left for X and ask if they want to knock them out first. Do NOT name another individual yet.",
+          "- Once X has nothing pending, you MUST run the summary and commit step for the work staged so far BEFORE naming the next individual: return {\"type\":\"summary\"}, read it back, ask for approval, then on approval return {\"type\":\"commit\"} and only THEN brief the first task for the next individual.",
+          "- Never move the caregiver to a new individual while there is staged, uncommitted work. Documentation happens first, every time.",
+          "- Remember everything reported earlier in this conversation; never ask them to repeat work they already reported.",
           "",
           "END OF SHIFT REVIEW AND COMMIT (important):",
           "- Work you stage during the shift is HELD, not saved yet. It is only written to Care Tracker when the caregiver approves the commit.",
