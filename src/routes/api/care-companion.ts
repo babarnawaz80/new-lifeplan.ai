@@ -113,12 +113,29 @@ export const Route = createFileRoute("/api/care-companion")({
         const stagedIds = new Set((body.staged ?? []).map((item) => item.rowId));
         const pending = briefing.filter((b) => b.status === "pending" && !stagedIds.has(b.rowId));
         const done = briefing.filter((b) => b.status !== "pending" || stagedIds.has(b.rowId));
-        const reportsCurrentDone = /\b(i(?:'m| am)? done|it(?:'s| is) done|finished|completed|all done|we(?:'re| are) done)\b/i.test(
+        const reportsCurrentDone = /\b(done|complete|completed|finished|all done|i did it|we did it|that(?:'s| is) done|it(?:'s| is) done|i(?:'m| am) finished|i(?:'m| am) done|we(?:'re| are) done)\b/i.test(
           lastUserMessage,
         );
+        const approvesCommit =
+          (body.staged ?? []).length > 0 &&
+          /\b(yes|yep|yeah|go ahead|commit|document|save|submit)\b/i.test(lastUserMessage) &&
+          /\b(commit|document|save|submit|go ahead|yes|yep|yeah)\b/i.test(lastUserMessage);
         const activeItem = body.activeRowId
           ? pending.find((item) => item.rowId === body.activeRowId)
           : undefined;
+
+        // Approval is transactional, not conversational: once the caregiver
+        // says to commit/document, the client writes every staged service.
+        if (approvesCommit) {
+          const stagedSummary = (body.staged ?? [])
+            .map((item) => `${item.individualName} — ${item.title}`)
+            .join(", ");
+          return Response.json({
+            say: `Done. I documented ${body.staged?.length ?? 0} completed service${body.staged?.length === 1 ? "" : "s"} in Care Tracker: ${stagedSummary}.`,
+            action: { type: "commit" },
+            focusRowId: null,
+          } satisfies CompanionReply);
+        }
 
         if (reportsCurrentDone && activeItem) {
           const nextForPerson = pending.find(
