@@ -57,19 +57,56 @@ export function CareCompanion({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [turns, thinking]);
 
+  const sendRef = useRef<(text: string) => void>(() => {});
+  const handsFreeRef = useRef(true);
+  const [handsFree, setHandsFree] = useState(true);
+  handsFreeRef.current = handsFree;
+
+  // Open the mic and keep it open until the caregiver stops talking.
+  const startListening = useCallback(() => {
+    if (!voiceInputSupported()) return;
+    listenerRef.current?.abort();
+    const listener = createListener({
+      onTranscript: (t) => setInput(t),
+      onEnd: () => {
+        setListening(false);
+        const spoken = listenerRef.current?.text ?? "";
+        if (spoken.trim()) sendRef.current(spoken);
+        else if (handsFreeRef.current) setTimeout(() => startListening(), 400);
+      },
+      onError: () => setListening(false),
+    });
+    if (!listener) return;
+    listenerRef.current = listener;
+    setListening(true);
+    try {
+      listener.start();
+    } catch {
+      setListening(false);
+    }
+  }, []);
+
   const say = useCallback(
     (text: string) => {
-      if (muted) return;
+      if (muted) {
+        if (handsFreeRef.current) startListening();
+        return;
+      }
       setSpeaking(true);
-      speak(text, () => setSpeaking(false));
+      speak(text, () => {
+        setSpeaking(false);
+        if (handsFreeRef.current) setTimeout(() => startListening(), 250);
+      });
     },
-    [muted],
+    [muted, startListening],
   );
 
   const send = useCallback(
     async (text: string) => {
       const clean = text.trim();
       if (!clean || thinking) return;
+      listenerRef.current?.abort();
+      setListening(false);
       setInput("");
       const next: Turn[] = [...turns, { role: "user", content: clean }];
       setTurns(next);
@@ -115,35 +152,40 @@ export function CareCompanion({
     [briefing, date, say, thinking, turns],
   );
 
+  useEffect(() => {
+    sendRef.current = (t: string) => void send(t);
+  }, [send]);
+
+  // Mic button pauses / resumes the hands-free conversation.
   const toggleMic = useCallback(() => {
-    if (listening) {
-      listenerRef.current?.stop();
+    if (handsFree) {
+      setHandsFree(false);
+      handsFreeRef.current = false;
+      listenerRef.current?.abort();
+      setListening(false);
       return;
     }
+    setHandsFree(true);
+    handsFreeRef.current = true;
     stopSpeaking();
     setSpeaking(false);
-    const listener = createListener({
-      onTranscript: (t) => setInput(t),
-      onEnd: () => {
-        setListening(false);
-        const spoken = listenerRef.current?.text ?? "";
-        if (spoken.trim()) void send(spoken);
-      },
-      onError: () => setListening(false),
-    });
-    if (!listener) return;
-    listenerRef.current = listener;
-    setListening(true);
-    listener.start();
-  }, [listening, send]);
+    startListening();
+  }, [handsFree, startListening]);
+
+  // Hands-free is on every time the companion opens.
+  useEffect(() => {
+    if (!open) return;
+    handsFreeRef.current = true;
+    setHandsFree(true);
+  }, [open]);
 
   // Greet with the shift briefing when the companion opens.
   useEffect(() => {
     if (!open || turns.length) return;
     const first = pending[0];
     const greeting = first
-      ? `Hi — you have ${pending.length} service${pending.length === 1 ? "" : "s"} due. Start with ${first.title} for ${first.individualName} at ${first.time}. Tap the mic and tell me when it's done.`
-      : "Everything scheduled right now is documented. Tap the mic if anything comes up.";
+      ? `Hi — you have ${pending.length} service${pending.length === 1 ? "" : "s"} due. Start with ${first.title} for ${first.individualName} at ${first.time}. I'm listening — just tell me when it's done.`
+      : "Everything scheduled right now is documented. I'm listening if anything comes up.";
     setTurns([{ role: "assistant", content: greeting }]);
     setFocusRowId(first?.rowId ?? null);
     say(greeting);
@@ -153,6 +195,8 @@ export function CareCompanion({
   useEffect(() => () => stopSpeaking(), []);
 
   const close = useCallback(() => {
+    handsFreeRef.current = false;
+    setHandsFree(false);
     stopSpeaking();
     listenerRef.current?.abort();
     setListening(false);
@@ -170,6 +214,15 @@ export function CareCompanion({
   }, [open, close]);
 
   const micSupported = voiceInputSupported();
+  const statusLine = thinking
+    ? "Thinking…"
+    : listening
+      ? input || "Listening…"
+      : handsFree
+        ? speaking
+          ? ""
+          : "One moment…"
+        : "Paused — tap the mic to talk again";
   const lastAssistant = [...turns].reverse().find((t) => t.role === "assistant")?.content ?? "";
 
   if (!open) return null;
@@ -236,8 +289,11 @@ export function CareCompanion({
         )}
 
         <p className="max-w-2xl text-center text-lg leading-relaxed text-white/90">
-          {thinking ? "Thinking…" : listening ? input || "Listening…" : lastAssistant}
+          {thinking || listening ? statusLine : lastAssistant}
         </p>
+        {!thinking && !listening && !handsFree && (
+          <p className="text-xs text-white/50">{statusLine}</p>
+        )}
 
         {charted.length > 0 && (
           <div className="flex flex-wrap justify-center gap-2">
@@ -288,18 +344,20 @@ export function CareCompanion({
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           <button
             type="button"
-            aria-label={listening ? "Stop listening" : "Speak to the companion"}
+            aria-label={handsFree ? "Pause the conversation" : "Resume the conversation"}
             onClick={toggleMic}
             disabled={!micSupported}
             className={cn(
               "flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-all",
               listening
                 ? "bg-red-500 text-white shadow-[0_0_0_10px_rgba(239,68,68,0.18)]"
-                : "bg-gradient-to-br from-primary to-violet-600 text-white hover:brightness-110",
+                : handsFree
+                  ? "bg-gradient-to-br from-primary to-violet-600 text-white hover:brightness-110"
+                  : "bg-white/10 text-white/70 hover:bg-white/20",
               !micSupported && "opacity-40",
             )}
           >
-            {micSupported && !listening ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+            {micSupported && handsFree ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
           </button>
           <textarea
             value={input}
