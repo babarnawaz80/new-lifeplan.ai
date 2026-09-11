@@ -49,13 +49,13 @@ function CareTrackerPage() {
 
   // Live data: individuals from iCM, schedule rows from the services that
   // implemented LifePlans pushed into CareTracker.
-  useCareTrackerVersion();
-  const individuals = useMemo(() => listCareTrackerIndividuals(date), [date]);
+  const ctVersion = useCareTrackerVersion();
+  const individuals = useMemo(() => listCareTrackerIndividuals(date), [date, ctVersion]);
   const activeId = selectedIndividual ?? individuals[0]?.id ?? null;
 
   const allRows = useMemo(
     () => (activeId ? rowsForIndividual(activeId, date) : []),
-    [activeId, date],
+    [activeId, date, ctVersion],
   );
   const rows = useMemo(
     () => filterByShift(allRows, detailShift as ShiftId),
