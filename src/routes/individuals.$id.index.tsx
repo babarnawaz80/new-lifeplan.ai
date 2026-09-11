@@ -47,6 +47,7 @@ type CategorySection = {
   color: string;
   /** Tailwind gradient classes (from/to) for the section band, using arbitrary HSL values */
   bandGradient: string;
+  tone: "red" | "blue" | "green" | "amber" | "lifeplan";
   items: ActionItem[];
 };
 
@@ -57,6 +58,7 @@ const categories: CategorySection[] = [
     title: "LifePlan.ai",
     color: "262 60% 55%",
     bandGradient: "from-[hsl(262,60%,55%)] via-[hsl(280,55%,42%)] to-[hsl(295,50%,32%)]",
+    tone: "lifeplan",
     items: [], // rendered specially
   },
   {
@@ -65,6 +67,7 @@ const categories: CategorySection[] = [
     title: "Medical & Services",
     color: "13 64% 48%",
     bandGradient: "from-[hsl(13,64%,48%)] via-[hsl(13,67%,39%)] to-[hsl(13,70%,29%)]",
+    tone: "red",
     items: [
       { icon: Pill, label: "Medication", description: "Manage current prescriptions and medication schedules" },
       { icon: LayoutList, label: "e-MAR", description: "Electronic medication administration records", badge: { text: "2 due", tone: "amber" } },
@@ -88,6 +91,7 @@ const categories: CategorySection[] = [
     title: "Assessments & Plans",
     color: "228 36% 39%",
     bandGradient: "from-[hsl(228,36%,39%)] via-[hsl(228,39%,30%)] to-[hsl(228,42%,22%)]",
+    tone: "blue",
     items: [
       { icon: FileCheck, label: "Resident Assessment Tool (RAT)", description: "Standardized resident assessment instrument" },
       { icon: FileText, label: "INE", description: "Initial nursing evaluation documentation" },
@@ -127,6 +131,7 @@ const categories: CategorySection[] = [
     title: "Health Tracking",
     color: "142 46% 34%",
     bandGradient: "from-[hsl(142,46%,34%)] via-[hsl(144,46%,26%)] to-[hsl(145,52%,19%)]",
+    tone: "green",
     items: [
       { icon: FileText, label: "Care Notes", description: "Daily care observation notes and documentation" },
       { icon: MessageSquare, label: "Progress Notes", description: "Track individual progress and milestones" },
@@ -147,6 +152,7 @@ const categories: CategorySection[] = [
     title: "Documents & Admin",
     color: "35 59% 40%",
     bandGradient: "from-[hsl(35,59%,40%)] via-[hsl(36,68%,30%)] to-[hsl(36,73%,20%)]",
+    tone: "amber",
     items: [
       { icon: Scan, label: "Scanned Items", description: "View and manage scanned document uploads" },
       { icon: FileSpreadsheet, label: "Managed Documents", description: "Organized document library and management" },
@@ -228,11 +234,7 @@ function IndividualEChart() {
 
   return (
     <AppShell>
-      <main className="min-h-screen" style={{ background: "#FBF8F4" }}>
-        <div className="fixed inset-0 pointer-events-none -z-10 opacity-[0.25]" style={{
-          backgroundImage: "radial-gradient(circle, rgba(31,27,22,0.08) 1px, transparent 1px)",
-          backgroundSize: "24px 24px",
-        }} />
+      <main className="min-h-screen bg-workspace">
 
         {/* Breadcrumb */}
         <div className="px-6 pt-5">
@@ -245,7 +247,7 @@ function IndividualEChart() {
 
         {/* Header card */}
         <div className="px-6 pt-4">
-          <div className="rounded-2xl bg-card border border-line shadow-soft p-6">
+          <div className="rounded-md bg-card border border-line shadow-sm p-5">
             <div className="flex flex-col lg:flex-row lg:items-start gap-6">
               <div className="flex items-start gap-4 flex-1">
                 {individual.avatar ? (
@@ -311,37 +313,34 @@ function IndividualEChart() {
             return (
               <section
                 key={cat.key}
-                className="rounded-[20px] overflow-hidden shadow-[0_1px_2px_rgba(31,27,22,0.04),0_2px_8px_rgba(31,27,22,0.04)]"
-                style={{ border: `1px solid hsl(${cat.color} / 0.18)` }}
+                className={`overflow-hidden rounded-lg border ${isLifePlan ? "border-action-purple/25 bg-card shadow-sm" : `echart-section-${cat.tone}`}`}
               >
                 {/* Section band header (clickable to toggle) */}
                 <button
                   type="button"
                   onClick={() => toggle(cat.key)}
-                  className={`w-full relative overflow-hidden bg-gradient-to-br ${cat.bandGradient} text-left cursor-pointer`}
+                  className={`w-full relative overflow-hidden text-left cursor-pointer ${isLifePlan ? `bg-gradient-to-br ${cat.bandGradient}` : "bg-transparent"}`}
                   aria-expanded={open}
                 >
                   <div
                     aria-hidden
-                    className="absolute inset-0 pointer-events-none"
+                    className={`absolute inset-0 pointer-events-none ${isLifePlan ? "block" : "hidden"}`}
                     style={{
                       background:
                         "radial-gradient(circle at 20% 40%, rgba(255,255,255,0.08) 0%, transparent 30%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.05) 0%, transparent 40%)",
                     }}
                   />
-                  <div className="relative flex items-center gap-3 px-4 py-2.5">
-                    <div className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-[8px] bg-white/15 backdrop-blur-[8px] border border-white/25">
-                      <cat.icon className="h-4 w-4 text-white" strokeWidth={1.6} />
+                  <div className="relative flex items-center gap-3 px-5 py-3">
+                    <div className={`shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-lg ${isLifePlan ? "bg-primary-foreground/15 border border-primary-foreground/25" : "echart-icon"}`}>
+                      <cat.icon className={`h-5 w-5 ${isLifePlan ? "text-primary-foreground" : "echart-accent"}`} strokeWidth={1.8} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-bold tracking-[0.1em] text-white/70 uppercase leading-none mb-1">
-                        {isLifePlan
-                          ? `Section · ${attachedAgents.length} plans`
-                          : `Section · ${cat.items.length} items`}
-                      </p>
-                      <h2 className="text-[15px] leading-none font-extrabold text-white tracking-[-0.02em]">
+                      <h2 className={`text-sm leading-none font-bold ${isLifePlan ? "text-primary-foreground" : "echart-accent"}`}>
                         {cat.title}
                       </h2>
+                      <p className={`mt-1 text-xs ${isLifePlan ? "text-primary-foreground/75" : "echart-muted"}`}>
+                        {isLifePlan ? `${attachedAgents.length} connected plans and person-centered support tools.` : categoryDescription(cat.key)}
+                      </p>
                     </div>
                     {isLifePlan && (
                       <>
@@ -358,24 +357,24 @@ function IndividualEChart() {
                               navigate({ to: "/guidelines" });
                             }
                           }}
-                          className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-white/95 bg-white/15 border border-white/25 px-2 py-1 rounded-full hover:bg-white/25 cursor-pointer"
+                           className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase text-primary-foreground bg-primary-foreground/15 border border-primary-foreground/25 px-2 py-1 rounded-full hover:bg-primary-foreground/25 cursor-pointer"
                         >
                           <Shield className="h-3 w-3" /> Guidelines
                         </span>
-                        <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase text-white/95 bg-white/15 border border-white/25 px-2 py-1 rounded-full">
+                         <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase text-primary-foreground bg-primary-foreground/15 border border-primary-foreground/25 px-2 py-1 rounded-full">
                           <Sparkles className="h-3 w-3" /> AI ready
                         </span>
                       </>
                     )}
                     <ChevronDown
-                      className={`h-4 w-4 text-white/90 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+                      className={`h-4 w-4 transition-transform duration-200 ${isLifePlan ? "text-primary-foreground/90" : "echart-accent"} ${open ? "rotate-180" : ""}`}
                     />
                   </div>
                 </button>
 
                 {/* Content panel */}
                 {open && (
-                  <div className="bg-card p-[18px]">
+                   <div className={`${isLifePlan ? "bg-card" : "bg-transparent"} p-3`}>
                     {isLifePlan ? (
                       <Pinwheel
                         individual={individual}
@@ -385,12 +384,12 @@ function IndividualEChart() {
                       />
                     ) : (
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                         {cat.items.map((item, idx) => (
                           <ActionItemCard
                             key={idx}
                             item={item}
-                            sectionColor={cat.color}
+                            tone={cat.tone}
                             onClick={
                               item.label === "Individual Trainings"
                                 ? () =>
@@ -426,15 +425,14 @@ function IndividualEChart() {
 
 function ActionItemCard({
   item,
-  sectionColor,
+  tone,
   onClick,
 }: {
   item: ActionItem;
-  sectionColor: string;
+  tone: CategorySection["tone"];
   onClick?: () => void;
 }) {
   const Icon = item.icon;
-  const style = { ["--sec" as string]: sectionColor } as React.CSSProperties;
   const badgeClass =
     item.badge?.tone === "red"
       ? "bg-[hsl(12,75%,92%)] text-[hsl(12,68%,50%)]"
@@ -442,26 +440,14 @@ function ActionItemCard({
   return (
     <button
       onClick={onClick}
-      style={style}
-      className="group relative flex items-center gap-3 pl-[18px] pr-[14px] py-[14px] rounded-[12px] text-left w-full bg-card border border-line transition-all duration-150 overflow-hidden hover:-translate-y-px hover:border-[hsl(var(--sec)/0.45)] hover:bg-[hsl(var(--sec)/0.06)]"
+      className={`group flex min-h-[62px] items-center gap-3 rounded-md border border-transparent bg-card px-3 py-2.5 text-left w-full shadow-none transition-colors hover:border-line ${`echart-card-${tone}`}`}
       title={item.description}
     >
-      <span
-        aria-hidden
-        className="absolute left-0 top-0 bottom-0 w-1 group-hover:w-1.5 transition-[width] duration-150"
-        style={{ background: `hsl(var(--sec))` }}
-      />
-      <span
-        className="relative shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-[10px] border"
-        style={{
-          background: `hsl(var(--sec) / 0.08)`,
-          borderColor: `hsl(var(--sec) / 0.18)`,
-        }}
-      >
-        <Icon className="h-5 w-5" strokeWidth={1.6} style={{ color: `hsl(var(--sec) / 0.85)` }} />
+      <span className="echart-icon relative shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-lg">
+        <Icon className="echart-accent h-4 w-4" strokeWidth={1.8} />
       </span>
-      <span className="flex-1 min-w-0 flex items-center gap-2">
-        <span className="text-[14px] font-semibold text-ink truncate">{item.label}</span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2"><span className="truncate text-xs font-bold text-ink">{item.label}</span>
         {item.badge && (
           <span
             className={`inline-flex items-center gap-1 px-2 py-[2px] rounded-[10px] font-bold leading-tight text-[10px] whitespace-nowrap shrink-0 ${badgeClass}`}
@@ -469,9 +455,16 @@ function ActionItemCard({
             <span className="w-[5px] h-[5px] rounded-full bg-current" />
             {item.badge.text}
           </span>
-        )}
+        )}</span>
+        <span className="mt-0.5 block truncate text-[11px] text-ink2">{item.description}</span>
       </span>
-      <ChevronRight className="h-3.5 w-3.5 text-ink3 group-hover:text-ink group-hover:translate-x-0.5 transition-all shrink-0" />
     </button>
   );
+}
+
+function categoryDescription(key: string) {
+  if (key === "medical") return "View active medications, allergies, appointments, and service records.";
+  if (key === "assessments") return "Nursing assessments, care plans, behavioral support, and clinical evaluations.";
+  if (key === "health") return "Continuous monitoring data, vital signs, case notes, and daily health logs.";
+  return "Access consent forms, insurance documentation, reports, and administrative tasks.";
 }
