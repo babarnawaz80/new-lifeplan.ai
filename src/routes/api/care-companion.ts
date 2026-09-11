@@ -75,7 +75,7 @@ export const Route = createFileRoute("/api/care-companion")({
         const key = process.env["LOVABLE_API_KEY"];
 
         if (!key) {
-          return Response.json(fallback(briefing, body.caregiver));
+          return Response.json(fallback(briefing, body.caregiver, body.staged ?? []));
         }
 
         const pending = briefing.filter((b) => b.status === "pending");
@@ -147,7 +147,7 @@ export const Route = createFileRoute("/api/care-companion")({
           if (!parsed.say) throw new Error("empty");
           return Response.json(parsed);
         } catch {
-          return Response.json(fallback(briefing, body.caregiver));
+          return Response.json(fallback(briefing, body.caregiver, body.staged ?? []));
         }
       },
     },
