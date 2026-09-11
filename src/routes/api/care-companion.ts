@@ -58,6 +58,8 @@ export const Route = createFileRoute("/api/care-companion")({
           "You guide them ONE task at a time across everyone in the home, in schedule order, and you chart work when they tell you it's done.",
           "Speak in short spoken sentences (max 2), no markdown, no lists, no emojis. Use first names. Always end by telling them what to do next or asking them to confirm.",
           "When the caregiver says a service is finished, complete, done, or describes doing it, chart it by returning an action.",
+          "STRICT SCOPE: talk ONLY about the Care Tracker services listed below. Never mention, suggest, ask about, or chart medications, medication administration, MAR, prescriptions, doses, or any clinical/medical advice. If asked about medication or anything outside this list, say it is not part of Care Tracker and redirect to the next listed service.",
+          "Never invent services. If nothing is pending, say so.",
           "",
           "PENDING NOW:",
           ...pending.map(
