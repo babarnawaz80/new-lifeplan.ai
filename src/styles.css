@@ -69,6 +69,14 @@
   --color-action-green: var(--action-green);
   --color-success-soft: var(--success-soft);
   --color-destructive-soft: var(--destructive-soft);
+  --color-echart-red: var(--echart-red);
+  --color-echart-red-soft: var(--echart-red-soft);
+  --color-echart-blue: var(--echart-blue);
+  --color-echart-blue-soft: var(--echart-blue-soft);
+  --color-echart-green: var(--echart-green);
+  --color-echart-green-soft: var(--echart-green-soft);
+  --color-echart-amber: var(--echart-amber);
+  --color-echart-amber-soft: var(--echart-amber-soft);
 }
 
 :root {
@@ -123,6 +131,14 @@
   --action-green: oklch(0.64 0.17 145);
   --success-soft: oklch(0.975 0.025 150);
   --destructive-soft: oklch(0.975 0.022 20);
+  --echart-red: oklch(0.57 0.2 24);
+  --echart-red-soft: oklch(0.97 0.027 20);
+  --echart-blue: oklch(0.53 0.13 244);
+  --echart-blue-soft: oklch(0.96 0.018 244);
+  --echart-green: oklch(0.57 0.15 146);
+  --echart-green-soft: oklch(0.97 0.025 146);
+  --echart-amber: oklch(0.58 0.14 55);
+  --echart-amber-soft: oklch(0.97 0.035 86);
 
   --ai-gradient: linear-gradient(118deg, #7C3AED 0%, #A855F7 42%, #E0398B 100%);
   --shadow-soft: 0 14px 40px -28px rgba(26, 35, 64, 0.5);
@@ -160,3 +176,15 @@
   background: var(--ai-gradient);
   color: #fff;
 }
+
+@utility echart-section-red { background: var(--echart-red-soft); border-color: color-mix(in oklab, var(--echart-red) 28%, transparent); --echart-tone: var(--echart-red); }
+@utility echart-section-blue { background: var(--echart-blue-soft); border-color: color-mix(in oklab, var(--echart-blue) 25%, transparent); --echart-tone: var(--echart-blue); }
+@utility echart-section-green { background: var(--echart-green-soft); border-color: color-mix(in oklab, var(--echart-green) 28%, transparent); --echart-tone: var(--echart-green); }
+@utility echart-section-amber { background: var(--echart-amber-soft); border-color: color-mix(in oklab, var(--echart-amber) 28%, transparent); --echart-tone: var(--echart-amber); }
+@utility echart-accent { color: var(--echart-tone); }
+@utility echart-muted { color: color-mix(in oklab, var(--echart-tone) 72%, var(--ink2)); }
+@utility echart-icon { background: color-mix(in oklab, var(--echart-tone) 9%, white); }
+@utility echart-card-red { --echart-tone: var(--echart-red); }
+@utility echart-card-blue { --echart-tone: var(--echart-blue); }
+@utility echart-card-green { --echart-tone: var(--echart-green); }
+@utility echart-card-amber { --echart-tone: var(--echart-amber); }
