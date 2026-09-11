@@ -86,7 +86,7 @@ export function CareCompanion({
         setListening(false);
         const spoken = listenerRef.current?.text ?? "";
         if (spoken.trim()) sendRef.current(spoken);
-        else if (handsFreeRef.current) setTimeout(() => startListening(), 400);
+        else if (handsFreeRef.current) setTimeout(() => startListening(), 120);
       },
       onError: () => setListening(false),
     });
@@ -109,7 +109,7 @@ export function CareCompanion({
       setSpeaking(true);
       speak(text, () => {
         setSpeaking(false);
-        if (handsFreeRef.current) setTimeout(() => startListening(), 250);
+        if (handsFreeRef.current) setTimeout(() => startListening(), 80);
       });
     },
     [muted, startListening],
