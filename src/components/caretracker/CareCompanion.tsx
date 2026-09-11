@@ -169,6 +169,7 @@ export function CareCompanion({
               },
             ]);
             setReviewing(false);
+            setCommitted(false);
           }
         } else if (action?.type === "summary") {
           setReviewing(true);
@@ -404,7 +405,7 @@ export function CareCompanion({
 
         {turns.length <= 1 && (
           <div className="flex flex-wrap justify-center gap-2">
-            {["Who do I take care of now?", "Walk me through my shift", "What's left?"].map((q) => (
+            {["Who do I take care of now?", "Walk me through my shift", "Wrap up my shift"].map((q) => (
               <button
                 key={q}
                 type="button"
