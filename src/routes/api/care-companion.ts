@@ -123,8 +123,8 @@ export const Route = createFileRoute("/api/care-companion")({
           "",
           `ALREADY DOCUMENTED: ${done.length ? done.map((b) => `${b.individualName}: ${b.title}`).join("; ") : "none yet"}`,
           "",
-          'Reply ONLY with JSON: {"say": string, "action": {"type":"chart","rowId":string,"notes":string} | null, "focusRowId": string | null}',
-          "rowId must be copied exactly from an id above. Use action only when the caregiver confirmed the work happened. notes should summarize what they reported (e.g. 'Esha enjoyed the walk, talked about the birds').",
+          'Reply ONLY with JSON: {"say": string, "action": {"type":"chart","rowId":string,"notes":string} | {"type":"summary"} | {"type":"commit"} | null, "focusRowId": string | null}',
+          "rowId must be copied exactly from an id above. Use a chart action only when the caregiver confirmed the work happened. notes should summarize what they reported (e.g. 'Esha enjoyed the walk, talked about the birds').",
         ].join("\n");
 
         try {
