@@ -18,11 +18,18 @@ import { createListener, speak, stopSpeaking, voiceInputSupported } from "@/lib/
 
 type Turn = { role: "user" | "assistant"; content: string };
 
+type CompanionAction =
+  | { type: "chart"; rowId: string; notes?: string }
+  | { type: "summary" }
+  | { type: "commit" };
+
 type CompanionReply = {
   say: string;
-  action?: { type: "chart"; rowId: string; notes?: string } | null;
+  action?: CompanionAction | null;
   focusRowId?: string | null;
 };
+
+type StagedItem = { rowId: string; individualName: string; title: string; notes?: string };
 
 export function CareCompanion({
   date,
@@ -43,6 +50,11 @@ export function CareCompanion({
   const [muted, setMuted] = useState(false);
   const [focusRowId, setFocusRowId] = useState<string | null>(null);
   const [charted, setCharted] = useState<string[]>([]);
+  const [staged, setStaged] = useState<StagedItem[]>([]);
+  const [reviewing, setReviewing] = useState(false);
+  const [committed, setCommitted] = useState(false);
+  const stagedRef = useRef<StagedItem[]>([]);
+  stagedRef.current = staged;
   const listenerRef = useRef<ReturnType<typeof createListener>>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const version = useCareTrackerVersion();
@@ -136,18 +148,46 @@ export function CareCompanion({
               goalStatement: b.goalStatement,
               outcomeStatement: b.outcomeStatement,
             })),
+            staged: stagedRef.current,
           }),
         });
         if (!res.ok) throw new Error(String(res.status));
         const reply = (await res.json()) as CompanionReply;
-        if (reply.action?.type === "chart") {
-          const ok = chartFromCompanion(reply.action.rowId, date, { notes: reply.action.notes });
-          if (ok) {
-            const item = briefing.find((b) => b.rowId === reply.action?.rowId);
-            if (item) setCharted((c) => [`${item.individualName} — ${item.title}`, ...c].slice(0, 6));
+        const action = reply.action ?? null;
+        let actionRowId: string | null = null;
+        if (action?.type === "chart") {
+          actionRowId = action.rowId;
+          const item = briefing.find((b) => b.rowId === action.rowId);
+          if (item) {
+            setStaged((s) => [
+              ...s.filter((x) => x.rowId !== action.rowId),
+              {
+                rowId: action.rowId,
+                individualName: item.individualName,
+                title: item.title,
+                notes: action.notes,
+              },
+            ]);
+            setReviewing(false);
+            setCommitted(false);
           }
+        } else if (action?.type === "summary") {
+          setReviewing(true);
+        } else if (action?.type === "commit") {
+          const items = stagedRef.current;
+          const done: string[] = [];
+          for (const s of items) {
+            if (chartFromCompanion(s.rowId, date, { notes: s.notes })) {
+              done.push(`${s.individualName} — ${s.title}`);
+            }
+          }
+          setCharted((c) => [...done.reverse(), ...c].slice(0, 12));
+          setStaged([]);
+          stagedRef.current = [];
+          setReviewing(false);
+          setCommitted(true);
         }
-        setFocusRowId(reply.focusRowId ?? reply.action?.rowId ?? null);
+        setFocusRowId(reply.focusRowId ?? actionRowId ?? null);
         setTurns((t) => [...t, { role: "assistant", content: reply.say }]);
         say(reply.say);
       } catch {
@@ -305,6 +345,51 @@ export function CareCompanion({
           <p className="text-xs text-white/50">{statusLine}</p>
         )}
 
+        {staged.length > 0 && (
+          <div
+            className={cn(
+              "w-full max-w-2xl rounded-2xl border px-5 py-4 text-left backdrop-blur",
+              reviewing ? "border-amber-400/40 bg-amber-400/10" : "border-white/15 bg-white/5",
+            )}
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/60">
+              {reviewing ? "End-of-shift snapshot — not committed yet" : "Held for your review"}
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {staged.map((s) => (
+                <li key={s.rowId} className="text-sm text-white/90">
+                  <span className="font-semibold">{s.individualName}</span> · {s.title}
+                  {s.notes ? <span className="text-white/60"> — {s.notes}</span> : null}
+                </li>
+              ))}
+            </ul>
+            {reviewing && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void send("Yes, go ahead and commit it.")}
+                  className="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white hover:brightness-110"
+                >
+                  Yes, commit to Care Tracker
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void send("Not yet, I want to change something.")}
+                  className="rounded-full border border-white/20 px-4 py-2 text-xs text-white/80 hover:bg-white/10"
+                >
+                  Not yet
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {committed && staged.length === 0 && (
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-300">
+            Committed to Care Tracker
+          </p>
+        )}
+
         {charted.length > 0 && (
           <div className="flex flex-wrap justify-center gap-2">
             {charted.map((c) => (
@@ -320,7 +405,7 @@ export function CareCompanion({
 
         {turns.length <= 1 && (
           <div className="flex flex-wrap justify-center gap-2">
-            {["Who do I take care of now?", "Walk me through my shift", "What's left?"].map((q) => (
+            {["Who do I take care of now?", "Walk me through my shift", "Wrap up my shift"].map((q) => (
               <button
                 key={q}
                 type="button"
