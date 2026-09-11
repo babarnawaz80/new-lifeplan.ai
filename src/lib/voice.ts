@@ -74,8 +74,8 @@ export function speak(text: string, onDone?: () => void): void {
     onDone?.();
     return;
   }
-  const token = ++speechToken;
   stopSpeaking();
+  const token = ++speechToken;
 
   void (async () => {
     try {
