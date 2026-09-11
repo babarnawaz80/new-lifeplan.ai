@@ -42,8 +42,17 @@ export type CompanionReply = {
   focusRowId?: string | null;
 };
 
-function fallback(briefing: BriefItem[], caregiver?: string, staged: StagedItem[] = []): CompanionReply {
+function fallback(briefing: BriefItem[], caregiver?: string, staged: StagedItem[] = [], lastMessage = ""): CompanionReply {
   const next = briefing.find((b) => b.status === "pending");
+  const wantsCommit = /\b(commit|document|wrap up|wrap-up|done for now|finish up)\b/i.test(lastMessage);
+  if (wantsCommit && staged.length) {
+    return {
+      say: `Okay${caregiver ? `, ${caregiver}` : ""}, here's what you've done so far: ${staged
+        .map((s) => `${s.individualName} — ${s.title}`)
+        .join(", ")}. Does everything look good? Should I go ahead and document it?`,
+      action: { type: "summary" },
+    };
+  }
   if (!next) {
     if (staged.length) {
       return {
